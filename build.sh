@@ -1,6 +1,17 @@
 #!/bin/sh
 set -e
 
+read_production_value() {
+  key="$1"
+  sed -n "s/^[[:space:]]*${key}[[:space:]]*=[[:space:]]*//p" .env.production | tail -n 1
+}
+
+if [ -f .env.production ]; then
+  NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-$(read_production_value NEXT_PUBLIC_API_URL)}"
+  NEXT_PUBLIC_CLIENT_ID="${NEXT_PUBLIC_CLIENT_ID:-$(read_production_value NEXT_PUBLIC_CLIENT_ID)}"
+  export NEXT_PUBLIC_API_URL NEXT_PUBLIC_CLIENT_ID
+fi
+
 : "${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL must be set for a production build}"
 : "${NEXT_PUBLIC_CLIENT_ID:?NEXT_PUBLIC_CLIENT_ID must be set for Google Sign-In}"
 
