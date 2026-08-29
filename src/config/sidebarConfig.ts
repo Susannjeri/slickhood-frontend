@@ -92,7 +92,7 @@ export const sidebarLinks: SidebarLink[] = [
   },
   {
     icon: ChartNoAxesCombined,
-    label: "Wealth",
+    label: "My Wealth",
     href: "/dashboard/wealth",
     protected: true,
     permissions: ["view_wealth"],

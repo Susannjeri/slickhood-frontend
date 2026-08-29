@@ -230,7 +230,7 @@ export default function DashboardPage() {
               </Link></Button>}
               {permissions.includes("view_estate") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/estate"><Building2 className="mr-2 h-4 w-4"/>Estate Management</Link></Button>}
               {permissions.includes("view_sale_pipeline") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/sales"><TrendingUp className="mr-2 h-4 w-4"/>Property Sale Management</Link></Button>}
-              {permissions.includes("view_wealth") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/wealth"><TrendingUp className="mr-2 h-4 w-4"/>Open Wealth</Link></Button>}
+              {permissions.includes("view_wealth") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/wealth"><TrendingUp className="mr-2 h-4 w-4"/>Open My Wealth</Link></Button>}
               {permissions.includes("view_lease_document") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/documents"><FileText className="mr-2 h-4 w-4"/>Documents & notices</Link></Button>}
             </CardContent>
           </Card>

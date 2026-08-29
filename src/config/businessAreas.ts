@@ -81,7 +81,7 @@ export const businessAreas: BusinessArea[] = [
   },
   {
     id: "asset-portfolio",
-    title: "SlickHood Wealth",
+    title: "My Wealth",
     eyebrow: "Your financial command centre",
     description: "Know what you own, what it is worth, what it earns, what it costs and what needs attention.",
     roleTitles: ["assetportfoliomanager"],
@@ -96,7 +96,7 @@ export const normalizedRoleTitle = (value?: string | null) =>
   value?.replaceAll(" ", "").replaceAll("_", "").toLowerCase() ?? "";
 
 const roleDisplayNames: Record<string, string> = {
-  assetportfoliomanager: "Wealth",
+  assetportfoliomanager: "My Wealth",
   estatemanager: "Estate Management",
   salesagent: "Property Sale Management",
 };

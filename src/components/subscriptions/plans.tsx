@@ -16,7 +16,7 @@ const CATEGORIES = [
     { label: "Property Sale Management", value: "PROPERTY_SALES" },
     { label: "Service Provider", value: "SERVICE_PROVIDER" },
     { label: "Affiliate", value: "AFFILIATE" },
-    { label: "SlickHood Wealth", value: "ASSET_PORTFOLIO_MANAGER" },
+    { label: "My Wealth", value: "ASSET_PORTFOLIO_MANAGER" },
 ];
 
 export default function Plans() {
