@@ -1,0 +1,12 @@
+import {API} from "@/lib/api";
+export type AffiliateProfile={id:number;userId:number;referralCode:string;status:string;commissionRate:number;minimumPayout:number;currency:string;payoutAccountId?:number};
+export type AffiliateReferral={id:number;referredUserId:number;status:string;campaign?:string;registeredAt:string;convertedAt?:string};
+export type AffiliateCommission={id:number;referredUserId:number;invoiceRef:string;qualifyingAmount:number;commissionRate:number;commissionAmount:number;currency:string;status:string;earnedAt:string};
+export type AffiliatePayout={id:number;payoutNumber:string;affiliateUserId:number;paymentAccountId:number;amount:number;currency:string;status:string;requestedAt:string;processedAt?:string;paymentReference?:string};
+export type AffiliateDashboard={profile:AffiliateProfile;totalReferrals:number;conversions:number;availableBalance:number;lifetimeEarnings:number;pendingPayouts:number;referrals:AffiliateReferral[];commissions:AffiliateCommission[];payouts:AffiliatePayout[]};
+export const affiliateDashboard=()=>API.get("/affiliate/dashboard");
+export const resolveAffiliate=(code:string)=>API.get(`/affiliate/public/${encodeURIComponent(code)}`);
+export const setAffiliatePayoutAccount=(paymentAccountId:number)=>API.put("/affiliate/payout-account",{paymentAccountId});
+export const requestAffiliatePayout=()=>API.post("/affiliate/payout");
+export const affiliateAdminPayouts=()=>API.get("/affiliate/admin/payouts");
+export const decideAffiliatePayout=(id:number,status:"PROCESSING"|"PAID"|"REJECTED",paymentReference?:string,notes?:string)=>API.put(`/affiliate/admin/payouts/${id}`,{status,paymentReference,notes});
