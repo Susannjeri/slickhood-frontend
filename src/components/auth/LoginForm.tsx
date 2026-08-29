@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/form";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
-import { useAuthHydrated } from "@/hooks/useAuthHydrated";
 
 const GoogleIcon = () => (
   <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
@@ -31,24 +30,15 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [googleReady, setGoogleReady]   = useState(false);
   const googleBtnRef                    = useRef<HTMLDivElement>(null);
-  const guardCheckedRef                 = useRef(false);
 
   const router = useRouter();
   const { inviteToken, setEmail, setToken, setmfaEnabled, settotpEnabled, setStep } = useAuthStore();
-  const authHydrated = useAuthHydrated();
   const { login, handleGoogleLogin } = useAuth();
 
   const form = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
-
-  useEffect(() => {
-    if (!authHydrated || guardCheckedRef.current) return;
-    guardCheckedRef.current = true;
-    const state = useAuthStore.getState();
-    if (state.step === "verify" && state.email) router.replace("/verify-code");
-  }, [authHydrated, router]);
 
   const handleCredentialResponse = async (response: any) => {
     setLoading(true);

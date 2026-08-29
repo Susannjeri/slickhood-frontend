@@ -20,6 +20,32 @@ test("sign-in form validates malformed credentials before the API call", async (
   expect(loginCalls).toBe(0);
 });
 
+test("sign in remains available when a previous registration stopped at verification", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("auth-storage", JSON.stringify({
+      state: {
+        email: "unfinished@example.test",
+        step: "verify",
+        roleId: 1,
+        inviteToken: null,
+        roles: [],
+        roleName: [],
+        permissions: [],
+        propertyIds: [],
+        propertyNames: [],
+        activeRole: null,
+      },
+      version: 0,
+    }));
+  });
+  await page.route("https://accounts.google.com/**", route => route.abort());
+
+  await page.goto("/login");
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+});
+
 test("an unverified account is sent to email verification instead of a tokenless dashboard", async ({ page }) => {
   await page.route("https://accounts.google.com/**", route => route.abort());
   await page.route("**/auth/login", route => route.fulfill({

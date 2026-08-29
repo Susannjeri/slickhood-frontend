@@ -30,10 +30,10 @@ test("pending verification cannot drift into registration", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Verify your email" })).toBeVisible();
 });
 
-test("pending verification cannot drift back into sign in", async ({ page }) => {
+test("pending verification does not prevent an explicit sign in", async ({ page }) => {
   await page.goto("/login");
-  await expect(page).toHaveURL(/\/verify-code$/);
-  await expect(page.getByText("pending.browser.test@example.com")).toBeVisible();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 });
 
 test("using a different account explicitly clears pending state", async ({ page }) => {
