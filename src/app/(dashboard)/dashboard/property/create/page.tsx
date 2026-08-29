@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -22,7 +22,6 @@ import {
 import {
   GoogleMap,
   Marker,
-  StandaloneSearchBox,
   useLoadScript
   
 } from "@react-google-maps/api";
@@ -37,6 +36,7 @@ import ProfileGateModal, { ProfileGateFields } from "@/components/auth/ProfileGa
 import dynamic from "next/dynamic";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import PlaceAutocompleteInput from "@/components/maps/PlaceAutocompleteInput";
 const CurrencySelect = dynamic(() => import("@/components/util/CurrencySelect"), { ssr: false });
 const Select = dynamic(() => import("react-select"), { ssr: false });
 
@@ -74,7 +74,6 @@ interface GoogleLocationPickerProps {
 }
 
 function GoogleLocationPicker({ apiKey, center, marker, onCoordinatesSelected }: GoogleLocationPickerProps) {
-  const searchBoxRef = useRef<google.maps.places.SearchBox | null>(null);
   const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey, libraries });
 
   if (loadError) {
@@ -95,17 +94,10 @@ function GoogleLocationPicker({ apiKey, center, marker, onCoordinatesSelected }:
     <>
       <div className="space-y-2">
         <Label>Search Location</Label>
-        <StandaloneSearchBox
-          onLoad={(ref) => (searchBoxRef.current = ref)}
-          onPlacesChanged={() => {
-            const place = searchBoxRef.current?.getPlaces()?.[0];
-            if (place?.geometry?.location) {
-              onCoordinatesSelected({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
-            }
-          }}
-        >
-          <Input type="text" placeholder="Search for a location..." className="w-full" />
-        </StandaloneSearchBox>
+        <PlaceAutocompleteInput
+          isLoaded={isLoaded}
+          onCoordinatesSelected={onCoordinatesSelected}
+        />
         <p className="text-xs text-gray-500">Search or click on the map to pin a location</p>
       </div>
       <div className="h-[400px] w-full overflow-hidden rounded-lg border-2" style={{ borderColor: marker ? "#EF4217" : "#e5e7eb" }}>

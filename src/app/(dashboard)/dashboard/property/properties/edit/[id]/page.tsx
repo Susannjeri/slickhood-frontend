@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -20,7 +20,6 @@ import {
 import {
   GoogleMap,
   Marker,
-  StandaloneSearchBox,
   useLoadScript
 } from "@react-google-maps/api";
 import { useRouter, useParams } from "next/navigation";
@@ -29,6 +28,7 @@ import { currencyOptions } from "@/lib/actions";
 import dynamic from "next/dynamic";
 import {usePropertyMetadata} from "@/app/(dashboard)/dashboard/property/propertyMetadata";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import PlaceAutocompleteInput from "@/components/maps/PlaceAutocompleteInput";
 
 // const CurrencySelect = dynamic(() => import("@/components/util/CurrencySelect"), { ssr: false });
 const Select = dynamic(() => import("react-select"), { ssr: false });
@@ -84,8 +84,6 @@ export default function EditPropertyForm() {
     lat: -1.286389,
     lng: 36.817223,
   });
-
-  const searchBoxRef = useRef<google.maps.places.SearchBox | null>(null);
 
   const {
     register,
@@ -551,30 +549,16 @@ export default function EditPropertyForm() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Search Location</Label>
-              <StandaloneSearchBox
-                onLoad={(ref) => (searchBoxRef.current = ref)}
-                onPlacesChanged={() => {
-                  const places = searchBoxRef.current?.getPlaces();
-                  if (places && places.length > 0) {
-                    const place = places[0];
-                    if (place.geometry?.location) {
-                      const lat = place.geometry.location.lat();
-                      const lng = place.geometry.location.lng();
-                      setMarker({ lat, lng });
-                      setMapCenter({ lat, lng });
-                      setValue("mapLocation", `${lat},${lng}`, {
-                        shouldValidate: true,
-                      });
-                    }
-                  }
+              <PlaceAutocompleteInput
+                isLoaded={isMapsLoaded}
+                onCoordinatesSelected={({ lat, lng }) => {
+                  setMarker({ lat, lng });
+                  setMapCenter({ lat, lng });
+                  setValue("mapLocation", `${lat},${lng}`, {
+                    shouldValidate: true,
+                  });
                 }}
-              >
-                <Input
-                  type="text"
-                  placeholder="Search for a location..."
-                  className="w-full"
-                />
-              </StandaloneSearchBox>
+              />
               <p className="text-xs text-gray-500">
                 Search or click on the map to update location
               </p>
