@@ -97,8 +97,8 @@ export default function ServiceCategories() {
 
     return (
         <div className="px-3 py-6">
-            <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center justify-between">
+            <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h2 className="text-lg font-semibold text-[#020B2D]">
                             Service Categories
@@ -132,7 +132,7 @@ export default function ServiceCategories() {
                             No service categories yet.
                         </p>
                     ) : (
-                        <table className="w-full table-fixed border-collapse text-left text-sm">
+                        <table className="min-w-[720px] w-full table-fixed border-collapse text-left text-sm">
                             <thead>
                                 <tr className="border-b border-gray-200">
                                     <th className="w-56 px-3 py-2.5 text-xs font-medium uppercase tracking-wide text-gray-500">
@@ -232,7 +232,7 @@ export default function ServiceCategories() {
 
                 {/* Pagination — separate from the table's loading/error/empty states */}
                 {!loading && !error && categories.length > 0 && (
-                    <div className="mt-4 flex items-center justify-between">
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <p className="text-xs text-gray-500">
                             Page {page + 1} of {totalPages}
                         </p>

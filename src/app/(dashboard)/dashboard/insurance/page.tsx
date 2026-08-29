@@ -24,8 +24,8 @@ export default function InsuranceHubPage(){
  const [companies,setCompanies]=useState<InsuranceCompany[]>([]),[loading,setLoading]=useState(true);
  async function load(){setLoading(true);try{const r=await insuranceService.companies();setCompanies(r.data?.data??[])}catch(e:unknown){toast.error(apiErrorMessage(e,"Could not load insurance partners."))}finally{setLoading(false)}}
  useEffect(()=>{load()},[]);
- return <div className="min-h-screen bg-[#f5f8fc] text-[#10243e]">
-  <section className="overflow-hidden rounded-3xl bg-[#0c2d57] px-6 py-10 text-white shadow-xl sm:px-10 lg:px-14">
+ return <div className="min-h-screen bg-[#f5f8fc] p-3 text-[#10243e] sm:p-6">
+  <section className="overflow-hidden rounded-3xl bg-[#0c2d57] px-5 py-8 text-white shadow-xl sm:px-10 sm:py-10 lg:px-14">
    <div className="grid items-center gap-10 lg:grid-cols-[1.4fr_.8fr]"><div><p className="mb-3 text-xs font-bold uppercase tracking-[.28em] text-[#7db8ea]">Silverwood Insurance Agency</p><h1 className="max-w-3xl text-4xl font-bold leading-tight sm:text-5xl">Insurance protection, made clear and connected.</h1><p className="mt-4 max-w-2xl text-lg text-white/75">Request advice, compare insurer quotations, manage policies, claims and renewals—all through your trusted insurance partner on SlickHood.</p><div className="mt-7 flex flex-wrap gap-3"><Button className="bg-[#1769aa] hover:bg-[#2080ca]">Get a Quote <ArrowRight className="ml-2 size-4"/></Button><Button variant="outline" className="border-white/30 bg-white/5 text-white hover:bg-white/10 hover:text-white">My Policies</Button></div></div>
    <div className="rounded-3xl border border-white/15 bg-white/10 p-6 backdrop-blur"><ShieldCheck className="size-12 text-[#7db8ea]"/><h2 className="mt-5 text-2xl font-semibold">Human advice. Digital convenience.</h2><p className="mt-2 text-white/70">Silverwood advisers review each request before quotations are presented. Insurance products and payment destinations cannot be configured by ordinary SlickHood users.</p></div></div>
   </section>

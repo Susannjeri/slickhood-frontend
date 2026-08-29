@@ -150,7 +150,7 @@ export default function SubscriptionCheckoutModal({ open, plan, role, token, onC
     <Dialog open={open} onOpenChange={value => { if (!value && !loading) onClose(); }}>
       <DialogContent className="max-h-[92vh] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto rounded-[28px] border border-[#dce4ef] bg-[#fbfbfc] p-0">
         <DialogTitle className="sr-only">Subscription payment</DialogTitle>
-        <div className="border-l-[8px] border-[#ff5b15] px-6 py-7 sm:px-12">
+        <div className="border-l-4 border-[#ff5b15] px-4 py-6 sm:border-l-[8px] sm:px-12 sm:py-7">
           {step === "method" && (
             <>
               <button onClick={onClose} className="ml-auto flex items-center gap-1 text-sm font-semibold text-slate-500">
@@ -160,7 +160,7 @@ export default function SubscriptionCheckoutModal({ open, plan, role, token, onC
                 <h2 className="text-3xl font-bold text-[#020b2d]">{isFree ? "Confirm Plan" : "Payment Method"}</h2>
                 <p className="mt-1 text-slate-400">{isFree ? "Confirm activation of this free plan." : "Choose how you would like to pay."}</p>
               </div>
-              <div className="mx-auto mt-7 flex max-w-lg items-center justify-between rounded-2xl border-2 border-[#ff5b15] bg-white px-7 py-4">
+              <div className="mx-auto mt-7 flex max-w-lg flex-col gap-2 rounded-2xl border-2 border-[#ff5b15] bg-white px-4 py-4 text-center sm:flex-row sm:items-center sm:justify-between sm:px-7 sm:text-left">
                 <span className="font-bold text-[#020b2d]">{plan.displayName}</span>
                 <span className="text-2xl font-bold text-[#ff5b15]">
                   {plan.currency} {Number(plan.price).toLocaleString()} <small className="text-sm font-normal text-slate-400">/ {plan.billingCycle.toLowerCase()}</small>

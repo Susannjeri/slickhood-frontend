@@ -123,7 +123,7 @@ export default function ServiceReviewModal({ service, onClose, onSuccess }: Revi
             <div className="w-full max-w-lg rounded-xl bg-white shadow-xl dark:bg-[#1A1740]">
 
                 {/* Header */}
-                <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-white/10">
+                <div className="flex items-center justify-between border-b border-gray-200 px-4 py-4 dark:border-white/10 sm:px-6">
                     <div>
                         <h2 className="text-lg font-semibold text-[#08184A] dark:text-white">
                             Review Pending Service
@@ -156,7 +156,7 @@ export default function ServiceReviewModal({ service, onClose, onSuccess }: Revi
                     ) : (
                         <>
                             {/* Summary Cards Grid */}
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-white/10 dark:bg-white/5">
                                     <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-white/60">
                                         <User className="h-3.5 w-3.5 text-[#08184A] dark:text-white/80" /> Provider
@@ -240,7 +240,7 @@ export default function ServiceReviewModal({ service, onClose, onSuccess }: Revi
                 </div>
 
                 {/* Footer Actions */}
-                <div className="flex items-center justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-white/10">
+                <div className="flex flex-col-reverse gap-3 border-t border-gray-200 px-4 py-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-end sm:px-6">
                     <button
                         type="button"
                         onClick={onClose}

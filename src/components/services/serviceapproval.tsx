@@ -78,7 +78,7 @@ export default function ServiceApproval({ onCountChange }: ServiceApprovalProps)
   return (
     <>
       <div className="mt-4 overflow-x-auto rounded-lg border border-gray-200 bg-white">
-        <table className="w-full text-left text-xs text-gray-600">
+        <table className="min-w-[720px] w-full text-left text-xs text-gray-600">
           <thead className="border-b border-gray-200 bg-gray-50/75 text-[11px] font-semibold uppercase tracking-wider text-[#020B2D]">
             <tr>
               <th scope="col" className="px-4 py-3">Provider</th>

@@ -130,7 +130,7 @@ export default function ReportsPage() {
         </div>
 
         <Card className="overflow-hidden border-slate-200 shadow-sm dark:border-white/10">
-          <CardHeader className="flex-row items-start justify-between gap-4"><div><CardTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-[#ef4217]" /> Detail</CardTitle><CardDescription className="mt-1">{report.from} to {report.to} · generated {new Date(report.generatedAt).toLocaleString("en-KE")}</CardDescription></div><Badge variant="outline">{report.rows.length.toLocaleString()} rows</Badge></CardHeader>
+          <CardHeader className="flex-col items-start gap-4 sm:flex-row sm:justify-between"><div><CardTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-[#ef4217]" /> Detail</CardTitle><CardDescription className="mt-1">{report.from} to {report.to} · generated {new Date(report.generatedAt).toLocaleString("en-KE")}</CardDescription></div><Badge variant="outline">{report.rows.length.toLocaleString()} rows</Badge></CardHeader>
           {report.truncated && <div className="mx-6 mb-4 flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800"><AlertTriangle className="h-4 w-4" /> The on-screen result reached the safe row limit. Narrow the date range for a complete extract.</div>}
           <CardContent className="p-0">
             {report.rows.length === 0 ? <div className="p-12 text-center text-sm text-slate-500">No records were found for this period.</div> :

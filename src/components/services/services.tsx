@@ -247,7 +247,7 @@ export default function ServiceProvider() {
     }
 
     return (
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
             {/* Header */}
             <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -342,7 +342,7 @@ export default function ServiceProvider() {
             ) : (
                 <div className="overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
+                        <table className="min-w-[760px] w-full text-left text-xs">
                             <thead>
                                 <tr className="border-b border-gray-200 bg-gray-50 uppercase tracking-wider text-[#020B2D]">
                                     <th className="px-5 py-3.5 font-semibold">Service</th>

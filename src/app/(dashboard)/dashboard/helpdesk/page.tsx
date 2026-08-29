@@ -124,7 +124,7 @@ export default function HelpDeskPage() {
         <KnowledgeView articles={filteredArticles} search={search} setSearch={setSearch} loading={loading}
           isAdmin={isAdmin} onNew={() => setArticleEditor(emptyArticle())} onEdit={setArticleEditor} />
       ) : (
-        <div className="grid min-h-[650px] gap-4 lg:grid-cols-[300px_minmax(0,1fr)_320px]">
+        <div className="grid min-h-[480px] min-w-0 gap-4 xl:min-h-[650px] xl:grid-cols-[300px_minmax(0,1fr)_320px]">
           <Card className="overflow-hidden">
             <CardHeader className="space-y-3 border-b p-4">
               <CardTitle className="text-base">{mode === "queue" ? "Support queue" : "Conversations"}</CardTitle>
@@ -140,9 +140,9 @@ export default function HelpDeskPage() {
             </ScrollArea>
           </Card>
 
-          <Card className="flex min-h-[650px] flex-col overflow-hidden">
+          <Card className="flex min-h-[480px] min-w-0 flex-col overflow-hidden sm:min-h-[650px]">
             {selected ? <>
-              <CardHeader className="flex-row items-center justify-between border-b p-4">
+              <CardHeader className="flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div><CardTitle className="text-lg">{selected.subject}</CardTitle><p className="mt-1 text-xs text-slate-500">Private conversation · {selected.activeRole}</p></div>
                 <div className="flex gap-2">{mode === "mine" && !["ESCALATED","ASSIGNED","RESOLVED"].includes(selected.status) && <Button variant="outline" size="sm" onClick={escalate}><UserRound className="mr-2 h-4 w-4" />Human support</Button>}{mode === "queue" && selected.status !== "RESOLVED" && <Button variant="outline" size="sm" onClick={resolve}><CheckCircle2 className="mr-2 h-4 w-4" />Resolve</Button>}</div>
               </CardHeader>

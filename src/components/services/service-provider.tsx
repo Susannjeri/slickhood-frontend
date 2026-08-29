@@ -67,7 +67,7 @@ export default function ServiceProvider() {
 
     if (profileStatus === "checking") {
         return (
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
                 <p className="text-sm text-gray-500">
                     Checking your service provider profile...
                 </p>
@@ -77,7 +77,7 @@ export default function ServiceProvider() {
 
     if (profileStatus === "error") {
         return (
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4">
                     <p className="text-sm font-medium text-red-700">
                         Unable to load your service provider profile.

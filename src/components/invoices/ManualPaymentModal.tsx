@@ -90,19 +90,19 @@ export function ManualPaymentModal({ invoice, open, onClose, onPaymentSuccess }:
       <DialogContent className="sm:max-w-md w-[calc(100vw-2rem)] rounded-2xl p-0 overflow-hidden">
 
         {/* Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-100">
+        <DialogHeader className="border-b border-gray-100 px-4 pb-4 pt-5 sm:px-6 sm:pt-6">
           <DialogTitle className="text-base text-[#141130]">Record Manual Payment</DialogTitle>
           <p className="text-xs text-gray-400 mt-0.5">
             Invoice <span className="font-semibold text-[#EF4217]">{invoice.ref}</span>
             {" · "}
             <span className="font-semibold text-[#141130]">
-              Due BND {invoice.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              Due {invoice.currency} {invoice.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </span>
           </p>
         </DialogHeader>
 
         {/* Form */}
-        <div className="px-6 py-5 flex flex-col gap-4">
+        <div className="flex flex-col gap-4 px-4 py-5 sm:px-6">
 
           {/* Amount */}
           <div className="flex flex-col gap-1.5">
@@ -141,7 +141,7 @@ export function ManualPaymentModal({ invoice, open, onClose, onPaymentSuccess }:
           </div>
 
           {/* Optional fields */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold text-gray-600">
                 Transaction ID <span className="text-gray-400 font-normal">(optional)</span>
@@ -172,13 +172,13 @@ export function ManualPaymentModal({ invoice, open, onClose, onPaymentSuccess }:
             <div className="rounded-xl bg-[#FEF3F0] border border-[#FDDDD6] p-3 flex items-center justify-between">
               <span className="text-xs text-gray-500">Recording payment of</span>
               <span className="text-sm font-bold text-[#EF4217]">
-                BND {Number(form.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                {invoice.currency} {Number(form.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </span>
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex gap-3 pt-1">
+          <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row">
             <Button
               variant="outline"
               className="flex-1 h-10"

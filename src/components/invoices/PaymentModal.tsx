@@ -147,7 +147,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
       <DialogContent className="sm:max-w-md w-[calc(100vw-2rem)] rounded-2xl p-0 overflow-hidden">
 
         {/* Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-100">
+        <DialogHeader className="border-b border-gray-100 px-4 pb-4 pt-5 sm:px-6 sm:pt-6">
           <div className="flex items-center gap-3">
             {step === "confirm" && (
               <button
@@ -173,7 +173,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
         </DialogHeader>
 
         {/* Body */}
-        <div className="px-6 py-5">
+        <div className="px-4 py-5 sm:px-6">
 
           {/* ── Step 1: account selection ─────────────────────────────────── */}
           {step === "accounts" && (
@@ -250,7 +250,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
               )}
 
               {/* Actions */}
-              <div className="flex gap-3 w-full">
+              <div className="flex w-full flex-col-reverse gap-3 sm:flex-row">
                 <Button
                   variant="outline"
                   className="flex-1 h-10"
