@@ -35,7 +35,7 @@ export default function PlaceAutocompleteInput({
     if (!isLoaded || !containerRef.current) return;
 
     let disposed = false;
-    let autocompleteElement: HTMLElement | null = null;
+    let autocompleteElement: (HTMLElement & { placeholder?: string }) | null = null;
 
     const initialise = async () => {
       const placesLibrary = (await google.maps.importLibrary("places")) as unknown as {
