@@ -14,7 +14,9 @@ import {Badge} from "@/components/ui/badge";
 import {Tabs,TabsContent,TabsList,TabsTrigger} from "@/components/ui/tabs";
 
 const today=()=>new Date().toISOString().slice(0,10);
-const money=(n:number,c="KES")=>new Intl.NumberFormat("en-KE",{style:"currency",currency:c,maximumFractionDigits:0}).format(n||0);
+const currency=(value?:string|null)=>/^[A-Z]{3}$/.test(value??"")?value!:"KES";
+const money=(n?:number|null,c?:string|null)=>new Intl.NumberFormat("en-KE",{style:"currency",currency:currency(c),maximumFractionDigits:0}).format(Number(n)||0);
+const list=<T,>(value:unknown):T[]=>Array.isArray(value)?value as T[]:[];
 const emptyAsset:AssetPayload={assetType:"PROPERTY",name:"",currency:"KES",acquisitionCost:0,currentValue:0,valuationDate:today(),status:"ACTIVE"};
 
 export default function WealthPage(){
@@ -24,9 +26,9 @@ export default function WealthPage(){
  const [years,setYears]=useState(5),[valueGrowth,setValueGrowth]=useState(5),[incomeGrowth,setIncomeGrowth]=useState(3),[expenseGrowth,setExpenseGrowth]=useState(3);
  const [docs,setDocs]=useState<VaultDocument[]>([]);
  const selectedAsset=useMemo(()=>assets.find(a=>a.id===selected),[assets,selected]);
- const load=useCallback(async()=>{try{const [d,a,p]=await Promise.all([wealthService.dashboard(years,valueGrowth,incomeGrowth,expenseGrowth),wealthService.assets(),wealthService.propertyOptions().catch(()=>({data:{data:[]}}))]);setDashboard(d.data?.data);const next=a.data?.data??[];setAssets(next);setPropertyOptions((p.data?.data??[]) as WealthPropertyOption[]);setSelected(v=>v??next[0]?.id)}catch(e:unknown){toast.error(apiErrorMessage(e,"Could not load Wealth."))}},[years,valueGrowth,incomeGrowth,expenseGrowth]);
+ const load=useCallback(async()=>{try{const [d,a,p]=await Promise.all([wealthService.dashboard(years,valueGrowth,incomeGrowth,expenseGrowth),wealthService.assets(),wealthService.propertyOptions().catch(()=>({data:{data:[]}}))]);const raw=d.data?.data as WealthDashboard|undefined;setDashboard(raw?{...raw,assets:list(raw.assets),obligations:list(raw.obligations),goals:list(raw.goals),goalProgress:list(raw.goalProgress),insights:list(raw.insights),projection:list(raw.projection)}:null);const next=list<WealthAsset>(a.data?.data);setAssets(next);setPropertyOptions(list<WealthPropertyOption>(p.data?.data));setSelected(v=>v??next[0]?.id)}catch(e:unknown){toast.error(apiErrorMessage(e,"Could not load Wealth."))}},[years,valueGrowth,incomeGrowth,expenseGrowth]);
  useEffect(()=>{load()},[load]);
- useEffect(()=>{if(!selected){setDocs([]);return}wealthService.documents(selected).then(r=>setDocs(r.data?.data??[])).catch(()=>setDocs([]))},[selected]);
+ useEffect(()=>{if(!selected){setDocs([]);return}wealthService.documents(selected).then(r=>setDocs(list<VaultDocument>(r.data?.data))).catch(()=>setDocs([]))},[selected]);
  async function run(action:()=>Promise<unknown>,success:string){setBusy(true);try{await action();toast.success(success);await load()}catch(e:unknown){toast.error(apiErrorMessage(e,"Wealth update failed."))}finally{setBusy(false)}}
  function submitAsset(e:FormEvent){e.preventDefault();run(()=>editing?wealthService.updateAsset(editing,assetForm):wealthService.createAsset(assetForm),editing?"Asset updated; valuation history preserved.":"Asset added to Wealth.");setAssetForm(emptyAsset);setEditing(undefined)}
  function editAsset(a:WealthAsset){setEditing(a.id);setAssetForm({propertyId:a.propertyId,assetType:a.assetType,name:a.name,reference:a.reference,location:a.location,currency:a.currency,acquisitionCost:a.acquisitionCost,acquisitionDate:a.acquisitionDate,currentValue:a.currentValue,valuationDate:a.valuationDate,status:a.status});}
