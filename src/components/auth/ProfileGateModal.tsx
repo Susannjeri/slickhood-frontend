@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, ArrowRight } from "lucide-react";
@@ -17,7 +17,8 @@ const toReadableLabel = (key: string): string =>
   key.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase());
 
 export default function ProfileGateModal({ open, fields, onClose }: ProfileGateModalProps) {
-  const router = useRouter();
+  const pathname = usePathname();
+  const verificationHref = `/kyc?returnTo=${encodeURIComponent(pathname)}`;
 
   const entries = Object.entries(fields);
   const missingCount = entries.filter(([, done]) => !done).length;
@@ -89,12 +90,14 @@ export default function ProfileGateModal({ open, fields, onClose }: ProfileGateM
         {/* ── CTA ──────────────────────────────────── */}
         <div className="px-6 pt-4 pb-7 bg-white">
           <Button
+            asChild
             className="w-full h-11 text-white font-semibold text-sm rounded-xl transition-opacity hover:opacity-90"
             style={{ background: "#EF4217" }}
-            onClick={() => router.push("/dashboard/user")}
           >
-            Complete My Profile
-            <ArrowRight className="w-4 h-4 ml-2" />
+            <a href={verificationHref} onClick={onClose}>
+              Complete Identity Verification
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </a>
           </Button>
         </div>
       </DialogContent>
