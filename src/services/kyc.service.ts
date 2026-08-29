@@ -13,6 +13,8 @@ export interface KycRequirement {
 export interface KycDocument {
   id: number;
   documentType: string;
+  originalFileName?: string;
+  contentType?: string;
   status: string;
   qualityStatus: string;
   qualityScore?: number;
@@ -64,6 +66,11 @@ export async function uploadKycDocument(documentType: string, file: File) {
   body.append("file", file);
   const response = await API.post("/kyc/documents", body);
   return first<KycDocument>(response)!;
+}
+
+export async function fetchKycDocumentContent(documentId: number) {
+  const response = await API.get(`/kyc/documents/${documentId}/content`, { responseType: "blob" });
+  return response.data as Blob;
 }
 
 export async function submitKyc() {

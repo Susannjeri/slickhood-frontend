@@ -1,9 +1,11 @@
 import {API} from "@/lib/api";
 
 export type AssetPayload={propertyId?:number;assetType:string;name:string;reference?:string;location?:string;currency:string;acquisitionCost:number;acquisitionDate?:string;currentValue:number;valuationDate:string;status:string};
+export type WealthPropertyOption={id:number;name:string;description?:string};
 export const wealthService={
  dashboard:(years=5,valueGrowth=5,incomeGrowth=3,expenseGrowth=3)=>API.get("/wealth/dashboard",{params:{years,valueGrowth,incomeGrowth,expenseGrowth}}),
  assets:()=>API.get("/wealth/assets"),
+ propertyOptions:()=>API.get("/wealth/property-options"),
  createAsset:(data:AssetPayload)=>API.post("/wealth/assets",data),
  updateAsset:(id:number,data:AssetPayload)=>API.put(`/wealth/assets/${id}`,data),
  archiveAsset:(id:number)=>API.delete(`/wealth/assets/${id}`),
