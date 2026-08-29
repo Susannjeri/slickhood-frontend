@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import {
   GoogleMap,
-  LoadScript,
   Marker,
   StandaloneSearchBox,
   useLoadScript
@@ -55,7 +54,7 @@ const propertySchema = z.object({
   mapLocation: z
     .string()
     .min(1, "Location is required")
-    .regex(/^-?\d+\.?\d*,-?\d+\.?\d*$/, "Invalid coordinates format (lat,lng)"),
+    .regex(/^\s*-?\d+\.?\d*\s*,\s*-?\d+\.?\d*\s*$/, "Invalid coordinates format (lat,lng)"),
   currency: z.string().optional(),
 });
 
@@ -65,6 +64,69 @@ const libraries: (
   "places" | "drawing" | "geometry" | "visualization"
 )[] = ["places"];
 
+type Coordinates = { lat: number; lng: number };
+
+interface GoogleLocationPickerProps {
+  apiKey: string;
+  center: Coordinates;
+  marker: Coordinates | null;
+  onCoordinatesSelected: (coordinates: Coordinates) => void;
+}
+
+function GoogleLocationPicker({ apiKey, center, marker, onCoordinatesSelected }: GoogleLocationPickerProps) {
+  const searchBoxRef = useRef<google.maps.places.SearchBox | null>(null);
+  const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey, libraries });
+
+  if (loadError) {
+    return (
+      <Alert className="border-amber-300 bg-amber-50">
+        <AlertDescription className="text-amber-900">
+          Google Maps is temporarily unavailable. Enter the property coordinates below or use your current location.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!isLoaded) {
+    return <div className="flex h-40 items-center justify-center rounded-lg border bg-gray-50"><Loader2 className="size-7 animate-spin text-[#EF4217]"/><span className="ml-3 text-sm text-gray-600">Loading map…</span></div>;
+  }
+
+  return (
+    <>
+      <div className="space-y-2">
+        <Label>Search Location</Label>
+        <StandaloneSearchBox
+          onLoad={(ref) => (searchBoxRef.current = ref)}
+          onPlacesChanged={() => {
+            const place = searchBoxRef.current?.getPlaces()?.[0];
+            if (place?.geometry?.location) {
+              onCoordinatesSelected({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
+            }
+          }}
+        >
+          <Input type="text" placeholder="Search for a location..." className="w-full" />
+        </StandaloneSearchBox>
+        <p className="text-xs text-gray-500">Search or click on the map to pin a location</p>
+      </div>
+      <div className="h-[400px] w-full overflow-hidden rounded-lg border-2" style={{ borderColor: marker ? "#EF4217" : "#e5e7eb" }}>
+        <GoogleMap
+          mapContainerStyle={{ width: "100%", height: "100%" }}
+          center={center}
+          zoom={marker ? 15 : 10}
+          onClick={(event) => {
+            const lat = event.latLng?.lat();
+            const lng = event.latLng?.lng();
+            if (lat !== undefined && lng !== undefined) onCoordinatesSelected({ lat, lng });
+          }}
+          options={{ streetViewControl: false, mapTypeControl: false }}
+        >
+          {marker && <Marker position={marker} animation={google.maps.Animation.DROP} />}
+        </GoogleMap>
+      </div>
+    </>
+  );
+}
+
 
 export default function CreatePropertyForm() {
   const router = useRouter();
@@ -72,10 +134,7 @@ export default function CreatePropertyForm() {
   const { createNewProperty } = useApi();
   const {isLoadingTypes, propertyTypeOptions } = usePropertyMetadata();
 
-  const { isLoaded: isMapsLoaded } = useLoadScript({
-      googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!,
-      libraries: ["places"] as any,
-    });
+  const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY?.trim() ?? "";
 
   // 🖼️ Image state
   const [image, setImage] = useState<File | null>(null);
@@ -89,9 +148,6 @@ export default function CreatePropertyForm() {
     lat: -1.286389,
     lng: 36.817223, // Nairobi
   });
-
-  // Ref for search box
-  const searchBoxRef = useRef<google.maps.places.SearchBox | null>(null);
 
   //Profile Gate
   const [profileGate, setProfileGate] = useState<ProfileGateFields | null>(null);
@@ -121,14 +177,22 @@ export default function CreatePropertyForm() {
     }
   };
 
-  // 📍 Handle map click
-  const handleMapClick = (e: google.maps.MapMouseEvent) => {
-    const lat = e.latLng?.lat();
-    const lng = e.latLng?.lng();
-    if (lat && lng) {
-      setMarker({ lat, lng });
-      setValue("mapLocation", `${lat},${lng}`, { shouldValidate: true });
+  const handleCoordinatesSelected = ({ lat, lng }: Coordinates) => {
+    setMarker({ lat, lng });
+    setMapCenter({ lat, lng });
+    setValue("mapLocation", `${lat},${lng}`, { shouldValidate: true });
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Location services are not supported by this browser.");
+      return;
     }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => handleCoordinatesSelected({ lat: coords.latitude, lng: coords.longitude }),
+      () => toast.error("We could not access your location. Enter the coordinates manually."),
+      { enableHighAccuracy: true, timeout: 10_000 }
+    );
   };
 
   // ✍️ Manual coordinate entry
@@ -210,21 +274,6 @@ export default function CreatePropertyForm() {
       setIsSubmitting(false);
     }
   };
-    if (!isMapsLoaded) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2
-            className="w-12 h-12 animate-spin mx-auto mb-4"
-            style={{ color: "#EF4217" }}
-          />
-          <p className="text-gray-600">
-            {!isMapsLoaded ? "Loading..." : "Google Maps API failed to load."}
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="w-full max-w-7xl mx-auto space-y-6 p-6">
@@ -504,80 +553,22 @@ export default function CreatePropertyForm() {
             </h3>
           </div>
 
-          {/* <LoadScript
-            googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!}
-            libraries={libraries}
-          > */}
             <div className="space-y-4">
+              {googleMapsKey ? (
+                <GoogleLocationPicker apiKey={googleMapsKey} center={mapCenter} marker={marker} onCoordinatesSelected={handleCoordinatesSelected} />
+              ) : (
+                <Alert className="border-blue-200 bg-blue-50">
+                  <AlertDescription className="text-blue-900">
+                    Map search is temporarily unavailable. Use your current location or enter latitude and longitude below.
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="space-y-2">
-                <Label>Search Location</Label>
-                <StandaloneSearchBox
-                  onLoad={(ref) => (searchBoxRef.current = ref)}
-                  onPlacesChanged={() => {
-                    const places = searchBoxRef.current?.getPlaces();
-                    if (places && places.length > 0) {
-                      const place = places[0];
-                      if (place.geometry?.location) {
-                        const lat = place.geometry.location.lat();
-                        const lng = place.geometry.location.lng();
-                        setMarker({ lat, lng });
-                        setMapCenter({ lat, lng });
-                        setValue("mapLocation", `${lat},${lng}`, {
-                          shouldValidate: true,
-                        });
-                      }
-                    }
-                  }}
-                >
-                  <Input
-                    type="text"
-                    placeholder="Search for a location..."
-                    className="w-full"
-                  />
-                </StandaloneSearchBox>
-                <p className="text-xs text-gray-500">
-                  Search or click on the map to pin a location
-                </p>
-              </div>
-
-              <div
-                className="h-[400px] w-full rounded-lg overflow-hidden border-2"
-                style={{
-                  borderColor: marker ? "#EF4217" : "#e5e7eb",
-                }}
-              >
-                <GoogleMap
-                  mapContainerStyle={{ width: "100%", height: "100%" }}
-                  center={mapCenter}
-                  zoom={marker ? 15 : 10}
-                  onClick={handleMapClick}
-                  options={{
-                    streetViewControl: false,
-                    mapTypeControl: false,
-                  }}
-                >
-                  {marker && (
-                    <Marker
-                      position={marker}
-                      animation={google.maps.Animation.DROP}
-                    />
-                  )}
-                </GoogleMap>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="mapLocation">
-                  Coordinates (Latitude, Longitude)
-                </Label>
-                <Input
-                  id="mapLocation"
-                  type="text"
-                  placeholder="-1.286389, 36.817223"
-                  value={mapLocation || ""}
-                  onChange={handleManualLocationChange}
-                  className={errors.mapLocation ? "border-red-500" : ""}
-                  disabled
-                />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label htmlFor="mapLocation">Coordinates (Latitude, Longitude)</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={handleUseCurrentLocation}><MapPin className="mr-2 size-4"/>Use my current location</Button>
+                </div>
+                <Input id="mapLocation" type="text" inputMode="decimal" placeholder="-1.286389, 36.817223" value={mapLocation || ""} onChange={handleManualLocationChange} className={errors.mapLocation ? "border-red-500" : ""} />
                 {errors.mapLocation && (
                   <p className="text-sm text-red-600">
                     {errors.mapLocation.message}
@@ -585,7 +576,6 @@ export default function CreatePropertyForm() {
                 )}
               </div>
             </div>
-          {/* </LoadScript> */}
         </div>
 
         {/* Buttons */}

@@ -14,6 +14,11 @@ export interface SidebarLink {
   subLinks?: SidebarLink[];
 }
 
+export interface SidebarSection {
+  label: string
+  links: SidebarLink[]
+}
+
 // Main navigation links (excluding settings)
 export const sidebarLinks: SidebarLink[] = [
   {
@@ -356,6 +361,28 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
   }
 ]
+
+// Navigation follows the way users work instead of the order in which
+// modules were developed. Keep route and permission definitions above as
+// the single source of truth; these sections only control presentation.
+const sectionDefinitions = [
+  { label: "Overview", links: ["Home", "Business Areas", "My Wealth"] },
+  { label: "Property & Leasing", links: ["Properties", "Leases", "Documents & Notices", "Estate Management", "Property Sale Management", "Community Funds"] },
+  { label: "Money", links: ["Accounts", "Payments", "Invoices", "Reports", "Insurance Hub"] },
+  { label: "People & Access", links: ["Visitors", "Visitor Management", "Smart Gates"] },
+  { label: "Services & Shopping", links: ["Marketplace", "Soko", "My Services", "Merchant Accounts", "Affiliate"] },
+  { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre", "Subscriptions", "Upgrade Plan"] },
+  { label: "Administration", links: ["Users", "KYC Reviews", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Affiliate Management"] },
+] as const
+
+const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))
+
+export const sidebarSections: SidebarSection[] = sectionDefinitions.map((section) => ({
+  label: section.label,
+  links: section.links
+    .map((label) => sidebarLinkByLabel.get(label))
+    .filter((link): link is SidebarLink => Boolean(link)),
+}))
 
 // Settings links for footer
 export const settingsLinks: SidebarLink[] = [

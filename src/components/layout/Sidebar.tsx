@@ -1,7 +1,7 @@
 "use client"
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { sidebarLinks, settingsLinks } from "@/config/sidebarConfig";
+import { sidebarLinks, sidebarSections, settingsLinks } from "@/config/sidebarConfig";
 import Can, { usePermissions } from "@/components/auth/Can";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -10,6 +10,7 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
@@ -90,7 +91,7 @@ export default function AppSidebar() {
   const { handleGetPendingUnits } = useApi();
   const pathname = usePathname();
 
-  const { hasPermission } = usePermissions();
+  const { hasPermission, hasRole } = usePermissions();
   const canAccessJobs = hasPermission(["create_unit"]);
 
   const roles = useAuthStore((s) => s.roles);
@@ -232,79 +233,90 @@ export default function AppSidebar() {
             </div>
           )}
 
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {sidebarLinks.map((link) => (
-                  <Can permissions={link.permissions || []} roles={link.roles || []} key={link.href || link.label}>
-                    <SidebarMenuItem>
-                      {link.subLinks && link.subLinks.length > 0 ? (
-                        <Collapsible
-                          open={openSubMenus[link.label]}
-                          onOpenChange={() => toggleSubMenu(link.label)}
-                          className="group/collapsible"
-                        >
-                          <CollapsibleTrigger asChild>
-                            <SidebarMenuButton
-                              tooltip={link.label}
-                              isActive={isLinkActive(link.href, link.subLinks)}
-                              className={cn(
-                                "font-bold text-[#08184A]/70 dark:text-white transition-all duration-200",
-                                "hover:bg-[#08184A]/10 dark:hover:bg-white/10 hover:text-[#08184A] dark:hover:text-white hover:translate-x-1",
-                                "data-[active=true]:bg-[#FF4B12]/10 data-[active=true]:text-[#FF4B12] data-[active=true]:font-bold data-[active=true]:border-l-2 data-[active=true]:border-[#FF4B12]"
-                              )}
-                            >
+          {sidebarSections.map((section) => {
+            const visibleLinks = section.links.filter((link) =>
+              hasPermission(link.permissions || []) && hasRole(link.roles || [])
+            )
+
+            if (visibleLinks.length === 0) return null
+
+            return (
+              <SidebarGroup key={section.label}>
+                <SidebarGroupLabel className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#08184A]/45 dark:text-white/45">
+                  {section.label}
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {visibleLinks.map((link) => (
+                      <SidebarMenuItem key={link.href || link.label}>
+                        {link.subLinks && link.subLinks.length > 0 ? (
+                          <Collapsible
+                            open={openSubMenus[link.label]}
+                            onOpenChange={() => toggleSubMenu(link.label)}
+                            className="group/collapsible"
+                          >
+                            <CollapsibleTrigger asChild>
+                              <SidebarMenuButton
+                                tooltip={link.label}
+                                isActive={isLinkActive(link.href, link.subLinks)}
+                                className={cn(
+                                  "font-bold text-[#08184A]/70 dark:text-white transition-all duration-200",
+                                  "hover:bg-[#08184A]/10 dark:hover:bg-white/10 hover:text-[#08184A] dark:hover:text-white hover:translate-x-1",
+                                  "data-[active=true]:bg-[#FF4B12]/10 data-[active=true]:text-[#FF4B12] data-[active=true]:font-bold data-[active=true]:border-l-2 data-[active=true]:border-[#FF4B12]"
+                                )}
+                              >
+                                {link.icon && <link.icon />}
+                                <span>{link.label}</span>
+                                <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                              </SidebarMenuButton>
+                            </CollapsibleTrigger>
+
+                            <CollapsibleContent>
+                              <SidebarMenuSub>
+                                {link.subLinks.map((subLink) => (
+                                  <Can permissions={subLink.permissions || []} key={subLink.href}>
+                                    <SidebarMenuSubItem>
+                                      <SidebarMenuSubButton
+                                        asChild
+                                        isActive={pathname === subLink.href}
+                                        className={cn(
+                                          "font-bold text-[#08184A]/70 dark:text-white transition-all duration-200",
+                                          "hover:bg-[#08184A]/10 dark:hover:bg-white/10 hover:text-[#08184A] dark:hover:text-white hover:translate-x-1",
+                                          "data-[active=true]:bg-[#FF4B12]/10 data-[active=true]:text-[#FF4B12] data-[active=true]:font-bold data-[active=true]:border-l-2 data-[active=true]:border-[#FF4B12]"
+                                        )}
+                                      >
+                                        <Link href={subLink.href || '#'}>{subLink.label}</Link>
+                                      </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                  </Can>
+                                ))}
+                              </SidebarMenuSub>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        ) : (
+                          <SidebarMenuButton
+                            asChild
+                            tooltip={link.label}
+                            isActive={pathname === link.href}
+                            className={cn(
+                              "font-bold text-[#08184A]/70 dark:text-white transition-all duration-200",
+                              "hover:bg-[#08184A]/10 dark:hover:bg-white/10 hover:text-[#08184A] dark:hover:text-white hover:translate-x-1",
+                              "data-[active=true]:bg-[#FF4B12]/10 data-[active=true]:text-[#FF4B12] data-[active=true]:font-bold data-[active=true]:border-l-2 data-[active=true]:border-[#FF4B12]"
+                            )}
+                          >
+                            <Link href={link.href || '#'}>
                               {link.icon && <link.icon />}
                               <span>{link.label}</span>
-                              <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                            </SidebarMenuButton>
-                          </CollapsibleTrigger>
-
-                          <CollapsibleContent>
-                            <SidebarMenuSub>
-                              {link.subLinks.map((subLink) => (
-                                <Can permissions={subLink.permissions || []} key={subLink.href}>
-                                  <SidebarMenuSubItem>
-                                    <SidebarMenuSubButton
-                                      asChild
-                                      isActive={pathname === subLink.href}
-                                      className={cn(
-                                        "font-bold text-[#08184A]/70 dark:text-white transition-all duration-200",
-                                        "hover:bg-[#08184A]/10 dark:hover:bg-white/10 hover:text-[#08184A] dark:hover:text-white hover:translate-x-1",
-                                        "data-[active=true]:bg-[#FF4B12]/10 data-[active=true]:text-[#FF4B12] data-[active=true]:font-bold data-[active=true]:border-l-2 data-[active=true]:border-[#FF4B12]"
-                                      )}
-                                    >
-                                      <Link href={subLink.href || '#'}>{subLink.label}</Link>
-                                    </SidebarMenuSubButton>
-                                  </SidebarMenuSubItem>
-                                </Can>
-                              ))}
-                            </SidebarMenuSub>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      ) : (
-                        <SidebarMenuButton
-                          asChild
-                          tooltip={link.label}
-                          isActive={pathname === link.href}
-                          className={cn(
-                            "font-bold text-[#08184A]/70 dark:text-white transition-all duration-200",
-                            "hover:bg-[#08184A]/10 dark:hover:bg-white/10 hover:text-[#08184A] dark:hover:text-white hover:translate-x-1",
-                            "data-[active=true]:bg-[#FF4B12]/10 data-[active=true]:text-[#FF4B12] data-[active=true]:font-bold data-[active=true]:border-l-2 data-[active=true]:border-[#FF4B12]"
-                          )}
-                        >
-                          <Link href={link.href || '#'}>
-                            {link.icon && <link.icon />}
-                            <span>{link.label}</span>
-                          </Link>
-                        </SidebarMenuButton>
-                      )}
-                    </SidebarMenuItem>
-                  </Can>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+                            </Link>
+                          </SidebarMenuButton>
+                        )}
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )
+          })}
           
         </SidebarContent>
 
