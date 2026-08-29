@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, ArrowRight, CheckCircle2, FileCheck2, Loader2, LockKeyhole, Phone, RefreshCw, ShieldCheck, Upload } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ const errorMessage = (error: unknown, fallback: string) => {
 
 export default function KycPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const profileRemediation = searchParams.get("remediate") === "profile";
   const token = useAuthStore(state => state.token);
   const activeRole = useAuthStore(state => state.activeRole);
   const sessionReady = useAuthStore(state => state.sessionReady);
@@ -111,8 +113,24 @@ export default function KycPage() {
     router.replace(next.destination);
   };
 
+  const reopenVerification = async () => {
+    if (!kyc) return;
+    setBusy(true);
+    try {
+      setKyc(await startKyc(kyc.consentVersion));
+      toast.success("Identity verification reopened. Upload the requested clear documents.");
+    } catch (error) {
+      toast.error(errorMessage(error, "Identity verification could not be reopened."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading || !kyc) return <Loading />;
-  if (kyc.status === "APPROVED" && kyc.accountStatus === "ACTIVE") return <StateCard icon="approved" title="Identity verified" text="Your account is approved. Continue to choose your plan or enter your assigned workspace." action="Continue setup" onAction={continueSetup} />;
+  if (kyc.status === "APPROVED" && kyc.accountStatus === "ACTIVE") {
+    if (profileRemediation) return <StateCard icon="waiting" title="Additional identity details required" text="Your account is active, but a legacy profile check is missing verified identity details. Reopen verification and upload the requested clear documents; manual entry remains disabled." action="Reopen secure verification" onAction={reopenVerification} />;
+    return <StateCard icon="approved" title="Identity verified" text="Your account is approved. Continue to choose your plan or enter your assigned workspace." action="Continue setup" onAction={continueSetup} />;
+  }
   if (waiting) return <StateCard icon="waiting" title="Verification under review" text="Your documents were submitted securely. You can leave this page and return later; we will preserve your progress." action="Check status" onAction={load} />;
 
   const needsStart = kyc.status === "NOT_STARTED" || kyc.status === "REJECTED" || kyc.status === "EXPIRED";

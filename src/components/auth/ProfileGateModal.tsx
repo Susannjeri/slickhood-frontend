@@ -18,7 +18,7 @@ const toReadableLabel = (key: string): string =>
 
 export default function ProfileGateModal({ open, fields, onClose }: ProfileGateModalProps) {
   const pathname = usePathname();
-  const verificationHref = `/kyc?returnTo=${encodeURIComponent(pathname)}`;
+  const verificationHref = `/kyc?remediate=profile&returnTo=${encodeURIComponent(pathname)}`;
 
   const entries = Object.entries(fields);
   const missingCount = entries.filter(([, done]) => !done).length;
