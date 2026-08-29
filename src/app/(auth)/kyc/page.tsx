@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, CheckCircle2, FileCheck2, Loader2, LockKeyhole, Phone, RefreshCw, ShieldCheck, Upload } from "lucide-react";
 import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,7 @@ const errorMessage = (error: unknown, fallback: string) => {
 
 export default function KycPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const profileRemediation = searchParams.get("remediate") === "profile";
+  const [profileRemediation, setProfileRemediation] = useState(false);
   const token = useAuthStore(state => state.token);
   const activeRole = useAuthStore(state => state.activeRole);
   const sessionReady = useAuthStore(state => state.sessionReady);
@@ -44,6 +43,10 @@ export default function KycPage() {
     }
     catch (error) { toast.error(errorMessage(error, "Identity verification could not be loaded.")); }
     finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    setProfileRemediation(new URLSearchParams(window.location.search).get("remediate") === "profile");
   }, []);
 
   useEffect(() => {
