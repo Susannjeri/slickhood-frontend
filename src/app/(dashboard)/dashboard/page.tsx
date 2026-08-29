@@ -9,6 +9,7 @@ import { useDashboardTotals } from "@/hooks/useDashboardTotals";
 import { DocumentDashboardWidget } from "@/components/documents/DocumentDashboardWidget";
 import Link from "next/link";
 import { useAuthStore } from "@/store/authStore";
+import { normalizedRoleTitle, roleDisplayName } from "@/config/businessAreas";
 import { generateReport, listReportCatalog, OperationalReport, ReportDefinition } from "@/lib/api";
 import {
   Building2,
@@ -27,6 +28,13 @@ export default function DashboardPage() {
   const { totals, loading, error } = useDashboardTotals();
   const activeRole = useAuthStore((state) => state.activeRole);
   const permissions = useAuthStore((state) => state.permissions);
+  const activeRoleKey = normalizedRoleTitle(activeRole?.title);
+  const workspaceDescription: Record<string, string> = {
+    landlord: "Manage properties, units, tenants, leases, collections and landlord obligations.",
+    estatemanager: "Manage homeowners, service charges, common areas and estate operations.",
+    salesagent: "Manage the complete property sale journey from buyer interest to ownership handover.",
+    assetportfoliomanager: "Track assets, performance, cash flow, debt, compliance and net worth.",
+  };
 
   useEffect(() => {
     if (error) toast.error(error);
@@ -80,9 +88,9 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#141130] dark:text-white">{activeRole?.title ?? "SlickHood"} dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#141130] dark:text-white">{roleDisplayName(activeRole?.title) || "SlickHood"} dashboard</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Here&apos;s what&apos;s happening with your properties today.
+            {workspaceDescription[activeRoleKey] ?? "Here’s what needs your attention today."}
           </p>
         </div>
         {permissions.includes("create_property") && <Button asChild className="text-white" style={{ backgroundColor: "#EF4217" }}><Link href="/dashboard/property/create">
@@ -220,8 +228,9 @@ export default function DashboardPage() {
                 <FileText className="w-4 h-4 mr-2" />
                 Create Lease
               </Link></Button>}
-              {permissions.includes("view_estate") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/estate"><Building2 className="mr-2 h-4 w-4"/>Estate & homeowners</Link></Button>}
-              {permissions.includes("view_sale_pipeline") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/sales"><TrendingUp className="mr-2 h-4 w-4"/>Sales pipeline</Link></Button>}
+              {permissions.includes("view_estate") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/estate"><Building2 className="mr-2 h-4 w-4"/>Estate Management</Link></Button>}
+              {permissions.includes("view_sale_pipeline") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/sales"><TrendingUp className="mr-2 h-4 w-4"/>Property Sale Management</Link></Button>}
+              {permissions.includes("view_wealth") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/wealth"><TrendingUp className="mr-2 h-4 w-4"/>Open Wealth</Link></Button>}
               {permissions.includes("view_lease_document") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/documents"><FileText className="mr-2 h-4 w-4"/>Documents & notices</Link></Button>}
             </CardContent>
           </Card>

@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+: "${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL must be set for a production build}"
+: "${NEXT_PUBLIC_CLIENT_ID:?NEXT_PUBLIC_CLIENT_ID must be set for Google Sign-In}"
+
 ARCHIVE=deploy.tar.gz
 
 rm -rf deploy

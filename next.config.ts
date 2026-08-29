@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
       "frame-ancestors 'none'",
       "object-src 'none'",
       "script-src 'self' 'unsafe-inline' https://accounts.google.com https://maps.googleapis.com https://maps.gstatic.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
       "font-src 'self' data: https://fonts.gstatic.com",
       "img-src 'self' data: blob: https:",
       `connect-src 'self' ${apiOrigin} https://api.ipify.org https://accounts.google.com https://*.googleapis.com https://*.gstatic.com`,

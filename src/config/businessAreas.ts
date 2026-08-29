@@ -26,8 +26,8 @@ export const businessAreas: BusinessArea[] = [
   },
   {
     id: "property-sales",
-    title: "Property Sales",
-    eyebrow: "SlickHood Sales",
+    title: "Property Sale Management",
+    eyebrow: "SlickHood Property Sales",
     description: "Manage buyers, viewings, offers, due diligence, agreements, completion and ownership handover.",
     roleTitles: ["salesagent"],
     registrationRoleName: "SalesAgent",
@@ -95,5 +95,11 @@ export const businessAreas: BusinessArea[] = [
 export const normalizedRoleTitle = (value?: string | null) =>
   value?.replaceAll(" ", "").replaceAll("_", "").toLowerCase() ?? "";
 
+const roleDisplayNames: Record<string, string> = {
+  assetportfoliomanager: "Wealth",
+  estatemanager: "Estate Management",
+  salesagent: "Property Sale Management",
+};
+
 export const roleDisplayName = (value?: string | null) =>
-  normalizedRoleTitle(value) === "assetportfoliomanager" ? "Wealth Owner" : value ?? "";
+  roleDisplayNames[normalizedRoleTitle(value)] ?? value ?? "";

@@ -13,7 +13,7 @@ const CATEGORIES = [
     { label: "All Categories", value: "" },
     { label: "Landlord", value: "LANDLORD" },
     { label: "Estate Management", value: "ESTATE_MANAGEMENT" },
-    { label: "Property Sales", value: "PROPERTY_SALES" },
+    { label: "Property Sale Management", value: "PROPERTY_SALES" },
     { label: "Service Provider", value: "SERVICE_PROVIDER" },
     { label: "Affiliate", value: "AFFILIATE" },
     { label: "SlickHood Wealth", value: "ASSET_PORTFOLIO_MANAGER" },

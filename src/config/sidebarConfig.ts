@@ -160,13 +160,13 @@ export const sidebarLinks: SidebarLink[] = [
       {
         label: "Sale Units",
         href: "/dashboard/property/sale-units",
-        permissions: ["create_property", "view_property"],
+        permissions: ["view_sale_pipeline"],
         protected: true,
       },
       {
         label: "Homeowners",
         href: "/dashboard/homeowners",
-        permissions: ["create_property", "view_property"],
+        permissions: ["view_estate"],
         protected: true,
       },
       {
@@ -200,17 +200,19 @@ export const sidebarLinks: SidebarLink[] = [
   },
   {
     icon: Building,
-    label: "Estate & Homeowners",
+    label: "Estate Management",
     href: "/dashboard/estate",
     permissions: ["view_estate"],
     protected: true,
+    description: "Homeowners, ownership history, service charges and estate operations.",
   },
   {
     icon: Landmark,
-    label: "Sales Pipeline",
+    label: "Property Sale Management",
     href: "/dashboard/sales",
     permissions: ["view_sale_pipeline"],
     protected: true,
+    description: "Buyer journeys, viewings, offers, due diligence, completion and handover.",
   },
   {
     icon: ClipboardClock,
