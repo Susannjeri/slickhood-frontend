@@ -29,12 +29,7 @@ jobs:
           ${{ secrets.ENV_PRODUCTION }}
           EOF
 
-      - name: Build Next.js app
-        run: npm run build
-        env:
-          NODE_ENV: production
-
-      - name: Package deployment binaries
+      - name: Build and package deployment binaries
         run:  |
           chmod +x ./build.sh
           ./build.sh

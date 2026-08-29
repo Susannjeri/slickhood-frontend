@@ -7,8 +7,10 @@ read_production_value() {
 }
 
 if [ -f .env.production ]; then
-  NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-$(read_production_value NEXT_PUBLIC_API_URL)}"
-  NEXT_PUBLIC_CLIENT_ID="${NEXT_PUBLIC_CLIENT_ID:-$(read_production_value NEXT_PUBLIC_CLIENT_ID)}"
+  # Production builds must not inherit stale values from a developer shell or
+  # .env.local. The checked deployment configuration is authoritative here.
+  NEXT_PUBLIC_API_URL="$(read_production_value NEXT_PUBLIC_API_URL)"
+  NEXT_PUBLIC_CLIENT_ID="$(read_production_value NEXT_PUBLIC_CLIENT_ID)"
   export NEXT_PUBLIC_API_URL NEXT_PUBLIC_CLIENT_ID
 fi
 
@@ -18,6 +20,17 @@ fi
 ARCHIVE=deploy.tar.gz
 
 rm -rf deploy
+
+# Build in the same exported production environment used for packaging. This
+# prevents an ignored developer .env.local file from overriding public URLs.
+NODE_ENV=production npm run build
+
+if grep -Rqs "http://localhost:8080" \
+  .next/server/app/api/auth/refresh \
+  .next/server/app/browser-session/refresh; then
+  echo "Refusing to package a production build containing localhost API URLs." >&2
+  exit 1
+fi
 
 # Create required directory structure
 mkdir -p deploy/.next/static
