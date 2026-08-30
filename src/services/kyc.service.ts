@@ -61,6 +61,12 @@ export interface KycAdminCase {
   kycCase: KycCase;
 }
 
+export interface KycDocumentReviewDecision {
+  documentId: number;
+  approved: boolean;
+  reason?: string;
+}
+
 const first = <T>(response: { data: { data?: T[] } }) =>
   response.data.data?.[0];
 
@@ -111,10 +117,12 @@ export async function reviewKyc(
   caseId: number,
   decision: "APPROVED" | "REJECTED",
   notes: string,
+  documents: KycDocumentReviewDecision[] = [],
 ) {
   const response = await API.post(`/kyc/admin/${caseId}/review`, {
     decision,
     notes,
+    documents,
   });
   return first<KycCase>(response)!;
 }

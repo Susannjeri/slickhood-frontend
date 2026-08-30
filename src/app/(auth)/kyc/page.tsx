@@ -261,8 +261,10 @@ export default function KycPage() {
 
   const needsStart =
     kyc.status === "NOT_STARTED" ||
-    kyc.status === "REJECTED" ||
     kyc.status === "EXPIRED";
+  const missingRequirements = kyc.requirements.filter((requirement) =>
+    missing.has(requirement.code),
+  );
   return (
     <main className="min-h-screen bg-[#F4F6FB] px-4 py-8 text-[#071744] sm:px-8">
       <Toaster position="top-center" />
@@ -381,6 +383,16 @@ export default function KycPage() {
                       Requirements are combined safely across all roles
                       currently assigned to your account.
                     </p>
+                    {(missingRequirements.length > 0 || !kyc.phoneVerified) && (
+                      <ul className="mt-3 space-y-1 text-sm text-amber-800" role="status">
+                        {!kyc.phoneVerified && <li>• Confirm your phone number.</li>}
+                        {missingRequirements.map((requirement) => (
+                          <li key={requirement.code}>
+                            • Replace or upload: {requirement.label}.
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     {kyc.requirements.map((requirement) => (
@@ -436,6 +448,7 @@ function RequirementCard({
 }) {
   const [type, setType] = useState(requirement.acceptedTypes[0]);
   const [uploading, setUploading] = useState(false);
+  const [replacing, setReplacing] = useState(false);
   const document = kyc.documents.find(
     (item) =>
       requirement.acceptedTypes.includes(item.documentType) &&
@@ -461,6 +474,7 @@ function RequirementCard({
             "The document could not be read confidently. Upload a clearer original.",
         );
       else toast.success(`${requirement.label} uploaded and checked.`);
+      setReplacing(false);
       await onUploaded();
     } catch (error) {
       toast.error(
@@ -498,15 +512,31 @@ function RequirementCard({
         </p>
       )}
       {document ? (
-        <div className="mt-4 rounded-xl bg-white p-3 text-sm">
-          <p className="font-semibold">{label(document.documentType)}</p>
-          <p className="text-xs text-slate-500">
-            {label(document.status)} ·{" "}
-            {new Date(document.uploadedAt).toLocaleString()}
-          </p>
-          <KycDocumentViewer document={document} className="mt-3 w-full" />
+        <div className="mt-4 space-y-3 rounded-xl bg-white p-3 text-sm">
+          <div>
+            <p className="font-semibold">{label(document.documentType)}</p>
+            <p className="text-xs text-slate-500">
+              {label(document.status)} ·{" "}
+              {new Date(document.uploadedAt).toLocaleString()}
+            </p>
+          </div>
+          <KycDocumentViewer document={document} className="w-full" />
+          {!replacing && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setType(document.documentType);
+                setReplacing(true);
+              }}
+            >
+              <Upload className="mr-2 h-4 w-4" />Replace this document
+            </Button>
+          )}
         </div>
-      ) : (
+      ) : null}
+      {(!document || replacing) && (
         <div className="mt-4 space-y-3">
           <select
             className="w-full rounded-xl border bg-white p-3 text-sm"
@@ -539,6 +569,17 @@ function RequirementCard({
             JPG, PNG or PDF · maximum {MAX_KYC_FILE_LABEL}. Large photos are
             optimized automatically.
           </p>
+          {replacing && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              disabled={uploading}
+              onClick={() => setReplacing(false)}
+            >
+              Keep current document
+            </Button>
+          )}
         </div>
       )}
     </article>

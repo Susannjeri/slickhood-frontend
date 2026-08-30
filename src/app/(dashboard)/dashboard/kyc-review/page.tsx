@@ -1,42 +1,517 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, FileSearch, Loader2, RefreshCw, ShieldAlert, XCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  CheckCircle2,
+  FileSearch,
+  Loader2,
+  RefreshCw,
+  ShieldAlert,
+  UserRoundSearch,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { KycAdminCase, listKycReviewQueue, reviewKyc } from "@/services/kyc.service";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { KycDocumentViewer } from "@/components/auth/KycDocumentViewer";
+import {
+  KycAdminCase,
+  listKycReviewQueue,
+  reviewKyc,
+} from "@/services/kyc.service";
 
-const readable = (value: string) => value.toLowerCase().replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());
-const message = (error: unknown) => (error as { response?: { data?: { description?: string } } }).response?.data?.description ?? "The review could not be completed.";
+type DocumentDecision = { approved: boolean | null; reason: string };
+
+const readable = (value: string) =>
+  value
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const message = (error: unknown) =>
+  (error as { response?: { data?: { description?: string } } }).response?.data
+    ?.description ?? "The review could not be completed.";
 
 export default function KycReviewPage() {
   const [rows, setRows] = useState<KycAdminCase[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<number>();
-  const load = useCallback(async () => { setLoading(true); try { setRows(await listKycReviewQueue()); } catch (error) { toast.error(message(error)); } finally { setLoading(false); } }, []);
-  useEffect(() => { void load(); }, [load]);
+  const [busy, setBusy] = useState(false);
+  const [selectedCaseId, setSelectedCaseId] = useState<number>();
+  const [decisions, setDecisions] = useState<
+    Record<number, DocumentDecision>
+  >({});
+  const [notes, setNotes] = useState("");
 
-  const decide = async (row: KycAdminCase, decision: "APPROVED" | "REJECTED") => {
-    const notes = decision === "REJECTED" ? window.prompt("State exactly what the customer must correct")?.trim() : window.prompt("Optional internal review note")?.trim() ?? "";
-    if (decision === "REJECTED" && !notes) return;
-    setBusyId(row.kycCase.id ?? undefined);
-    try { await reviewKyc(row.kycCase.id!, decision, notes ?? ""); toast.success(decision === "APPROVED" ? "Customer identity approved and account activated." : "Customer notified to correct their KYC submission."); await load(); }
-    catch (error) { toast.error(message(error)); }
-    finally { setBusyId(undefined); }
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setRows(await listKycReviewQueue());
+    } catch (error) {
+      toast.error(message(error));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const selected = useMemo(
+    () => rows.find((row) => row.kycCase.id === selectedCaseId),
+    [rows, selectedCaseId],
+  );
+  const pendingReview =
+    selected?.kycCase.status === "SUBMITTED" ||
+    selected?.kycCase.status === "REVIEW_REQUIRED";
+  const documents = selected?.kycCase.documents ?? [];
+  const allDecided =
+    documents.length > 0 &&
+    documents.every(
+      (document) => decisions[document.id]?.approved !== null,
+    );
+  const hasRejected = documents.some(
+    (document) => decisions[document.id]?.approved === false,
+  );
+  const rejectionReasonsComplete = documents.every((document) => {
+    const decision = decisions[document.id];
+    return decision?.approved !== false || decision.reason.trim().length > 0;
+  });
+
+  const openReview = (row: KycAdminCase) => {
+    const initial: Record<number, DocumentDecision> = {};
+    row.kycCase.documents.forEach((document) => {
+      initial[document.id] = {
+        approved:
+          document.status === "VERIFIED"
+            ? true
+            : document.status === "REJECTED"
+              ? false
+              : null,
+        reason: document.rejectionReason ?? "",
+      };
+    });
+    setDecisions(initial);
+    setNotes(
+      row.kycCase.status === "REJECTED"
+        ? row.kycCase.reviewNotes ?? ""
+        : "",
+    );
+    setSelectedCaseId(row.kycCase.id ?? undefined);
   };
 
-  return <div className="space-y-6 px-3 py-6">
-    <header className="flex flex-col justify-between gap-4 rounded-3xl bg-[#071744] p-7 text-white md:flex-row md:items-end"><div><p className="text-xs font-bold uppercase tracking-[.2em] text-orange-300">Controlled operations</p><h1 className="mt-2 text-3xl font-bold">Customer KYC review</h1><p className="mt-2 text-white/70">Approve only after comparing every required original document. Every decision is attributed to the reviewer.</p></div><Button variant="secondary" onClick={load} disabled={loading}><RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />Refresh queue</Button></header>
-    <div className="grid gap-4 md:grid-cols-3"><Metric label="Awaiting decision" value={rows.filter(row => ["SUBMITTED", "REVIEW_REQUIRED"].includes(row.kycCase.status)).length} icon={FileSearch} /><Metric label="Returned for correction" value={rows.filter(row => row.kycCase.status === "REJECTED").length} icon={ShieldAlert} /><Metric label="Queue total" value={rows.length} icon={CheckCircle2} /></div>
-    {loading ? <div className="flex min-h-56 items-center justify-center text-slate-500"><Loader2 className="mr-2 h-6 w-6 animate-spin" />Loading review queue…</div> : rows.length === 0 ? <Card><CardContent className="py-20 text-center text-slate-500">No KYC cases are waiting for attention.</CardContent></Card> : rows.map(row => <Card key={row.kycCase.id} className="overflow-hidden"><CardHeader className="border-b bg-slate-50"><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{row.fullName || "Unnamed customer"}</CardTitle><CardDescription>{row.email} · User #{row.userId}</CardDescription></div><Badge variant={row.kycCase.status === "REJECTED" ? "destructive" : "secondary"}>{readable(row.kycCase.status)}</Badge></div></CardHeader><CardContent className="space-y-5 p-5">
-      {row.kycCase.reviewNotes && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800"><b>Previous decision:</b> {row.kycCase.reviewNotes}</div>}
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{row.kycCase.documents.map(document => { const fields = Object.entries(document.extractedFields ?? {}).filter(([key]) => !key.startsWith("_")); const warning = document.extractedFields?._validationWarnings; return <div key={document.id} className="rounded-xl border p-4"><div className="flex items-start justify-between gap-2"><b>{readable(document.documentType)}</b><Badge variant={document.status === "OCR_COMPLETE" ? "secondary" : "destructive"}>{readable(document.status)}</Badge></div><p className="mt-2 text-xs text-slate-500">Quality {document.qualityScore?.toFixed(1) ?? "checked"} · OCR {document.ocrConfidence?.toFixed(1) ?? "not available"}%</p>{warning && <p className="mt-3 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">{warning}</p>}{fields.length > 0 && <dl className="mt-3 space-y-2 rounded-lg bg-slate-50 p-3 text-xs">{fields.map(([key,value]) => <div key={key} className="flex justify-between gap-3"><dt className="text-slate-500">{readable(key)}</dt><dd className="text-right font-semibold">{value}{document.extractedFields[`_confidence.${key}`] ? ` (${document.extractedFields[`_confidence.${key}`]}%)` : ""}</dd></div>)}</dl>}<KycDocumentViewer document={document} className="mt-4 w-full" /></div>})}</div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4"><p className="text-sm text-slate-500">Phone {row.kycCase.phoneVerified ? "verified" : "not verified"} · {row.kycCase.missingRequirementCodes.length} missing requirements</p>{row.kycCase.status !== "REJECTED" && <div className="flex gap-2"><Button variant="destructive" disabled={busyId === row.kycCase.id} onClick={() => decide(row, "REJECTED")}><XCircle className="mr-2 h-4 w-4" />Return for correction</Button><Button className="bg-emerald-600 hover:bg-emerald-700" disabled={busyId === row.kycCase.id || !row.kycCase.phoneVerified || row.kycCase.missingRequirementCodes.length > 0} onClick={() => decide(row, "APPROVED")}><CheckCircle2 className="mr-2 h-4 w-4" />Approve and activate</Button></div>}</div>
-    </CardContent></Card>)}
-  </div>;
+  const setDocumentDecision = (documentId: number, approved: boolean) => {
+    setDecisions((current) => ({
+      ...current,
+      [documentId]: {
+        approved,
+        reason: approved ? "" : current[documentId]?.reason ?? "",
+      },
+    }));
+  };
+
+  const setReason = (documentId: number, reason: string) => {
+    setDecisions((current) => ({
+      ...current,
+      [documentId]: { approved: false, reason },
+    }));
+  };
+
+  const submitDecision = async (decision: "APPROVED" | "REJECTED") => {
+    if (!selected?.kycCase.id || !allDecided) return;
+    if (decision === "APPROVED" && hasRejected) {
+      toast.error(
+        "Resolve every rejected document before approving the account.",
+      );
+      return;
+    }
+    if (
+      decision === "REJECTED" &&
+      (!hasRejected || !rejectionReasonsComplete)
+    ) {
+      toast.error(
+        "Select the inaccurate document and state what must be corrected.",
+      );
+      return;
+    }
+    setBusy(true);
+    try {
+      await reviewKyc(
+        selected.kycCase.id,
+        decision,
+        notes.trim(),
+        documents.map((document) => ({
+          documentId: document.id,
+          approved: decisions[document.id].approved === true,
+          reason: decisions[document.id].reason.trim() || undefined,
+        })),
+      );
+      toast.success(
+        decision === "APPROVED"
+          ? "KYC approved and the customer account activated."
+          : "Only the inaccurate documents were returned for replacement.",
+      );
+      setSelectedCaseId(undefined);
+      await load();
+    } catch (error) {
+      toast.error(message(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 px-3 py-6">
+      <header className="flex flex-col justify-between gap-4 rounded-3xl bg-[#071744] p-7 text-white md:flex-row md:items-end">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[.2em] text-orange-300">
+            Controlled operations
+          </p>
+          <h1 className="mt-2 text-3xl font-bold">Customer KYC requests</h1>
+          <p className="mt-2 max-w-3xl text-white/70">
+            Select a request, compare each protected original with its OCR
+            data, and decide every document independently.
+          </p>
+        </div>
+        <Button variant="secondary" onClick={load} disabled={loading}>
+          <RefreshCw
+            className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`}
+          />
+          Refresh list
+        </Button>
+      </header>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Metric
+          label="Awaiting decision"
+          value={
+            rows.filter((row) =>
+              ["SUBMITTED", "REVIEW_REQUIRED"].includes(row.kycCase.status),
+            ).length
+          }
+          icon={FileSearch}
+        />
+        <Metric
+          label="Returned for correction"
+          value={
+            rows.filter((row) => row.kycCase.status === "REJECTED").length
+          }
+          icon={ShieldAlert}
+        />
+        <Metric
+          label="Requests received"
+          value={rows.length}
+          icon={UserRoundSearch}
+        />
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex min-h-56 items-center justify-center text-slate-500">
+              <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+              Loading requests…
+            </div>
+          ) : rows.length === 0 ? (
+            <p className="py-20 text-center text-slate-500">
+              No KYC requests require attention.
+            </p>
+          ) : (
+            <div className="divide-y">
+              {rows.map((row) => (
+                <div
+                  key={row.kycCase.id}
+                  className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <p className="font-bold text-[#071744]">
+                      {row.fullName || "Unnamed customer"}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {row.email} · User #{row.userId}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-sm text-slate-500">
+                      {row.kycCase.documents.length} current documents
+                    </span>
+                    <Badge
+                      variant={
+                        row.kycCase.status === "REJECTED"
+                          ? "destructive"
+                          : "secondary"
+                      }
+                    >
+                      {readable(row.kycCase.status)}
+                    </Badge>
+                    <Button variant="outline" onClick={() => openReview(row)}>
+                      <FileSearch className="mr-2 h-4 w-4" />
+                      {row.kycCase.status === "REJECTED"
+                        ? "View correction"
+                        : "Review request"}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={Boolean(selected)}
+        onOpenChange={(open) => !open && setSelectedCaseId(undefined)}
+      >
+        <DialogContent className="max-h-[94vh] max-w-[96vw] overflow-y-auto p-0 sm:max-w-6xl">
+          {selected && (
+            <>
+              <DialogHeader className="border-b bg-slate-50 p-6 pr-14 text-left">
+                <DialogTitle>
+                  {selected.fullName || "Unnamed customer"}
+                </DialogTitle>
+                <DialogDescription>
+                  {selected.email} · Review the OCR values against each
+                  protected original.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 p-6">
+                {selected.kycCase.reviewNotes && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <b>Case note:</b> {selected.kycCase.reviewNotes}
+                  </div>
+                )}
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {documents.map((document) => {
+                    const fields = Object.entries(
+                      document.extractedFields ?? {},
+                    ).filter(([key]) => !key.startsWith("_"));
+                    const warning =
+                      document.extractedFields?._validationWarnings;
+                    const choice = decisions[document.id];
+                    return (
+                      <article
+                        key={document.id}
+                        className="rounded-2xl border p-5"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <h3 className="font-bold">
+                              {readable(document.documentType)}
+                            </h3>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Quality{" "}
+                              {document.qualityScore?.toFixed(1) ?? "checked"} ·
+                              OCR{" "}
+                              {document.ocrConfidence?.toFixed(1) ??
+                                "not available"}
+                              %
+                            </p>
+                          </div>
+                          <Badge
+                            variant={
+                              document.status === "REJECTED"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                          >
+                            {readable(document.status)}
+                          </Badge>
+                        </div>
+                        {warning && (
+                          <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+                            {warning}
+                          </p>
+                        )}
+                        <div className="mt-4">
+                          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                            OCR extracted data
+                          </p>
+                          {fields.length ? (
+                            <dl className="space-y-2 rounded-xl bg-slate-50 p-3 text-sm">
+                              {fields.map(([key, value]) => (
+                                <div
+                                  key={key}
+                                  className="flex justify-between gap-4 border-b border-slate-200 pb-2 last:border-0 last:pb-0"
+                                >
+                                  <dt className="text-slate-500">
+                                    {readable(key)}
+                                  </dt>
+                                  <dd className="text-right font-semibold">
+                                    {value}
+                                    {document.extractedFields[
+                                      `_confidence.${key}`
+                                    ]
+                                      ? ` (${document.extractedFields[`_confidence.${key}`]}%)`
+                                      : ""}
+                                  </dd>
+                                </div>
+                              ))}
+                            </dl>
+                          ) : (
+                            <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+                              No structured value was extracted. Inspect the
+                              original carefully.
+                            </p>
+                          )}
+                        </div>
+                        <KycDocumentViewer
+                          document={document}
+                          className="mt-4 w-full"
+                        />
+                        {pendingReview ? (
+                          <div className="mt-4 space-y-3 border-t pt-4">
+                            <div className="grid grid-cols-2 gap-2">
+                              <Button
+                                type="button"
+                                variant={
+                                  choice?.approved === true
+                                    ? "default"
+                                    : "outline"
+                                }
+                                className={
+                                  choice?.approved === true
+                                    ? "bg-emerald-600 hover:bg-emerald-700"
+                                    : ""
+                                }
+                                onClick={() =>
+                                  setDocumentDecision(document.id, true)
+                                }
+                              >
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                Accept document
+                              </Button>
+                              <Button
+                                type="button"
+                                variant={
+                                  choice?.approved === false
+                                    ? "destructive"
+                                    : "outline"
+                                }
+                                onClick={() =>
+                                  setDocumentDecision(document.id, false)
+                                }
+                              >
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Reject document
+                              </Button>
+                            </div>
+                            {choice?.approved === false && (
+                              <Textarea
+                                aria-label={`Correction reason for ${readable(document.documentType)}`}
+                                value={choice.reason}
+                                onChange={(event) =>
+                                  setReason(document.id, event.target.value)
+                                }
+                                placeholder="Explain exactly what is inaccurate or unreadable and what the customer must replace."
+                              />
+                            )}
+                          </div>
+                        ) : document.rejectionReason ? (
+                          <p className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                            <b>Correction requested:</b>{" "}
+                            {document.rejectionReason}
+                          </p>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+
+                {pendingReview && (
+                  <div className="space-y-4 rounded-2xl border bg-slate-50 p-5">
+                    <div>
+                      <label
+                        htmlFor="case-notes"
+                        className="text-sm font-bold"
+                      >
+                        Overall review note (optional)
+                      </label>
+                      <Textarea
+                        id="case-notes"
+                        className="mt-2 bg-white"
+                        value={notes}
+                        onChange={(event) => setNotes(event.target.value)}
+                        placeholder="Add a concise case-level note. Document-specific correction reasons are captured above."
+                      />
+                    </div>
+                    {!allDecided && (
+                      <p className="text-sm text-amber-800">
+                        Decide every current document before completing this
+                        review.
+                      </p>
+                    )}
+                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                      <Button
+                        variant="destructive"
+                        disabled={
+                          busy ||
+                          !allDecided ||
+                          !hasRejected ||
+                          !rejectionReasonsComplete
+                        }
+                        onClick={() => void submitDecision("REJECTED")}
+                      >
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Request document correction
+                      </Button>
+                      <Button
+                        className="bg-emerald-600 hover:bg-emerald-700"
+                        disabled={
+                          busy ||
+                          !allDecided ||
+                          hasRejected ||
+                          !selected.kycCase.phoneVerified ||
+                          selected.kycCase.missingRequirementCodes.length > 0
+                        }
+                        onClick={() => void submitDecision("APPROVED")}
+                      >
+                        {busy && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Approve KYC and activate
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 
-function Metric({ label, value, icon: Icon }: { label: string; value: number; icon: typeof FileSearch }) { return <Card><CardContent className="flex items-center gap-4 pt-5"><div className="rounded-xl bg-orange-50 p-3 text-[#EF4217]"><Icon className="h-5 w-5" /></div><div><p className="text-2xl font-bold text-[#071744]">{value}</p><p className="text-sm text-slate-500">{label}</p></div></CardContent></Card>; }
+function Metric({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: number;
+  icon: typeof FileSearch;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-4 pt-5">
+        <div className="rounded-xl bg-orange-50 p-3 text-[#EF4217]">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-[#071744]">{value}</p>
+          <p className="text-sm text-slate-500">{label}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
