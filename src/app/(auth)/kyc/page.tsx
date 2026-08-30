@@ -38,8 +38,12 @@ const label = (value: string) =>
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 const errorMessage = (error: unknown, fallback: string) => {
-  const candidate = error as { response?: { data?: { description?: string } } };
+  const candidate = error as {
+    response?: { data?: { description?: string; data?: unknown[] } };
+  };
+  const detail = candidate.response?.data?.data?.[0];
   return (
+    (typeof detail === "string" && detail.trim() ? detail : undefined) ??
     candidate.response?.data?.description ??
     (error instanceof Error ? error.message : fallback)
   );
