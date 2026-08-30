@@ -187,23 +187,20 @@ export function useApi() {
           console.log("Deleting user with email:", email);
         }
 
-      const createNewProperty = async (data: {image: File, name: string, type: string, address: string,mapLocation: string, currency:string}) => {
+      const createNewProperty = async (data: {image: File, name: string, type: string, managementMode: "RENTAL" | "SALE" | "SERVICE_CHARGE", address: string,mapLocation: string, currency:string}) => {
         try {
           const { token } = useAuthStore.getState();
           if (!token) throw new Error("No token available");
-          console.log("Creating property with data:", data);
           const res = await createProperty(data, token);
           if (res.data?.code === "S0174") {
-                console.log("Gated: ", res.data.code)
                 return {profileGate: true, fields: res.data.data[0]} satisfies ProfileGateResult;
               }
-          console.log("Response from createProperty:", res);
           return res.data;
         }
-        catch (error: any) {
-          if (error?.response?.data?.code === "S0174") {
-                  console.log("Gated: ", error.response.data.code)
-                return {profileGate: true, fields: error?.response?.data.data[0]} satisfies ProfileGateResult;
+        catch (error: unknown) {
+          const apiError = error as { response?: { data?: { code?: string; data?: ProfileGateFields[] } } };
+          if (apiError.response?.data?.code === "S0174") {
+                return {profileGate: true, fields: apiError.response.data.data?.[0] ?? {}} satisfies ProfileGateResult;
               }
           console.error("Error creating property:", error);
           throw error;

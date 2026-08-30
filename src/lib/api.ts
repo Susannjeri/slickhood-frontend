@@ -249,6 +249,7 @@ export const createProperty = (data: {
   image: File;
   name: string;
   type: string;
+  managementMode: "RENTAL" | "SALE" | "SERVICE_CHARGE";
   address: string;
   currency: string;
   mapLocation: string;
@@ -257,6 +258,7 @@ export const createProperty = (data: {
   formData.append("image", data.image);
   formData.append("name", data.name);
   formData.append("type", data.type);
+  formData.append("managementMode", data.managementMode);
   formData.append("address", data.address);
   formData.append("currency", data.currency);
   formData.append("mapLocation", data.mapLocation);

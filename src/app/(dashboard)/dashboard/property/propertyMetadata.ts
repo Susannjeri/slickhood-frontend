@@ -1,8 +1,18 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useApi } from "@/hooks/useApi";
 
 const PROPERTY_TYPE_KEY = "pms_property_types";
 const UNIT_TYPE_KEY = "pms_unit_types";
+
+function readCache<T>(key: string, fallback: T): T {
+    try {
+        const value = localStorage.getItem(key);
+        return value ? JSON.parse(value) as T : fallback;
+    } catch {
+        localStorage.removeItem(key);
+        return fallback;
+    }
+}
 
 export interface TypeMetaData {
     id: string;
@@ -12,6 +22,8 @@ export interface TypeMetaData {
 
 export const usePropertyMetadata = () => {
     const { getSupportedPropertyTypes, fetchSupportedUnitTypes } = useApi();
+    const getSupportedPropertyTypesRef = useRef(getSupportedPropertyTypes);
+    const fetchSupportedUnitTypesRef = useRef(fetchSupportedUnitTypes);
     const [propertyTypes, setPropertyTypes] = useState<TypeMetaData[]>([]);
     const [unitTypes, setUnitTypes] = useState<Record<string, TypeMetaData[]>>({});
     const [loading, setLoading] = useState(false);
@@ -20,25 +32,28 @@ export const usePropertyMetadata = () => {
 
     useEffect(() => {
         const initProperties = async () => {
-            const localData = localStorage.getItem(PROPERTY_TYPE_KEY);
+            const cachedTypes = readCache<TypeMetaData[]>(PROPERTY_TYPE_KEY, []);
 
-            if (localData) {
-                setPropertyTypes(JSON.parse(localData));
+            if (cachedTypes.length > 0) {
+                setPropertyTypes(cachedTypes);
             } else {
                 setLoading(true);
-                const propertyTypeResponse = await getSupportedPropertyTypes();
-                if (propertyTypeResponse.success && Array.isArray(propertyTypeResponse.data)) {
-                    const fetchedTypes: any[] = propertyTypeResponse.data;
-
-                    setPropertyTypes(fetchedTypes);
-                    localStorage.setItem(PROPERTY_TYPE_KEY, JSON.stringify(fetchedTypes));
+                try {
+                    const propertyTypeResponse = await getSupportedPropertyTypesRef.current();
+                    if (propertyTypeResponse.success && Array.isArray(propertyTypeResponse.data)) {
+                        const fetchedTypes: TypeMetaData[] = propertyTypeResponse.data;
+                        setPropertyTypes(fetchedTypes);
+                        localStorage.setItem(PROPERTY_TYPE_KEY, JSON.stringify(fetchedTypes));
+                    }
+                } catch {
+                    setPropertyTypes([]);
+                } finally {
+                    setLoading(false);
                 }
-                setLoading(false);
             }
         };
         const initUnitTypeFromLocalStorage = async () => {
-            const localUnits = localStorage.getItem(UNIT_TYPE_KEY);
-            const cache: Record<string, TypeMetaData[]> = localUnits ? JSON.parse(localUnits) : {};
+            const cache = readCache<Record<string, TypeMetaData[]>>(UNIT_TYPE_KEY, {});
             setUnitTypes(cache);
         }
         initProperties();
@@ -47,8 +62,7 @@ export const usePropertyMetadata = () => {
 
     const getUnitTypes = useCallback(async (propertyTypeName: string) => {
         setCurrentPropertyType(propertyTypeName);
-        const localUnits = localStorage.getItem(UNIT_TYPE_KEY);
-        const cache: Record<string, TypeMetaData[]> = localUnits ? JSON.parse(localUnits) : {};
+        const cache = readCache<Record<string, TypeMetaData[]>>(UNIT_TYPE_KEY, {});
 
         if (cache[propertyTypeName]) {
             return cache[propertyTypeName];
@@ -56,17 +70,19 @@ export const usePropertyMetadata = () => {
 
         // Not in cache? Fetch from API
         setLoading(true);
-        const unitTypeResponse = await fetchSupportedUnitTypes(propertyTypeName);
-
-        if (unitTypeResponse.success && Array.isArray(unitTypeResponse.data)) {
-            const fetchedTypes: TypeMetaData[] = unitTypeResponse.data;
-            const updatedCache = { ...cache, [propertyTypeName]: fetchedTypes };
-            setUnitTypes(updatedCache);
-            localStorage.setItem(UNIT_TYPE_KEY, JSON.stringify(updatedCache));
-            return updatedCache;
+        try {
+            const unitTypeResponse = await fetchSupportedUnitTypesRef.current(propertyTypeName);
+            if (unitTypeResponse.success && Array.isArray(unitTypeResponse.data)) {
+                const fetchedTypes: TypeMetaData[] = unitTypeResponse.data;
+                const updatedCache = { ...cache, [propertyTypeName]: fetchedTypes };
+                setUnitTypes(updatedCache);
+                localStorage.setItem(UNIT_TYPE_KEY, JSON.stringify(updatedCache));
+                return fetchedTypes;
+            }
+            return [];
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
-        return [];
     }, []);
 
     const propertyTypeOptions = useMemo(() =>
