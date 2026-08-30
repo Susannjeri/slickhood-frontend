@@ -131,7 +131,12 @@ export const googleLogin = (data: { idToken: string, token?: string }) =>
 
 export const listRoles = () => API.get("/role/list")
 
-export type InternalStaffRole = "SUPPORT" | "SALES_MARKETING" | "FINANCE";
+export type InternalStaffRole =
+  | "SUPPORT"
+  | "SALES_MARKETING"
+  | "FINANCE"
+  | "INSURANCE_ADVISER"
+  | "INSURANCE_MANAGER";
 export const inviteInternalStaff = (email: string, role: InternalStaffRole, token: string) =>
   API.post("/user/staff/invite", { email, role }, {
     headers: { Authorization: `Bearer ${token}` },

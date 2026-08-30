@@ -31,9 +31,9 @@ export const sidebarLinks: SidebarLink[] = [
   },
   {
     icon: User,
-    label: "Users",
+    label: "Users & Staff",
     href: "/dashboard/users",
-    description: "View and manage users, accounts, and access.",
+    description: "View users and securely invite SlickHood and Silverwood staff.",
     protected: true,
     permissions: ["list_users"],
   },
@@ -390,7 +390,7 @@ const sectionDefinitions = [
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "Soko", "My Services", "Merchant Accounts", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre", "Subscriptions", "Upgrade Plan"] },
-  { label: "Administration", links: ["Users", "KYC Reviews", "Team User Types", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Affiliate Management"] },
+  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Affiliate Management"] },
 ] as const
 
 const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))
