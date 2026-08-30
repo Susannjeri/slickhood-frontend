@@ -54,6 +54,30 @@ export const resolveHelpConversation = (conversationId: number) =>
 export const saveHelpArticle = (article: Omit<HelpDeskArticle, "id">, id?: number) =>
   id ? API.put(`/helpdesk/admin/articles/${id}`, article) : API.post("/helpdesk/admin/articles", article);
 
+export type TeamMembershipStatus = "PENDING" | "ACCEPTED" | "KYC_PENDING" | "ACTIVE" | "EXPIRED" | "REVOKED" | "SUSPENDED";
+export type TeamScopeType = "ENTIRE_WORKSPACE" | "SELECTED_RESOURCES";
+export interface TeamRoleOption { id: number; code: string; name: string; permissionTemplate: string }
+export interface TeamResource { id: number; name: string; description?: string }
+export interface TeamInvitation { id: number; email: string; role: string; roleName: string; scopeType: TeamScopeType; resourceIds: number[]; status: TeamMembershipStatus; expiresAt: string; resendCount: number }
+export interface TeamMember { id: number; userId: number; email: string; name: string; role: string; roleName: string; scopeType: TeamScopeType; resourceIds: number[]; status: TeamMembershipStatus; acceptedAt?: string; activatedAt?: string }
+export interface TeamWorkspace { id: number; name: string; businessArea: string; owner: boolean; seatLimit: number; seatsUsed: number; roles: TeamRoleOption[]; resources: TeamResource[]; invitations: TeamInvitation[]; members: TeamMember[] }
+export type TeamBusinessArea = "LANDLORD" | "ESTATE_MANAGEMENT" | "PROPERTY_SALE_MANAGEMENT";
+export type TeamPermissionTemplate = "WORKSPACE_ADMIN" | "PROPERTY_MANAGER" | "PROPERTY_ACCOUNTANT" | "LEASING_OFFICER" | "ESTATE_OPERATIONS_MANAGER" | "SECURITY_SUPERVISOR" | "GUARD" | "SALES_COORDINATOR" | "LISTING_AGENT" | "VIEWER";
+export interface TeamRoleDefinition { id: number; code: string; displayName: string; description?: string; businessArea: TeamBusinessArea; permissionTemplate: TeamPermissionTemplate; active: boolean }
+export interface TeamRoleDefinitionPayload { code: string; displayName: string; description?: string; businessArea: TeamBusinessArea; permissionTemplate: TeamPermissionTemplate }
+export const getTeamWorkspace = () => API.get("/team-access");
+export const inviteTeamMember = (payload: { email: string; roleDefinitionId: number; scopeType: TeamScopeType; resourceIds: number[] }) => API.post("/team-access/invitations", payload);
+export const resendTeamInvitation = (id: number) => API.post(`/team-access/invitations/${id}/resend`);
+export const revokeTeamInvitation = (id: number) => API.delete(`/team-access/invitations/${id}`);
+export const updateTeamMemberScope = (id: number, payload: { scopeType: TeamScopeType; resourceIds: number[] }) => API.patch(`/team-access/members/${id}/scope`, payload);
+export const suspendTeamMember = (id: number) => API.post(`/team-access/members/${id}/suspend`);
+export const resumeTeamMember = (id: number) => API.post(`/team-access/members/${id}/resume`);
+export const revokeTeamMember = (id: number) => API.delete(`/team-access/members/${id}`);
+export const listTeamRoleDefinitions = () => API.get("/team-access/role-definitions");
+export const createTeamRoleDefinition = (payload: TeamRoleDefinitionPayload) => API.post("/team-access/role-definitions", payload);
+export const updateTeamRoleDefinition = (id: number, payload: TeamRoleDefinitionPayload) => API.put(`/team-access/role-definitions/${id}`, payload);
+export const setTeamRoleDefinitionStatus = (id: number, active: boolean) => API.patch(`/team-access/role-definitions/${id}/status`, null, { params: { active } });
+
 export interface ReportDefinition {
   code: string;
   title: string;

@@ -1,0 +1,45 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import { Pencil, Plus, RefreshCw, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { createTeamRoleDefinition, listTeamRoleDefinitions, setTeamRoleDefinitionStatus, TeamBusinessArea, TeamPermissionTemplate, TeamRoleDefinition, TeamRoleDefinitionPayload, updateTeamRoleDefinition } from "@/lib/api";
+
+const businessAreas: Array<{ value: TeamBusinessArea; label: string }> = [
+  { value: "LANDLORD", label: "Landlord" }, { value: "ESTATE_MANAGEMENT", label: "Estate Management" }, { value: "PROPERTY_SALE_MANAGEMENT", label: "Property Sale Management" },
+];
+const templates: Array<{ value: TeamPermissionTemplate; label: string }> = [
+  { value: "WORKSPACE_ADMIN", label: "Workspace administrator" }, { value: "PROPERTY_MANAGER", label: "Property manager" },
+  { value: "PROPERTY_ACCOUNTANT", label: "Property accountant" }, { value: "LEASING_OFFICER", label: "Leasing officer" },
+  { value: "ESTATE_OPERATIONS_MANAGER", label: "Estate operations manager" }, { value: "SECURITY_SUPERVISOR", label: "Security supervisor" },
+  { value: "GUARD", label: "Guard" }, { value: "SALES_COORDINATOR", label: "Sales coordinator" },
+  { value: "LISTING_AGENT", label: "Listing agent" }, { value: "VIEWER", label: "Read-only viewer" },
+];
+const blank: TeamRoleDefinitionPayload = { code: "", displayName: "", description: "", businessArea: "LANDLORD", permissionTemplate: "VIEWER" };
+const message = (error: unknown) => axios.isAxiosError<{description?: string}>(error) ? error.response?.data?.description ?? "The change could not be saved." : "The change could not be saved.";
+
+export default function TeamRoleDefinitionsPage() {
+  const [roles, setRoles] = useState<TeamRoleDefinition[]>([]); const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<TeamRoleDefinition | null | undefined>(undefined); const [form, setForm] = useState<TeamRoleDefinitionPayload>(blank);
+  const load = useCallback(async () => { try { setLoading(true); setRoles((await listTeamRoleDefinitions()).data.data as TeamRoleDefinition[]); } catch (error) { toast.error(message(error)); } finally { setLoading(false); } }, []);
+  useEffect(() => { void load(); }, [load]);
+  const grouped = useMemo(() => businessAreas.map(area => ({ ...area, roles: roles.filter(role => role.businessArea === area.value) })), [roles]);
+  const openNew = () => { setForm(blank); setEditing(null); };
+  const openEdit = (role: TeamRoleDefinition) => { setForm({ code: role.code, displayName: role.displayName, description: role.description ?? "", businessArea: role.businessArea, permissionTemplate: role.permissionTemplate }); setEditing(role); };
+  const save = async () => { if (!form.code.trim() || !form.displayName.trim()) return toast.error("Code and display name are required."); const payload = { ...form, code: form.code.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_"), displayName: form.displayName.trim(), description: form.description?.trim() }; try { setBusy(true); editing ? await updateTeamRoleDefinition(editing.id, payload) : await createTeamRoleDefinition(payload); toast.success(editing ? "User type updated." : "User type created."); setEditing(undefined); await load(); } catch (error) { toast.error(message(error)); } finally { setBusy(false); } };
+  const toggle = async (role: TeamRoleDefinition) => { try { setBusy(true); await setTeamRoleDefinitionStatus(role.id, !role.active); toast.success(role.active ? "User type disabled." : "User type enabled."); await load(); } catch (error) { toast.error(message(error)); } finally { setBusy(false); } };
+
+  return <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
+    <section className="rounded-2xl bg-[#071a4f] p-6 text-white shadow-sm lg:p-8"><div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-orange-300"><ShieldCheck className="h-4 w-4" /> Superadmin control</p><h1 className="mt-2 text-3xl font-bold">Customer team user types</h1><p className="mt-2 max-w-3xl text-sm text-blue-100">Create the types workspace owners may assign. Each type is bound to a fixed SlickHood permission template; customer administrators cannot edit or create them.</p></div><Button onClick={openNew} className="bg-orange-600 hover:bg-orange-700"><Plus className="mr-2 h-4 w-4" /> Add user type</Button></div></section>
+    {loading ? <div className="flex min-h-60 items-center justify-center"><RefreshCw className="h-7 w-7 animate-spin text-orange-600" /></div> : <div className="grid gap-6 lg:grid-cols-3">{grouped.map(group => <Card key={group.value}><CardHeader><CardTitle>{group.label}</CardTitle><CardDescription>{group.roles.length} controlled user type{group.roles.length === 1 ? "" : "s"}</CardDescription></CardHeader><CardContent className="space-y-3">{group.roles.length === 0 ? <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">No user types configured.</div> : group.roles.map(role => <div key={role.id} className="rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{role.displayName}</p><Badge variant="outline" className={role.active ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-600"}>{role.active ? "Active" : "Disabled"}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{role.code}</p><p className="mt-2 text-sm text-muted-foreground">{role.description || "No description"}</p><p className="mt-2 text-xs font-medium text-blue-800">Security template: {templates.find(item => item.value === role.permissionTemplate)?.label}</p></div><Button size="icon" variant="ghost" onClick={() => openEdit(role)} aria-label={`Edit ${role.displayName}`}><Pencil className="h-4 w-4" /></Button></div><Button variant="outline" size="sm" disabled={busy} onClick={() => toggle(role)} className="mt-4 w-full">{role.active ? "Disable" : "Enable"}</Button></div>)}</CardContent></Card>)}</div>}
+    <Dialog open={editing !== undefined} onOpenChange={open => !open && setEditing(undefined)}><DialogContent className="sm:max-w-xl"><DialogHeader><DialogTitle>{editing ? "Edit user type" : "Create user type"}</DialogTitle><DialogDescription>The permission template is a fixed security ceiling. Names and descriptions never add authority.</DialogDescription></DialogHeader><div className="grid gap-4 py-2"><div className="grid gap-2"><Label>Business area</Label><Select value={form.businessArea} onValueChange={value => setForm(current => ({ ...current, businessArea: value as TeamBusinessArea }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{businessAreas.map(area => <SelectItem key={area.value} value={area.value}>{area.label}</SelectItem>)}</SelectContent></Select></div><div className="grid gap-2"><Label>Security template</Label><Select value={form.permissionTemplate} onValueChange={value => setForm(current => ({ ...current, permissionTemplate: value as TeamPermissionTemplate }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{templates.map(template => <SelectItem key={template.value} value={template.value}>{template.label}</SelectItem>)}</SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="role-name">Display name</Label><Input id="role-name" value={form.displayName} onChange={event => setForm(current => ({ ...current, displayName: event.target.value }))} placeholder="e.g. Day Shift Guard" /></div><div className="grid gap-2"><Label htmlFor="role-code">System code</Label><Input id="role-code" value={form.code} disabled={Boolean(editing)} onChange={event => setForm(current => ({ ...current, code: event.target.value.toUpperCase() }))} placeholder="DAY_SHIFT_GUARD" /></div><div className="grid gap-2"><Label htmlFor="role-description">Description</Label><Input id="role-description" value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} placeholder="When workspace owners should assign this type" /></div></div><DialogFooter><Button variant="outline" onClick={() => setEditing(undefined)}>Cancel</Button><Button onClick={save} disabled={busy} className="bg-orange-600 hover:bg-orange-700">Save user type</Button></DialogFooter></DialogContent></Dialog>
+  </main>;
+}

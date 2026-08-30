@@ -127,6 +127,15 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
     permissions: ["admin_access"],
   },
+  {
+    icon: ShieldCheck,
+    label: "Team User Types",
+    href: "/dashboard/team-role-definitions",
+    description: "Create and govern the customer team roles available in each business area.",
+    protected: false,
+    permissions: [],
+    roles: ["Superadmin"],
+  },
 
 
   // { 
@@ -275,6 +284,15 @@ export const sidebarLinks: SidebarLink[] = [
   },
   {
     icon: Users,
+    label: "Team & Access",
+    href: "/dashboard/team-access",
+    protected: false,
+    permissions: [],
+    roles: ["Landlord", "EstateManager", "SalesAgent", "WorkspaceAdmin"],
+    description: "Invite team members, assign secure roles and control their workspace scope.",
+  },
+  {
+    icon: Users,
     label: "Visitors",
     href: "/dashboard/visitors",
     protected: true,
@@ -369,10 +387,10 @@ const sectionDefinitions = [
   { label: "Overview", links: ["Home", "Business Areas", "My Wealth"] },
   { label: "Property & Leasing", links: ["Properties", "Leases", "Documents & Notices", "Estate Management", "Property Sale Management", "Community Funds"] },
   { label: "Money", links: ["Accounts", "Payments", "Invoices", "Reports", "Insurance Hub"] },
-  { label: "People & Access", links: ["Visitors", "Visitor Management", "Smart Gates"] },
+  { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "Soko", "My Services", "Merchant Accounts", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre", "Subscriptions", "Upgrade Plan"] },
-  { label: "Administration", links: ["Users", "KYC Reviews", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Affiliate Management"] },
+  { label: "Administration", links: ["Users", "KYC Reviews", "Team User Types", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Affiliate Management"] },
 ] as const
 
 const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))

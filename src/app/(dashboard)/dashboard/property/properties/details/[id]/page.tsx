@@ -1274,8 +1274,32 @@ export default function PropertyDetailsPage() {
                     )}
                 </div>
 
-                {/* Staff & Invites Section - MOVED TO BOTTOM WITH TABS */}
+                {/* Property assignments now use the centralized, email-bound workspace workflow. */}
                 <CanProperty propertyId={Number(propertyId)} permissions={["view_property_staff"]}>
+                    <div className="rounded-lg border bg-white p-6 shadow-sm">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-start gap-3">
+                                <Users className="mt-1 h-5 w-5 text-[#EF4217]" />
+                                <div>
+                                    <h2 className="text-xl font-semibold text-[#141130]">Assigned team</h2>
+                                    <p className="mt-1 max-w-2xl text-sm text-gray-600">
+                                        Invite and manage staff through Team &amp; Access. This property will be
+                                        preselected so every membership remains email-bound, auditable and scoped.
+                                    </p>
+                                </div>
+                            </div>
+                            <Button
+                                onClick={() => router.push(`/dashboard/team-access?propertyId=${propertyId}`)}
+                                className="w-full bg-[#EF4217] text-white hover:bg-[#d93a13] sm:w-auto"
+                            >
+                                Open Team &amp; Access
+                            </Button>
+                        </div>
+                    </div>
+                </CanProperty>
+
+                {/* Retained temporarily for migration safety; no longer rendered or reachable. */}
+                {staffData && (false as boolean) && (<CanProperty propertyId={Number(propertyId)} permissions={["view_property_staff"]}>
                     <Accordion type="single" collapsible className="w-full">
                         <AccordionItem value="staff-invites" className="border rounded-lg bg-white">
                             <AccordionTrigger className="px-6 hover:no-underline">
@@ -1503,7 +1527,7 @@ export default function PropertyDetailsPage() {
                             </AccordionContent>
                         </AccordionItem>
                     </Accordion>
-                </CanProperty>
+                </CanProperty>)}
             </div>
         </div>
     );
