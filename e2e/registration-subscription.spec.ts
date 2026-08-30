@@ -22,7 +22,7 @@ test("selected business area invisibly carries the correct role into registratio
   await expect(page).toHaveURL(/\/register$/);
 
   await page.getByPlaceholder("Enter your full name").fill("SlickHood Test Owner");
-  await page.getByPlaceholder("Enter your email").fill("owner.e2e@slickhood.test");
+  await page.getByPlaceholder("Enter your email").fill("Owner.E2E@SlickHood.Test");
   await page.getByPlaceholder("Create a password").fill("StrongPass1!");
   await page.getByPlaceholder("Confirm your password").fill("StrongPass1!");
   await page.getByRole("button", { name: "Create account" }).click();

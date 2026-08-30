@@ -763,7 +763,8 @@ export function useAuth() {
   const register = async (email: string, password: string, fullName: string) => {
     try {
       const { roleId, inviteToken } = useAuthStore.getState();
-      const payload: { email: string; password: string; fullName: string; roleId?: number; token?: string; referralCode?: string; referralCampaign?: string } = { email, password, fullName };
+      const normalizedEmail = email.trim().toLowerCase();
+      const payload: { email: string; password: string; fullName: string; roleId?: number; token?: string; referralCode?: string; referralCampaign?: string } = { email: normalizedEmail, password, fullName: fullName.trim() };
       if (roleId) payload.roleId = roleId;
       if (inviteToken) payload.token = inviteToken;
       if (typeof window !== "undefined") {
@@ -777,7 +778,7 @@ export function useAuth() {
       if (typeof window !== "undefined") { localStorage.removeItem("slickhood_referral_code"); localStorage.removeItem("slickhood_referral_campaign"); }
 
       const description = response.data.description;
-      setEmail(email);
+      setEmail(normalizedEmail);
 
       if (inviteToken) {
         console.log("Clearing invite token after successful use");

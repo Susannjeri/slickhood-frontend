@@ -52,6 +52,7 @@ export default function RegisterForm() {
     const googleBtnRef                      = useRef<HTMLDivElement>(null);
     const credentialHandlerRef              = useRef<(response: GoogleCredentialResponse) => void>(() => undefined);
     const guardCheckedRef                   = useRef(false);
+    const registrationInFlightRef           = useRef(false);
 
     const router = useRouter();
     const { setStep, setToken, setmfaEnabled, settotpEnabled } = useAuthStore();
@@ -133,13 +134,21 @@ export default function RegisterForm() {
 
     // Handlers (unchanged)
     const runRegister = async (values: RegisterSchema) => {
+        if (registrationInFlightRef.current) return;
+        registrationInFlightRef.current = true;
+        setLoading(true);
         setError(null);
-        const result = await register(values.email, values.password, values.fullName);
-        if (result.success) {
-            setStep("verify");
-            router.push("/verify-code");
-        } else {
-            setError(result.message || "Registration failed");
+        try {
+            const result = await register(values.email, values.password, values.fullName);
+            if (result.success) {
+                setStep("verify");
+                router.push("/verify-code");
+            } else {
+                setError(result.message || "Registration failed");
+            }
+        } finally {
+            registrationInFlightRef.current = false;
+            setLoading(false);
         }
     };
 
