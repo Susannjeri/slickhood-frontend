@@ -9,7 +9,9 @@ export const loginSchema = z.object({
 export type LoginSchema = z.infer<typeof loginSchema>;
 
 export const registerSchema = z.object({
+  profileType: z.enum(["INDIVIDUAL", "COMPANY"]),
   fullName: z.string().trim().min(2, "Enter your full name").max(120, "Name is too long"),
+  organizationName: z.string().trim().max(160, "Organization name is too long"),
   email: z.email("Invalid email"),
   password: z
     .string()
@@ -19,9 +21,13 @@ export const registerSchema = z.object({
     .regex(/\d/, "Password must contain at least one number")
     .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character"),
   confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords must match",
-  path: ["confirmPassword"],
+}).superRefine((data, context) => {
+  if (data.password !== data.confirmPassword) {
+    context.addIssue({ code: "custom", message: "Passwords must match", path: ["confirmPassword"] });
+  }
+  if (data.profileType === "COMPANY" && data.organizationName.length < 2) {
+    context.addIssue({ code: "custom", message: "Enter the registered company or organization name", path: ["organizationName"] });
+  }
 });
 
 export type RegisterSchema = z.infer<typeof registerSchema>;

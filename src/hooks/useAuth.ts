@@ -501,7 +501,7 @@
 // 'use server';
 
 import axios from "axios";
-import { listRoles, loginUser, logoutUser, setrefreshToken, retrieveRefreshToken, registerUser, googleLogin, googleRegister, getOTP, validateTotp, getVerificationOptions, setCookie, clearCookie } from "@/lib/api";
+import { listRoles, loginUser, logoutUser, setrefreshToken, retrieveRefreshToken, registerUser, googleLogin, googleRegister, getOTP, validateTotp, getVerificationOptions, setCookie, clearCookie, RegistrationProfileType } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { decodeIdToken } from "@/lib/actions";
 import { decodeServerToken } from "@/lib/actions";
@@ -760,11 +760,12 @@ export function useAuth() {
 
   // ─── register ──────────────────────────────────────────────────────────────
 
-  const register = async (email: string, password: string, fullName: string) => {
+  const register = async (email: string, password: string, fullName: string, profileType: RegistrationProfileType, organizationName?: string) => {
     try {
       const { roleId, inviteToken } = useAuthStore.getState();
       const normalizedEmail = email.trim().toLowerCase();
-      const payload: { email: string; password: string; fullName: string; roleId?: number; token?: string; referralCode?: string; referralCampaign?: string } = { email: normalizedEmail, password, fullName: fullName.trim() };
+      const payload: { email: string; password: string; fullName: string; profileType: RegistrationProfileType; organizationName?: string; roleId?: number; token?: string; referralCode?: string; referralCampaign?: string } = { email: normalizedEmail, password, fullName: fullName.trim(), profileType };
+      if (profileType === "COMPANY") payload.organizationName = organizationName?.trim();
       if (roleId) payload.roleId = roleId;
       if (inviteToken) payload.token = inviteToken;
       if (typeof window !== "undefined") {
@@ -876,10 +877,11 @@ export function useAuth() {
 
   // ─── Google register ───────────────────────────────────────────────────────
 
-  const handleGoogleRegister = async (idToken: string, roleId: number) => {
+  const handleGoogleRegister = async (idToken: string, roleId: number, profileType: RegistrationProfileType, organizationName?: string) => {
     try {
       const { inviteToken } = useAuthStore.getState();
-      const payload: { idToken: string; roleId: number; token?: string; referralCode?: string; referralCampaign?: string } = { idToken, roleId };
+      const payload: { idToken: string; roleId: number; token?: string; profileType: RegistrationProfileType; organizationName?: string; referralCode?: string; referralCampaign?: string } = { idToken, roleId, profileType };
+      if (profileType === "COMPANY") payload.organizationName = organizationName?.trim();
       if (inviteToken) payload.token = inviteToken;
       if (typeof window !== "undefined") {
         const referralCode = localStorage.getItem("slickhood_referral_code");

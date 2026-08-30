@@ -1,5 +1,20 @@
-import { expect, test } from "@playwright/test";
+import { expect, Page, test } from "@playwright/test";
 import { authenticated, envelope, testToken } from "./support";
+
+async function acceptPolicies(page: Page) {
+  const policies = [
+    ["T&C", "I have read and agree to the Terms & Conditions."],
+    ["Privacy", "I have read and agree to the Privacy Policy."],
+    ["AUP", "I have read and agree to the Acceptable Use Policy."],
+    ["Data", "I have read and agree to the Data Protection & Privacy Policy."],
+    ["Age", "I confirm I am 18 years or older and legally capable of entering a binding agreement."],
+  ];
+  for (const [tab, checkbox] of policies) {
+    await page.getByRole("button", { name: tab, exact: true }).click();
+    await page.getByRole("checkbox", { name: checkbox }).check();
+  }
+  await page.getByRole("button", { name: "Accept & continue" }).click();
+}
 
 test("selected business area invisibly carries the correct role into registration", async ({ page }) => {
   await page.route("https://accounts.google.com/**", route => route.abort());
@@ -28,25 +43,47 @@ test("selected business area invisibly carries the correct role into registratio
   await page.getByRole("button", { name: "Create account" }).click();
 
   await expect(page.getByRole("dialog", { name: /Review & accept our policies/i })).toBeVisible();
-  const policies = [
-    ["T&C", "I have read and agree to the Terms & Conditions."],
-    ["Privacy", "I have read and agree to the Privacy Policy."],
-    ["AUP", "I have read and agree to the Acceptable Use Policy."],
-    ["Data", "I have read and agree to the Data Protection & Privacy Policy."],
-    ["Age", "I confirm I am 18 years or older and legally capable of entering a binding agreement."],
-  ];
-  for (const [tab, checkbox] of policies) {
-    await page.getByRole("button", { name: tab, exact: true }).click();
-    await page.getByRole("checkbox", { name: checkbox }).check();
-  }
-  await page.getByRole("button", { name: "Accept & continue" }).click();
+  await acceptPolicies(page);
   await expect(page).toHaveURL(/\/verify-code$/);
   expect(registration).toMatchObject({
     fullName: "SlickHood Test Owner",
     email: "owner.e2e@slickhood.test",
+    profileType: "INDIVIDUAL",
     roleId: 101,
   });
   expect(registration?.password).toBe("StrongPass1!");
+});
+
+test("organization registration separates the legal entity from its authorized representative", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/role/list", route => route.fulfill({ json: envelope([
+    { roleId: 102, roleName: "EstateManager", roleDescription: "Manage an estate", selfAssignable: true },
+  ]) }));
+  let registration: Record<string, unknown> | undefined;
+  await page.route("**/auth/register", async route => {
+    registration = route.request().postDataJSON();
+    await route.fulfill({ json: envelope([{ userId: 502 }]) });
+  });
+
+  await page.goto("/role");
+  await page.locator("article").filter({ hasText: "Estate Management" }).getByRole("button", { name: "Choose this area" }).click();
+  await page.getByRole("button", { name: /Company or organization/ }).click();
+  await page.getByPlaceholder("Enter the legal organization name").fill("Mitero Hope SHG");
+  await page.getByPlaceholder("Enter your full name").fill("Susan Wanjohi");
+  await page.getByPlaceholder("Enter your email").fill("office@mitero.example");
+  await page.getByPlaceholder("Create a password").fill("StrongPass1!");
+  await page.getByPlaceholder("Confirm your password").fill("StrongPass1!");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await acceptPolicies(page);
+
+  await expect(page).toHaveURL(/\/verify-code$/);
+  expect(registration).toMatchObject({
+    profileType: "COMPANY",
+    organizationName: "Mitero Hope SHG",
+    fullName: "Susan Wanjohi",
+    email: "office@mitero.example",
+    roleId: 102,
+  });
 });
 
 test("trial duration comes from policy and activation remains attached to the selected role", async ({ context, page }) => {

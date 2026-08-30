@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, Mail, Lock, User } from "lucide-react";
+import { Building2, Eye, EyeOff, Loader2, Mail, Lock, User } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store/authStore";
@@ -61,8 +61,9 @@ export default function RegisterForm() {
 
     const form = useForm<RegisterSchema>({
         resolver: zodResolver(registerSchema),
-        defaultValues: { fullName: "", email: "", password: "", confirmPassword: "" },
+        defaultValues: { profileType: "INDIVIDUAL", fullName: "", organizationName: "", email: "", password: "", confirmPassword: "" },
     });
+    const profileType = form.watch("profileType");
 
     // Keep an authenticated pending account inside the verification journey.
     // Leaving that journey must be an explicit action from the verification page.
@@ -80,8 +81,14 @@ export default function RegisterForm() {
     // Google credential callback (unchanged)
     credentialHandlerRef.current = async (response: GoogleCredentialResponse) => {
         const roleId = useAuthStore.getState().roleId || 0;
+        const values = form.getValues();
+        if (values.profileType === "COMPANY" && values.organizationName.trim().length < 2) {
+            form.setError("organizationName", { message: "Enter the registered company or organization name" });
+            setError("Enter your organization name before continuing with Google.");
+            return;
+        }
         setLoading(true);
-        const result = await handleGoogleRegister(response.credential, roleId);
+        const result = await handleGoogleRegister(response.credential, roleId, values.profileType, values.organizationName);
         if (result.success) {
             setToken(result.token || null);
             setmfaEnabled(result.mfaEnabled);
@@ -139,7 +146,7 @@ export default function RegisterForm() {
         setLoading(true);
         setError(null);
         try {
-            const result = await register(values.email, values.password, values.fullName);
+            const result = await register(values.email, values.password, values.fullName, values.profileType, values.organizationName);
             if (result.success) {
                 setStep("verify");
                 router.push("/verify-code");
@@ -192,10 +199,47 @@ export default function RegisterForm() {
 
                     <FormField
                         control={form.control}
+                        name="profileType"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-xs font-semibold text-[#14235C] dark:text-white">Who is this account for?</FormLabel>
+                                <FormControl>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <button type="button" aria-pressed={field.value === "INDIVIDUAL"} onClick={() => { field.onChange("INDIVIDUAL"); form.setValue("organizationName", ""); }} className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-colors ${field.value === "INDIVIDUAL" ? "border-[#EF4217] bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
+                                            <User className="mt-0.5 h-5 w-5 text-[#EF4217]" />
+                                            <span><strong className="block text-sm text-[#14235C]">Individual</strong><span className="text-xs text-gray-500">Register in your own legal name.</span></span>
+                                        </button>
+                                        <button type="button" aria-pressed={field.value === "COMPANY"} onClick={() => field.onChange("COMPANY")} className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-colors ${field.value === "COMPANY" ? "border-[#EF4217] bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
+                                            <Building2 className="mt-0.5 h-5 w-5 text-[#EF4217]" />
+                                            <span><strong className="block text-sm text-[#14235C]">Company or organization</strong><span className="text-xs text-gray-500">Register a business, estate, agency, group or institution.</span></span>
+                                        </button>
+                                    </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    {profileType === "COMPANY" && (
+                        <FormField
+                            control={form.control}
+                            name="organizationName"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="text-xs font-semibold text-[#14235C] dark:text-white">Registered company or organization name</FormLabel>
+                                    <FormControl><div className="relative"><Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><Input placeholder="Enter the legal organization name" autoComplete="organization" {...field} className={`pl-10 ${inputClass}`} /></div></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    )}
+
+                    <FormField
+                        control={form.control}
                         name="fullName"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="text-xs font-semibold text-[#14235C] dark:text-white">Full Name</FormLabel>
+                                <FormLabel className="text-xs font-semibold text-[#14235C] dark:text-white">{profileType === "COMPANY" ? "Authorized representative's full legal name" : "Full legal name"}</FormLabel>
                                 <FormControl>
                                     <div className="relative">
                                         <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />

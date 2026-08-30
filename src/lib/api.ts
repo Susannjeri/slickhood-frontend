@@ -95,10 +95,11 @@ API.interceptors.request.use((config) => {
 export const loginUser = (data: { email: string; password: string; roleId?: number; token?: string }) =>
   API.post("/auth/login", data)
 
-export const registerUser = (data: { email: string; password: string; fullName: string; roleId?: number; token?: string; referralCode?: string; referralCampaign?: string }) =>
+export type RegistrationProfileType = "INDIVIDUAL" | "COMPANY";
+export const registerUser = (data: { email: string; password: string; fullName: string; profileType: RegistrationProfileType; organizationName?: string; roleId?: number; token?: string; referralCode?: string; referralCampaign?: string }) =>
   API.post("/auth/register", data)
 
-export const googleRegister = (data: { idToken: string, roleId?: number, token?: string, referralCode?: string, referralCampaign?: string }) =>
+export const googleRegister = (data: { idToken: string, roleId?: number, token?: string, profileType: RegistrationProfileType, organizationName?: string, referralCode?: string, referralCampaign?: string }) =>
   API.post("/auth/google", data)
 
 export const googleLogin = (data: { idToken: string, token?: string }) =>
