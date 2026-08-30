@@ -106,6 +106,12 @@ export const googleLogin = (data: { idToken: string, token?: string }) =>
 
 export const listRoles = () => API.get("/role/list")
 
+export type InternalStaffRole = "SUPPORT" | "SALES_MARKETING" | "FINANCE";
+export const inviteInternalStaff = (email: string, role: InternalStaffRole, token: string) =>
+  API.post("/user/staff/invite", { email, role }, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
 export const selfAssignRole = (roleId: number, token: string) =>
   API.post(`/role/self-assign?roleId=${roleId}`, null, {
     headers: { Authorization: `Bearer ${token}` }

@@ -7,7 +7,7 @@ import { getCurrentKyc } from "@/services/kyc.service";
 import { useAuthStore } from "@/store/authStore";
 import { normalizedRoleTitle } from "@/config/businessAreas";
 
-const staffRoles = new Set(["superadmin", "finance", "insuranceadviser", "insurancemanager", "guard", "propertymanager"]);
+const staffRoles = new Set(["superadmin", "support", "salesmarketing", "finance", "insuranceadviser", "insurancemanager", "guard", "propertymanager"]);
 
 export default function OperationalAccessGuard({ children }: { children: ReactNode }) {
   const router = useRouter();

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthStore } from "@/store/authStore";
+import { normalizedRoleTitle } from "@/config/businessAreas";
 import {
   createHelpConversation, escalateHelpConversation, HelpDeskArticle, HelpDeskConversation,
   listHelpArticles, listHelpConversations, replyToHelpConversation, resolveHelpConversation,
@@ -22,7 +23,7 @@ const unwrap = <T,>(response: any): T[] => response?.data?.data ?? [];
 
 export default function HelpDeskPage() {
   const activeRole = useAuthStore((s) => s.activeRole?.title);
-  const isAdmin = activeRole === "Superadmin";
+  const isAdmin = ["superadmin", "support"].includes(normalizedRoleTitle(activeRole));
   const [mode, setMode] = useState<Mode>("mine");
   const [conversations, setConversations] = useState<HelpDeskConversation[]>([]);
   const [articles, setArticles] = useState<HelpDeskArticle[]>([]);

@@ -21,8 +21,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Search, ChevronDown, ChevronUp, ChevronsUpDown, Loader2, Trash2 } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, ChevronsUpDown, Loader2, Trash2, UserPlus, X } from 'lucide-react';
 import { useApi } from '@/hooks/useApi';
+import { inviteInternalStaff, InternalStaffRole } from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
+import { normalizedRoleTitle } from '@/config/businessAreas';
 
 interface User {
   name: string | null;
@@ -48,10 +51,18 @@ interface UserListResponse {
 
 export default function UserTable() {
   const { getUserList, deleteUser } = useApi();
+  const token = useAuthStore((state) => state.token);
+  const activeRole = useAuthStore((state) => state.activeRole?.title);
+  const isSuperadmin = normalizedRoleTitle(activeRole) === 'superadmin';
 
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<InternalStaffRole>('SUPPORT');
+  const [inviteSaving, setInviteSaving] = useState(false);
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
 
   // Table state
   const [page, setPage] = useState(0);
@@ -118,13 +129,53 @@ export default function UserTable() {
   const startIndex = page * pageSize;
   const endIndex = Math.min(startIndex + pageSize, totalElements);
 
+  const submitStaffInvite = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!token || !inviteEmail.trim()) return;
+    setInviteSaving(true);
+    setInviteMessage(null);
+    try {
+      const response = await inviteInternalStaff(inviteEmail.trim(), inviteRole, token);
+      const result = response.data?.data?.[0] ?? response.data?.data;
+      setInviteMessage(`Invitation sent to ${result?.email ?? inviteEmail.trim()}.`);
+      setInviteEmail('');
+    } catch (err: any) {
+      setInviteMessage(err?.response?.data?.description ?? 'The staff invitation could not be sent.');
+    } finally {
+      setInviteSaving(false);
+    }
+  };
+
   return (
     <div className="w-full space-y-6 p-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold">Users</h2>
-        <p className="text-sm text-muted-foreground">Manage your user accounts</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Users</h2>
+          <p className="text-sm text-muted-foreground">Manage users and securely invite SlickHood staff.</p>
+        </div>
+        {isSuperadmin && (
+          <button type="button" onClick={() => { setInviteMessage(null); setInviteOpen(true); }}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[#EF4217] px-4 py-2 font-semibold text-white hover:bg-[#d93a13]">
+            <UserPlus className="h-4 w-4" /> Invite staff member
+          </button>
+        )}
       </div>
+
+      {inviteOpen && isSuperadmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="staff-invite-title">
+          <form onSubmit={submitStaffInvite} className="w-full max-w-lg space-y-5 rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div><h3 id="staff-invite-title" className="text-xl font-bold">Invite SlickHood staff</h3><p className="mt-1 text-sm text-muted-foreground">The staff member will set their own password using a one-time invitation bound to this email.</p></div>
+              <button type="button" onClick={() => setInviteOpen(false)} aria-label="Close" className="rounded-md p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+            </div>
+            <label className="block space-y-2"><span className="text-sm font-semibold">Work email</span><input type="email" required maxLength={254} autoComplete="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="w-full rounded-md border px-3 py-2" placeholder="name@company.com" /></label>
+            <label className="block space-y-2"><span className="text-sm font-semibold">Staff role</span><select value={inviteRole} onChange={(e) => setInviteRole(e.target.value as InternalStaffRole)} className="w-full rounded-md border px-3 py-2"><option value="SUPPORT">Support</option><option value="SALES_MARKETING">Sales &amp; Marketing</option><option value="FINANCE">Finance</option></select></label>
+            {inviteMessage && <p className="rounded-md bg-slate-50 px-3 py-2 text-sm" role="status">{inviteMessage}</p>}
+            <div className="flex justify-end gap-2"><button type="button" onClick={() => setInviteOpen(false)} className="rounded-md border px-4 py-2">Close</button><button type="submit" disabled={inviteSaving || !inviteEmail.trim()} className="inline-flex min-w-36 items-center justify-center rounded-md bg-[#EF4217] px-4 py-2 font-semibold text-white disabled:opacity-50">{inviteSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send invitation'}</button></div>
+          </form>
+        </div>
+      )}
 
       {/* Search + Rows per page */}
       <div className="flex items-center gap-4">

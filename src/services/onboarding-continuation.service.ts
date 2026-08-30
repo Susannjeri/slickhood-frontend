@@ -23,7 +23,7 @@ export async function resolveOnboardingContinuation(
   }
 
   const normalizedRole = normalizedRoleTitle(activeRole.title);
-  const internalRoles = ["superadmin", "finance", "insuranceadviser", "insurancemanager", "guard", "propertymanager"];
+  const internalRoles = ["superadmin", "support", "salesmarketing", "finance", "insuranceadviser", "insurancemanager", "guard", "propertymanager"];
   if (normalizedRole === "superadmin") {
     return { complete: true, destination: "/dashboard", message: "Your workspace is ready." };
   }
