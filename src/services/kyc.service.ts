@@ -1,7 +1,20 @@
 import { API } from "@/lib/api";
 
-export type KycStatus = "NOT_STARTED" | "IN_PROGRESS" | "REVIEW_REQUIRED" | "SUBMITTED" | "APPROVED" | "REJECTED" | "EXPIRED";
-export type AccountStatus = "PENDING_EMAIL_VERIFICATION" | "PENDING_KYC" | "KYC_UNDER_REVIEW" | "KYC_REJECTED" | "ACTIVE" | "SUSPENDED";
+export type KycStatus =
+  | "NOT_STARTED"
+  | "IN_PROGRESS"
+  | "REVIEW_REQUIRED"
+  | "SUBMITTED"
+  | "APPROVED"
+  | "REJECTED"
+  | "EXPIRED";
+export type AccountStatus =
+  | "PENDING_EMAIL_VERIFICATION"
+  | "PENDING_KYC"
+  | "KYC_UNDER_REVIEW"
+  | "KYC_REJECTED"
+  | "ACTIVE"
+  | "SUSPENDED";
 
 export interface KycRequirement {
   code: string;
@@ -48,7 +61,8 @@ export interface KycAdminCase {
   kycCase: KycCase;
 }
 
-const first = <T>(response: { data: { data?: T[] } }) => response.data.data?.[0];
+const first = <T>(response: { data: { data?: T[] } }) =>
+  response.data.data?.[0];
 
 export async function getCurrentKyc() {
   const response = await API.get("/kyc/current");
@@ -56,7 +70,10 @@ export async function getCurrentKyc() {
 }
 
 export async function startKyc(consentVersion: string) {
-  const response = await API.post("/kyc/start", { consent: true, consentVersion });
+  const response = await API.post("/kyc/start", {
+    consent: true,
+    consentVersion,
+  });
   return first<KycCase>(response)!;
 }
 
@@ -69,7 +86,9 @@ export async function uploadKycDocument(documentType: string, file: File) {
 }
 
 export async function fetchKycDocumentContent(documentId: number) {
-  const response = await API.get(`/kyc/documents/${documentId}/content`, { responseType: "blob" });
+  const response = await API.get(`/kyc/documents/${documentId}/content`, {
+    responseType: "blob",
+  });
   return response.data as Blob;
 }
 
@@ -78,12 +97,24 @@ export async function submitKyc() {
   return first<KycCase>(response)!;
 }
 
+export async function reprocessKycDocuments() {
+  const response = await API.post("/kyc/reprocess");
+  return first<KycCase>(response)!;
+}
+
 export async function listKycReviewQueue() {
   const response = await API.get("/kyc/admin/queue");
   return (response.data.data ?? []) as KycAdminCase[];
 }
 
-export async function reviewKyc(caseId: number, decision: "APPROVED" | "REJECTED", notes: string) {
-  const response = await API.post(`/kyc/admin/${caseId}/review`, { decision, notes });
+export async function reviewKyc(
+  caseId: number,
+  decision: "APPROVED" | "REJECTED",
+  notes: string,
+) {
+  const response = await API.post(`/kyc/admin/${caseId}/review`, {
+    decision,
+    notes,
+  });
   return first<KycCase>(response)!;
 }
