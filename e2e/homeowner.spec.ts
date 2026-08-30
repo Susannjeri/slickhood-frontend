@@ -53,3 +53,17 @@ test("service-charge unit creates a homeowner invite rather than tenant access",
   expect(request.postDataJSON()).toEqual({ inviteType: "HOMEOWNER", entityId: 77 });
   await expect(page.locator('input[value="https://slickhood.test/invite/homeowner"]')).toBeVisible();
 });
+
+test("homeowner can report maintenance but cannot advance operational status", async ({ page }) => {
+  await page.goto("/dashboard/unit/details/77?p=11&from=homeowners");
+  await page.getByRole("tab", { name: "Maintenance" }).click();
+  await page.getByRole("button", { name: "New request" }).click();
+  await page.getByPlaceholder("Issue title").fill("Kitchen leak");
+  await page.getByPlaceholder("Describe the problem and access considerations").fill("Water is collecting below the sink.");
+  await page.route("**/maintenance", route => route.request().method() === "POST" ? route.fulfill({ json: envelope({id:1}) }) : route.continue());
+  const requestPromise = page.waitForRequest(request => request.url().endsWith("/maintenance") && request.method() === "POST");
+  await page.getByRole("button", { name: "Submit request" }).click();
+  const request = await requestPromise;
+  expect(request.postDataJSON()).toMatchObject({unitId:77,title:"Kitchen leak",description:"Water is collecting below the sink."});
+  await expect(page.getByText("Advance status")).toHaveCount(0);
+});

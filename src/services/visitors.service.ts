@@ -61,7 +61,7 @@ export type TenantUnit = {
 };
 
 export const getTenantUnits = (token: string) => {
-  return API.get("/property/unit/list/by/tenant", {
+  return API.get("/property/unit/list/by/resident", {
     headers: {
       Authorization: `Bearer ${token}`,
     },

@@ -21,6 +21,15 @@ test("homeowner sees ownership, reconciled balances, and overdue state", async (
       pendingAmount: 2500, status: "OVERDUE", createdOn: "2026-07-20T08:00:00Z",
     }]), totalPages: 1, totalElements: 1, size: 50,
   } }));
+  await page.route("**/estate/operations/properties/11/meetings**", route => route.fulfill({ json: {
+    ...envelope([{id:3,propertyId:11,title:"Annual homeowners meeting",scheduledAt:"2026-09-15T15:00:00Z",venue:"Clubhouse",status:"SCHEDULED",quorumRequired:12,attendeeCount:0}]),totalPages:1,totalElements:1,size:20,
+  } }));
+  await page.route("**/estate/operations/properties/11/budgets**", route => route.fulfill({ json: {
+    ...envelope([{budget:{id:4,propertyId:11,budgetYear:2026,name:"Estate operations",currency:"KES",status:"APPROVED"},lines:[{id:8,category:"Security",plannedAmount:500000,actualAmount:420000}],plannedTotal:500000,actualTotal:420000}]),totalPages:1,totalElements:1,size:20,
+  } }));
+  await page.route("**/estate/operations/properties/11/work-orders**", route => route.fulfill({ json: {
+    ...envelope([{id:6,propertyId:11,workOrderNumber:"EWO-100",areaName:"Main gate",title:"Replace barrier motor",description:"Motor has intermittent faults",category:"SECURITY",priority:"HIGH",status:"IN_PROGRESS",currency:"KES"}]),totalPages:1,totalElements:1,size:20,
+  } }));
 
   await page.goto("/dashboard/estate");
 
@@ -29,6 +38,11 @@ test("homeowner sees ownership, reconciled balances, and overdue state", async (
   await expect(page.getByText("OVERDUE", { exact: true })).toBeVisible();
   await expect(page.getByText(/Silverwood Estate \/ A-101/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Add homeowner" })).toHaveCount(0);
+  await expect(page.getByText("Annual homeowners meeting")).toBeVisible();
+  await page.getByRole("tab", { name: "Budgets" }).click();
+  await expect(page.getByText(/Planned KES 500,000/)).toBeVisible();
+  await page.getByRole("tab", { name: "Common work" }).click();
+  await expect(page.getByText("Replace barrier motor")).toBeVisible();
 });
 
 test("private inbox calls only the recipient-scoped endpoint", async ({ page }) => {
