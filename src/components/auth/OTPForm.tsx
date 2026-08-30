@@ -247,7 +247,7 @@ const OTPForm: React.FC = () => {
             </div>
             <h2 className="text-xl font-bold text-[#14235C] dark:text-white">Email Verified!</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Continue to choose your business area and subscription.
+              Continue to identity verification and secure account setup.
             </p>
             <Loader2 className="w-5 h-5 animate-spin text-[#EF4217] mt-1" />
           </div>

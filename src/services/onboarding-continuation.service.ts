@@ -13,6 +13,7 @@ export type OnboardingContinuation = {
 export async function resolveOnboardingContinuation(
   token: string,
   activeRole: Role | null,
+  selectedBusinessAreaId?: string | null,
 ): Promise<OnboardingContinuation> {
   if (!activeRole) {
     return {
@@ -50,7 +51,10 @@ export async function resolveOnboardingContinuation(
     };
   }
 
-  const area = businessAreas.find(item => item.roleTitles.includes(normalizedRole));
+  const selectedArea = selectedBusinessAreaId
+    ? businessAreas.find(item => item.id === selectedBusinessAreaId && item.roleTitles.includes(normalizedRole))
+    : undefined;
+  const area = selectedArea ?? businessAreas.find(item => item.roleTitles.includes(normalizedRole));
   if (!area) {
     return { complete: true, destination: "/dashboard", message: "Your assigned workspace is ready." };
   }

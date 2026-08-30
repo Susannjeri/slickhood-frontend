@@ -5,11 +5,11 @@ import React from 'react';
 import { Check } from 'lucide-react';
 
 const STEPS = [
-    { id: 1, label: 'Choose Role' },
-    { id: 2, label: 'Create Account' },
-    { id: 3, label: 'Verify Email' },
-    { id: 4, label: 'Phone' },
-    { id: 5, label: 'Profile' },
+    { id: 1, label: 'Business Area' },
+    { id: 2, label: 'Account' },
+    { id: 3, label: 'Email' },
+    { id: 4, label: 'Identity' },
+    { id: 5, label: 'Plan' },
 ];
 
 export const RegistrationStepper: React.FC<{ currentStep?: number }> = ({ currentStep = 1 }) => (

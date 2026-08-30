@@ -14,6 +14,7 @@ export default function ResumeOnboarding() {
   const sessionReady = useAuthStore(state => state.sessionReady);
   const token = useAuthStore(state => state.token);
   const activeRole = useAuthStore(state => state.activeRole);
+  const selectedBusinessAreaId = useAuthStore(state => state.selectedBusinessAreaId);
   const [continuation, setContinuation] = useState<OnboardingContinuation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +24,7 @@ export default function ResumeOnboarding() {
     setLoading(true);
     setError(null);
     try {
-      const result = await resolveOnboardingContinuation(token, activeRole);
+      const result = await resolveOnboardingContinuation(token, activeRole, selectedBusinessAreaId);
       if (result.complete) {
         router.replace(result.destination);
         return;
@@ -46,7 +47,7 @@ export default function ResumeOnboarding() {
     void load();
     // activeRole is restored together with the token by SessionHydrator.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionReady, token, activeRole?.title]);
+  }, [sessionReady, token, activeRole?.title, selectedBusinessAreaId]);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f5f6f8] px-5 py-12 text-[#071744]">

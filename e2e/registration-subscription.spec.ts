@@ -54,6 +54,79 @@ test("selected business area invisibly carries the correct role into registratio
   expect(registration?.password).toBe("StrongPass1!");
 });
 
+test("business-area registration remains usable without horizontal overflow", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/role/list", route => route.fulfill({ json: envelope([
+    { roleId: 101, roleName: "Landlord", selfAssignable: true },
+    { roleId: 102, roleName: "SalesAgent", selfAssignable: true },
+    { roleId: 103, roleName: "EstateManager", selfAssignable: true },
+    { roleId: 104, roleName: "ServiceProvider", selfAssignable: true },
+    { roleId: 105, roleName: "Affiliate", selfAssignable: true },
+    { roleId: 106, roleName: "AssetPortfolioManager", selfAssignable: true },
+  ]) }));
+
+  for (const viewport of [{ width: 360, height: 740 }, { width: 768, height: 1024 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/role");
+    await expect(page.getByRole("heading", { name: "Choose your business area" })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    const cards = page.locator("article");
+    await expect(cards).toHaveCount(7);
+    for (let index = 0; index < await cards.count(); index += 1) {
+      const box = await cards.nth(index).boundingBox();
+      expect(box?.width ?? 0).toBeLessThanOrEqual(viewport.width);
+    }
+    await expect(page.locator("article").filter({ hasText: "Rental Management" }).getByRole("button", { name: "Choose this area" })).toBeVisible();
+  }
+});
+
+test("business-area loading failure is recoverable without restarting registration", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  let attempts = 0;
+  await page.route("**/role/list", route => {
+    attempts += 1;
+    if (attempts === 1) return route.fulfill({ status: 503, json: { success: false, description: "Unavailable" } });
+    return route.fulfill({ json: envelope([{ roleId: 101, roleName: "Landlord", selfAssignable: true }]) });
+  });
+
+  await page.goto("/role");
+  const loadError = page.getByRole("alert").filter({ hasText: "could not load" });
+  await expect(loadError).toContainText("could not load");
+  await page.getByRole("button", { name: "Try again" }).click();
+  await expect(loadError).toHaveCount(0);
+  await expect(page.locator("article").filter({ hasText: "Rental Management" }).getByRole("button", { name: "Choose this area" })).toBeEnabled();
+  expect(attempts).toBe(2);
+});
+
+test("verified registration continues to KYC before subscription activation", async ({ context, page }) => {
+  const token = await authenticated(context, page, { title: "Landlord", permissions: [] });
+  await page.addInitScript(() => {
+    const persisted = JSON.parse(localStorage.getItem("auth-storage") || "{}");
+    persisted.state = { ...persisted.state, selectedBusinessAreaId: "property-management" };
+    localStorage.setItem("auth-storage", JSON.stringify(persisted));
+  });
+  await page.route("**/browser-session/get-token", route => route.fulfill({ json: { data: { jwt: token } } }));
+  await page.unroute("**/kyc/current");
+  await page.route("**/kyc/current", route => route.fulfill({ json: envelope([{
+    id: 91,
+    status: "IN_PROGRESS",
+    accountStatus: "PENDING_KYC",
+    consentVersion: "2026-08",
+    phoneVerified: false,
+    requirements: [],
+    missingRequirements: ["NATIONAL_ID_FRONT"],
+    documents: [],
+  }]) }));
+
+  await page.goto("/account-activated");
+  await expect(page.getByText("Complete the remaining verification controls")).toBeVisible();
+  await page.getByRole("button", { name: "Continue secure setup" }).click();
+  await expect(page).toHaveURL(/\/continue-setup$/);
+  await expect(page.getByText("Complete identity verification before choosing a plan or entering your workspace.")).toBeVisible();
+  await page.getByRole("button", { name: "Continue setup" }).click();
+  await expect(page).toHaveURL(/\/kyc$/);
+});
+
 test("organization registration separates the legal entity from its authorized representative", async ({ page }) => {
   await page.route("https://accounts.google.com/**", route => route.abort());
   await page.route("**/role/list", route => route.fulfill({ json: envelope([

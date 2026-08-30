@@ -19,6 +19,7 @@ interface AuthState {
   step: RegistrationStep;
   email: string | null;
   roleId: number | null;
+  selectedBusinessAreaId: string | null;
   inviteToken: string | null;
 
   // from decoded token
@@ -42,6 +43,7 @@ interface AuthState {
   setStep: (s: RegistrationStep) => void;
   setEmail: (email: string) => void;
   setRole: (roleId: number) => void;
+  setSelectedBusinessAreaId: (businessAreaId: string | null) => void;
   setInviteToken: (inviteToken: string | null) => void;
   setRoleName: (roleName: string[]) => void;
   setPermissions: (permissions: string[]) => void;
@@ -65,6 +67,7 @@ export const useAuthStore = create<AuthState>()(
       step: "role",
       email: null,
       roleId: null,
+      selectedBusinessAreaId: null,
       inviteToken: null,
       roles: [],
       roleName: [],
@@ -81,6 +84,7 @@ export const useAuthStore = create<AuthState>()(
       setStep: (step) => set({ step }),
       setEmail: (email) => set({ email }),
       setRole: (roleId) => set({ roleId }),
+      setSelectedBusinessAreaId: (selectedBusinessAreaId) => set({ selectedBusinessAreaId }),
       setInviteToken: (inviteToken) => set({ inviteToken }),
       setRoleName: (roleName) => set({ roleName }),
       setPermissions: (permissions) => set({ permissions }),
@@ -112,6 +116,7 @@ export const useAuthStore = create<AuthState>()(
           totpEnabled: false,
           email: null,
           roleId: null,
+          selectedBusinessAreaId: null,
           inviteToken: null,
           roles: [],
           roleName: [],
@@ -126,6 +131,7 @@ export const useAuthStore = create<AuthState>()(
         set({
           email: null,
           roleId: null,
+          selectedBusinessAreaId: null,
           token: null,
           mfaEnabled: false,
           totpEnabled: false,
@@ -147,6 +153,7 @@ export const useAuthStore = create<AuthState>()(
         totpEnabled: state.totpEnabled,
         email: state.email,
         roleId: state.roleId,
+        selectedBusinessAreaId: state.selectedBusinessAreaId,
         step: state.step,
         inviteToken: state.inviteToken,
         roles: state.roles,
