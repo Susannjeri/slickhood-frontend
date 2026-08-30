@@ -26,6 +26,7 @@ import { KycDocumentViewer } from "@/components/auth/KycDocumentViewer";
 import {
   KycAdminCase,
   listKycReviewQueue,
+  reprocessKycCase,
   reviewKyc,
 } from "@/services/kyc.service";
 
@@ -86,6 +87,13 @@ export default function KycReviewPage() {
     const decision = decisions[document.id];
     return decision?.approved !== false || decision.reason.trim().length > 0;
   });
+  const undecidedDocuments = documents.filter(
+    (document) => decisions[document.id]?.approved == null,
+  );
+  const rejectedWithoutReason = documents.filter((document) => {
+    const decision = decisions[document.id];
+    return decision?.approved === false && decision.reason.trim().length === 0;
+  });
 
   const openReview = (row: KycAdminCase) => {
     const initial: Record<number, DocumentDecision> = {};
@@ -109,14 +117,32 @@ export default function KycReviewPage() {
     setSelectedCaseId(row.kycCase.id ?? undefined);
   };
 
-  const setDocumentDecision = (documentId: number, approved: boolean) => {
+  const setDocumentDecision = (
+    documentId: number,
+    approved: boolean,
+    suggestedReason = "",
+  ) => {
     setDecisions((current) => ({
       ...current,
       [documentId]: {
         approved,
-        reason: approved ? "" : current[documentId]?.reason ?? "",
+        reason: approved
+          ? ""
+          : current[documentId]?.reason?.trim() || suggestedReason,
       },
     }));
+  };
+
+  const acceptRemainingDocuments = () => {
+    setDecisions((current) => {
+      const next = { ...current };
+      documents.forEach((document) => {
+        if (next[document.id]?.approved == null) {
+          next[document.id] = { approved: true, reason: "" };
+        }
+      });
+      return next;
+    });
   };
 
   const setReason = (documentId: number, reason: string) => {
@@ -159,6 +185,25 @@ export default function KycReviewPage() {
         decision === "APPROVED"
           ? "KYC approved and the customer account activated."
           : "Only the inaccurate documents were returned for replacement.",
+      );
+      setSelectedCaseId(undefined);
+      await load();
+    } catch (error) {
+      toast.error(message(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rerunUploadChecks = async () => {
+    if (!selected?.kycCase.id) return;
+    setBusy(true);
+    try {
+      const result = await reprocessKycCase(selected.kycCase.id);
+      toast.success(
+        result.status === "IN_PROGRESS"
+          ? "Upload checks found evidence that must be replaced. The customer can now correct it."
+          : "Upload checks passed. The request remains ready for reviewer approval.",
       );
       setSelectedCaseId(undefined);
       await load();
@@ -284,6 +329,26 @@ export default function KycReviewPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 p-6">
+                {pendingReview && (
+                  <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-bold">Re-run production upload checks</p>
+                      <p className="mt-1 text-blue-800">
+                        Reprocesses the current files and returns blocking OCR or identity-field issues to the customer before approval.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="shrink-0 bg-white"
+                      disabled={busy}
+                      onClick={() => void rerunUploadChecks()}
+                    >
+                      {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                      Re-run checks
+                    </Button>
+                  </div>
+                )}
                 {selected.kycCase.reviewNotes && (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                     <b>Case note:</b> {selected.kycCase.reviewNotes}
@@ -296,11 +361,27 @@ export default function KycReviewPage() {
                     ).filter(([key]) => !key.startsWith("_"));
                     const warning =
                       document.extractedFields?._validationWarnings;
+                    const issues = document.validationIssues ?? [];
+                    const blockingIssues = issues.filter((issue) => issue.blocking);
                     const choice = decisions[document.id];
+                    const suggestedReason =
+                      issues.length > 0
+                        ? issues
+                            .map(
+                              (issue) =>
+                                `${issue.message} ${issue.guidance}`.trim(),
+                            )
+                            .join(" ")
+                        : document.rejectionReason ??
+                          `The ${readable(document.documentType).toLowerCase()} is inaccurate or does not match this customer. Upload the correct original document.`;
                     return (
                       <article
                         key={document.id}
-                        className="rounded-2xl border p-5"
+                        className={`rounded-2xl border p-5 ${
+                          blockingIssues.length
+                            ? "border-red-300 bg-red-50/30"
+                            : "border-slate-200"
+                        }`}
                       >
                         <div className="flex flex-wrap items-start justify-between gap-2">
                           <div>
@@ -326,11 +407,23 @@ export default function KycReviewPage() {
                             {readable(document.status)}
                           </Badge>
                         </div>
-                        {warning && (
-                          <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-                            {warning}
-                          </p>
-                        )}
+                        {issues.length > 0 ? (
+                          <div className="mt-3 space-y-2" aria-label="Document validation issues">
+                            {issues.map((issue) => (
+                              <div
+                                key={`${issue.field}-${issue.code}-${issue.message}`}
+                                className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900"
+                              >
+                                <p className="font-bold">
+                                  {issue.field === "document" ? "Document" : readable(issue.field)}: {issue.message}
+                                </p>
+                                <p className="mt-1 text-xs text-red-700">{issue.guidance}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : warning ? (
+                          <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">{warning}</p>
+                        ) : null}
                         <div className="mt-4">
                           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
                             OCR extracted data
@@ -338,22 +431,34 @@ export default function KycReviewPage() {
                           {fields.length ? (
                             <dl className="space-y-2 rounded-xl bg-slate-50 p-3 text-sm">
                               {fields.map(([key, value]) => (
-                                <div
-                                  key={key}
-                                  className="flex justify-between gap-4 border-b border-slate-200 pb-2 last:border-0 last:pb-0"
-                                >
-                                  <dt className="text-slate-500">
-                                    {readable(key)}
-                                  </dt>
-                                  <dd className="text-right font-semibold">
-                                    {value}
-                                    {document.extractedFields[
-                                      `_confidence.${key}`
-                                    ]
-                                      ? ` (${document.extractedFields[`_confidence.${key}`]}%)`
-                                      : ""}
-                                  </dd>
-                                </div>
+                                (() => {
+                                  const fieldIssues = issues.filter((issue) => issue.field === key);
+                                  return (
+                                    <div
+                                      key={key}
+                                      className={`flex justify-between gap-4 rounded-lg border-b pb-2 last:border-0 last:pb-0 ${
+                                        fieldIssues.length
+                                          ? "border-red-300 bg-red-50 px-2 pt-2 text-red-900"
+                                          : "border-slate-200"
+                                      }`}
+                                    >
+                                      <dt className={fieldIssues.length ? "font-bold text-red-700" : "text-slate-500"}>
+                                        {readable(key)}
+                                      </dt>
+                                      <dd className="text-right font-semibold">
+                                        {value}
+                                        {document.extractedFields[`_confidence.${key}`]
+                                          ? ` (${document.extractedFields[`_confidence.${key}`]}%)`
+                                          : ""}
+                                        {fieldIssues.map((issue) => (
+                                          <span key={issue.code} className="mt-1 block max-w-xs text-xs font-normal text-red-700">
+                                            {issue.message}
+                                          </span>
+                                        ))}
+                                      </dd>
+                                    </div>
+                                  );
+                                })()
                               ))}
                             </dl>
                           ) : (
@@ -397,7 +502,11 @@ export default function KycReviewPage() {
                                     : "outline"
                                 }
                                 onClick={() =>
-                                  setDocumentDecision(document.id, false)
+                                  setDocumentDecision(
+                                    document.id,
+                                    false,
+                                    suggestedReason,
+                                  )
                                 }
                               >
                                 <XCircle className="mr-2 h-4 w-4" />
@@ -443,12 +552,34 @@ export default function KycReviewPage() {
                         placeholder="Add a concise case-level note. Document-specific correction reasons are captured above."
                       />
                     </div>
-                    {!allDecided && (
-                      <p className="text-sm text-amber-800">
-                        Decide every current document before completing this
-                        review.
-                      </p>
-                    )}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="space-y-1 text-sm">
+                        {undecidedDocuments.length > 0 && (
+                          <p className="text-amber-800">
+                            {undecidedDocuments.length} document
+                            {undecidedDocuments.length === 1 ? "" : "s"} still
+                            {undecidedDocuments.length === 1 ? " needs" : " need"} a decision.
+                          </p>
+                        )}
+                        {rejectedWithoutReason.length > 0 && (
+                          <p className="text-red-700">
+                            Add a correction reason for: {rejectedWithoutReason
+                              .map((document) => readable(document.documentType))
+                              .join(", ")}.
+                          </p>
+                        )}
+                      </div>
+                      {undecidedDocuments.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={acceptRemainingDocuments}
+                        >
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          Accept all remaining documents
+                        </Button>
+                      )}
+                    </div>
                     <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                       <Button
                         variant="destructive"

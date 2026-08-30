@@ -31,6 +31,15 @@ const documents = [
       fullName: "SlickHood Test Owner",
       "_confidence.documentNumber": "97",
     },
+    validationIssues: [
+      {
+        field: "documentNumber",
+        code: "DOCUMENT_NUMBER_UNREADABLE",
+        message: "The identification number is obscured by glare.",
+        guidance: "Upload a clear original with every digit visible.",
+        blocking: true,
+      },
+    ],
     uploadedAt: "2026-08-30T10:00:00Z",
   },
   {
@@ -95,20 +104,21 @@ test("admin reviews OCR and originals, accepts good evidence and returns only th
   await expect(
     page.getByRole("heading", { name: "SlickHood Test Owner" }),
   ).toBeVisible();
-    await expect(page.getByText("12345678 (97%)", { exact: true })).toBeVisible();
+  await expect(page.getByText(/12345678 \(97%\)/)).toBeVisible();
   await expect(
     page.getByRole("button", { name: "View protected original" }).first(),
   ).toBeVisible();
 
   const identity = page.locator("article").filter({ hasText: "National Id Front" });
-  const tax = page
-    .locator("article")
-    .filter({ hasText: "Kra Pin Certificate" });
   await identity.getByRole("button", { name: "Reject document" }).click();
-  await identity
-    .getByLabel("Correction reason for National Id Front")
-    .fill("The identification number is obscured by glare.");
-  await tax.getByRole("button", { name: "Accept document" }).click();
+  await expect(
+    identity.getByLabel("Correction reason for National Id Front"),
+  ).toHaveValue(
+    "The identification number is obscured by glare. Upload a clear original with every digit visible.",
+  );
+  await page
+    .getByRole("button", { name: "Accept all remaining documents" })
+    .click();
   await page
     .getByRole("button", { name: "Request document correction" })
     .click();
@@ -119,7 +129,8 @@ test("admin reviews OCR and originals, accepts good evidence and returns only th
       {
         documentId: 81,
         approved: false,
-        reason: "The identification number is obscured by glare.",
+        reason:
+          "The identification number is obscured by glare. Upload a clear original with every digit visible.",
       },
       { documentId: 82, approved: true },
     ],
