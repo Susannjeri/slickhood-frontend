@@ -69,6 +69,7 @@ import {
   Wrench,
 } from "lucide-react";
 import CanProperty, { usePropertyPermissions } from "@/components/auth/CanProperty";
+import Can from "@/components/auth/Can";
 import { useAuthStore } from "@/store/authStore";
 import ManageChargesDrawer from "@/components/unit/ManageChargesDrawer";
 import { usePropertyMetadata } from "@/app/(dashboard)/dashboard/property/propertyMetadata";
@@ -341,10 +342,8 @@ export default function ViewUnitPage() {
       const hasViewTenants = checkPermissions(["view_tenants"]);
       const hasViewManagers = checkPermissions(["view_landlord_and_managers"]);
 
-      if (hasViewTenants) {
-        loadTenants();
-        loadUnitInvites();
-      }
+      if (hasViewTenants) loadTenants();
+      if (checkPermissions(["view_invite_list"])) loadUnitInvites();
       if (hasViewManagers) {
         loadManagers();
       }
@@ -476,17 +475,20 @@ export default function ViewUnitPage() {
     setIsChargesDrawerOpen(false);
   };
 
-  const onCreateTenantInvite = async () => {
+  const onCreateOccupantInvite = async () => {
+    const inviteType = unit?.leaseMode === "SERVICE_CHARGE" || origin === "homeowners" ? "HOMEOWNER" : "TENANT";
+    const inviteLabel = inviteType === "HOMEOWNER" ? "Homeowner" : "Tenant";
     try {
       setActionLoading(true);
-      const response = await handleCreateInvite("TENANT", Number(unitId));
+      const response = await handleCreateInvite(inviteType, Number(unitId));
       if (response.success && response.data && response.data.length > 0) {
         setCreatedInviteLink(response.data[0]);
-        toast.success("Tenant invite created successfully");
+        toast.success(`${inviteLabel} invite created successfully`);
         loadUnitInvites();
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.description || "Failed to create tenant invite");
+    } catch (err: unknown) {
+      const apiError = err as { response?: { data?: { description?: string } } };
+      toast.error(apiError.response?.data?.description || `Failed to create ${inviteLabel.toLowerCase()} invite`);
     } finally {
       setActionLoading(false);
     }
@@ -717,6 +719,8 @@ export default function ViewUnitPage() {
   }
 
   const totalMonthly = unit.price + unitCharges.reduce((sum, c) => sum + c.amount, 0);
+  const isHomeownerUnit = unit.leaseMode === "SERVICE_CHARGE" || origin === "homeowners";
+  const occupantLabel = isHomeownerUnit ? "Homeowner" : "Tenant";
 
   // ─── Main Render ──────────────────────────────────────────────────────────
 
@@ -731,9 +735,9 @@ export default function ViewUnitPage() {
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Send className="w-5 h-5" style={{ color: "#EF4217" }} />Share Tenant Invite
+                <Send className="w-5 h-5" style={{ color: "#EF4217" }} />Share Invite
               </DialogTitle>
-              <DialogDescription>Send this invitation link to the tenant via email or SMS.</DialogDescription>
+              <DialogDescription>Send this invitation link securely via email or SMS.</DialogDescription>
             </DialogHeader>
             <form onSubmit={(e) => { e.preventDefault(); if (!e.currentTarget.checkValidity()) { e.currentTarget.reportValidity(); return; } onShareInvite(); }}>
               <div className="space-y-4 py-4">
@@ -774,9 +778,9 @@ export default function ViewUnitPage() {
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5" style={{ color: "#EF4217" }} />Create Tenant Invite
+                <UserPlus className="w-5 h-5" style={{ color: "#EF4217" }} />Create {occupantLabel} Invite
               </DialogTitle>
-              <DialogDescription>Generate an invitation link for a tenant to join this unit.</DialogDescription>
+              <DialogDescription>Generate an invitation link for the {occupantLabel.toLowerCase()} of this unit.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               {createdInviteLink ? (
@@ -786,11 +790,11 @@ export default function ViewUnitPage() {
                     <Input value={createdInviteLink} readOnly className="font-mono text-sm" />
                     <Button size="icon" variant="outline" onClick={() => copyToClipboard(createdInviteLink)}><Copy className="w-4 h-4" /></Button>
                   </div>
-                  <p className="text-xs text-gray-500">Copy this link to share with the tenant</p>
+                  <p className="text-xs text-gray-500">Copy this link to share with the {occupantLabel.toLowerCase()}</p>
                 </div>
               ) : (
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-gray-700">This will create a unique invitation link for a tenant to register for Unit {unit.ref}.</p>
+                  <p className="text-sm text-gray-700">This will create a unique invitation link for the {occupantLabel.toLowerCase()} of Unit {unit.ref}.</p>
                 </div>
               )}
             </div>
@@ -799,7 +803,7 @@ export default function ViewUnitPage() {
                 {createdInviteLink ? "Close" : "Cancel"}
               </Button>
               {!createdInviteLink && (
-                <Button onClick={onCreateTenantInvite} disabled={actionLoading} className="text-white" style={{ backgroundColor: "#EF4217" }}>
+                <Button onClick={onCreateOccupantInvite} disabled={actionLoading} className="text-white" style={{ backgroundColor: "#EF4217" }}>
                   {actionLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</> : <><UserPlus className="w-4 h-4 mr-2" />Create Invite</>}
                 </Button>
               )}
@@ -903,13 +907,13 @@ export default function ViewUnitPage() {
                   </Button>
                 </CanProperty>
               )}
-              <CanProperty propertyId={Number(propertyId)} permissions={["view_tenants"]}>
+              <Can permissions={["create_invite"]}>
                 {!unit.occupied && tenants.length === 0 && (
                   <Button onClick={() => setCreateInviteOpen(true)} variant="outline">
-                    <UserPlus className="w-4 h-4 mr-2" />Assign Tenant
+                    <UserPlus className="w-4 h-4 mr-2" />Assign {occupantLabel}
                   </Button>
                 )}
-              </CanProperty>
+              </Can>
             </div>
           </div>
         </div>
