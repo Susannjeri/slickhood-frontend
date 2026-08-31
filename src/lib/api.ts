@@ -1158,6 +1158,29 @@ export const signLease = (leaseId: number, token: string) => {
   });
 }
 
+export interface TypeCatalogOption {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  displayOrder: number;
+  common: boolean;
+}
+
+export interface PropertyUnitTypeCatalog {
+  propertyType: TypeCatalogOption;
+  enabledUnitTypeIds: string[];
+}
+
+export interface UnitTypeCatalog {
+  propertyTypes: PropertyUnitTypeCatalog[];
+  availableUnitTypes: TypeCatalogOption[];
+}
+
+export const getUnitTypeCatalog = () => API.get("/property/unit/type/catalog");
+export const updateUnitTypeCatalog = (propertyType: string, unitTypeIds: string[]) =>
+  API.put(`/property/unit/type/catalog/${encodeURIComponent(propertyType)}`, unitTypeIds);
+
 export interface ActiveLease {
   id: number;
   name: string;

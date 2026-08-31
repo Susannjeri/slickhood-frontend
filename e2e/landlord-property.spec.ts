@@ -7,7 +7,12 @@ test.beforeEach(async ({ context, page }) => {
     permissions: ["create_property", "view_property", "create_unit", "view_account", "view_invoice_list"],
   });
   await page.route("**/property/type**", route => route.fulfill({
-    json: envelope([{ id: "APARTMENT", name: "Apartment", description: "Multi-unit residential property" }]),
+    json: envelope([
+      { id: "APARTMENT_BLOCK", name: "Apartment", description: "Multi-unit residential property", category: "RESIDENTIAL", displayOrder: 0, common: true },
+      { id: "STANDALONE_HOUSE", name: "House", description: "A standalone home", category: "RESIDENTIAL", displayOrder: 1, common: true },
+      { id: "AIRBNB_UNIT", name: "Airbnb / Short Stay", description: "Short-stay accommodation", category: "HOSPITALITY", displayOrder: 2, common: true },
+      { id: "WAREHOUSE", name: "Warehouse", description: "Industrial storage", category: "INDUSTRIAL", displayOrder: 400, common: false },
+    ]),
   }));
 });
 
@@ -49,7 +54,7 @@ test("property creation preserves the selected management workflow", async ({ pa
     buffer: Buffer.from(pngBase64, "base64"),
   });
   await page.getByLabel("Property name *").fill("Sunset Villa");
-  await page.getByLabel("Property type *").selectOption("APARTMENT");
+  await page.getByLabel("Property type *").selectOption("APARTMENT_BLOCK");
   await page.getByLabel("Address *").fill("123 Main Street, Nairobi");
   await page.getByLabel("Coordinates (Latitude, Longitude) *").fill("-1.286389, 36.817223");
 
@@ -65,6 +70,17 @@ test("property creation preserves the selected management workflow", async ({ pa
   expect(body).toContain('name="managementMode"');
   expect(body).toContain("RENTAL");
   expect(body).toContain('name="image"; filename="property.png"');
+});
+
+test("property types put common choices first and group specialised choices", async ({ page }) => {
+  await page.goto("/dashboard/property/create");
+  await page.getByRole("button", { name: /Rental property/i }).click();
+
+  const propertyType = page.getByLabel("Property type *");
+  await expect(propertyType.locator("optgroup").first()).toHaveAttribute("label", "Common property types");
+  await expect(propertyType.locator("option").nth(1)).toHaveText("Apartment");
+  await expect(propertyType.locator("option").nth(2)).toHaveText("House");
+  await expect(propertyType.locator("optgroup[label='Industrial'] option")).toHaveText("Warehouse");
 });
 
 test("landlord navigation is grouped in task order", async ({ page }) => {

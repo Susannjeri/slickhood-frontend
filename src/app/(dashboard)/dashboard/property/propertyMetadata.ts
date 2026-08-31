@@ -18,6 +18,9 @@ export interface TypeMetaData {
     id: string;
     name: string;
     description: string;
+    category?: string;
+    displayOrder?: number;
+    common?: boolean;
 }
 
 export const usePropertyMetadata = () => {
@@ -34,22 +37,19 @@ export const usePropertyMetadata = () => {
         const initProperties = async () => {
             const cachedTypes = readCache<TypeMetaData[]>(PROPERTY_TYPE_KEY, []);
 
-            if (cachedTypes.length > 0) {
-                setPropertyTypes(cachedTypes);
-            } else {
-                setLoading(true);
-                try {
-                    const propertyTypeResponse = await getSupportedPropertyTypesRef.current();
-                    if (propertyTypeResponse.success && Array.isArray(propertyTypeResponse.data)) {
-                        const fetchedTypes: TypeMetaData[] = propertyTypeResponse.data;
-                        setPropertyTypes(fetchedTypes);
-                        localStorage.setItem(PROPERTY_TYPE_KEY, JSON.stringify(fetchedTypes));
-                    }
-                } catch {
-                    setPropertyTypes([]);
-                } finally {
-                    setLoading(false);
+            if (cachedTypes.length > 0) setPropertyTypes(cachedTypes);
+            setLoading(true);
+            try {
+                const propertyTypeResponse = await getSupportedPropertyTypesRef.current();
+                if (propertyTypeResponse.success && Array.isArray(propertyTypeResponse.data)) {
+                    const fetchedTypes: TypeMetaData[] = propertyTypeResponse.data;
+                    setPropertyTypes(fetchedTypes);
+                    localStorage.setItem(PROPERTY_TYPE_KEY, JSON.stringify(fetchedTypes));
                 }
+            } catch {
+                if (cachedTypes.length === 0) setPropertyTypes([]);
+            } finally {
+                setLoading(false);
             }
         };
         const initUnitTypeFromLocalStorage = async () => {
@@ -64,11 +64,8 @@ export const usePropertyMetadata = () => {
         setCurrentPropertyType(propertyTypeName);
         const cache = readCache<Record<string, TypeMetaData[]>>(UNIT_TYPE_KEY, {});
 
-        if (cache[propertyTypeName]) {
-            return cache[propertyTypeName];
-        }
-
-        // Not in cache? Fetch from API
+        // Refresh on use so a super-admin catalogue update is visible immediately.
+        // The last successful response remains as an offline/transient-error fallback.
         setLoading(true);
         try {
             const unitTypeResponse = await fetchSupportedUnitTypesRef.current(propertyTypeName);
@@ -79,7 +76,9 @@ export const usePropertyMetadata = () => {
                 localStorage.setItem(UNIT_TYPE_KEY, JSON.stringify(updatedCache));
                 return fetchedTypes;
             }
-            return [];
+            return cache[propertyTypeName] ?? [];
+        } catch {
+            return cache[propertyTypeName] ?? [];
         } finally {
             setLoading(false);
         }
@@ -89,7 +88,10 @@ export const usePropertyMetadata = () => {
         propertyTypes.map(item => ({
             value: item.id,
             label: item.name,
-            description: item.description
+            description: item.description,
+            category: item.category,
+            common: item.common,
+            displayOrder: item.displayOrder
         })), [propertyTypes]);
 
     const unitTypeOptions = useMemo(() => {

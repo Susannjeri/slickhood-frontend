@@ -136,6 +136,15 @@ export const sidebarLinks: SidebarLink[] = [
     permissions: [],
     roles: ["Superadmin"],
   },
+  {
+    icon: LayoutGrid,
+    label: "Property Type Catalogue",
+    href: "/dashboard/property-type-catalog",
+    description: "Control the unit types available for every property type.",
+    protected: false,
+    permissions: [],
+    roles: ["Superadmin"],
+  },
 
 
   // { 
@@ -393,7 +402,7 @@ const sectionDefinitions = [
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "Soko", "My Services", "Merchant Accounts", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre", "Subscriptions", "Upgrade Plan"] },
-  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Affiliate Management"] },
+  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Affiliate Management"] },
 ] as const
 
 const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))

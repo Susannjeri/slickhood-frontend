@@ -230,7 +230,15 @@ export default function CreatePropertyPage() {
               <Field htmlFor="type" label="Property type" required error={errors.type?.message}>
                 <select id="type" disabled={isLoadingTypes} aria-invalid={!!errors.type} {...register("type")} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50">
                   <option value="">{isLoadingTypes ? "Loading property types…" : "Select property type"}</option>
-                  {propertyTypeOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  <optgroup label="Common property types">
+                    {propertyTypeOptions.filter(option => option.common || !option.category).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </optgroup>
+                  {["RESIDENTIAL", "COMMERCIAL", "HOSPITALITY", "MIXED", "INDUSTRIAL", "LAND"].map(category => {
+                    const options = propertyTypeOptions.filter(option => !option.common && option.category === category);
+                    return options.length > 0 ? <optgroup key={category} label={category.replaceAll("_", " ").toLowerCase().replace(/^./, c => c.toUpperCase())}>
+                      {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </optgroup> : null;
+                  })}
                 </select>
               </Field>
               <Field htmlFor="address" label="Address" required error={errors.address?.message}><Input id="address" autoComplete="street-address" maxLength={500} placeholder="e.g., 123 Main Street, Nairobi" aria-invalid={!!errors.address} {...register("address")} /></Field>

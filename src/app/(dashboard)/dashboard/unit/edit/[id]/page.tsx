@@ -109,7 +109,7 @@ export default function EditUnitPage() {
   const [newImages, setNewImages] = useState<File[]>([]);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const {isLoadingTypes, unitTypeOptions, setCurrentPropertyType } = usePropertyMetadata();
+  const {isLoadingTypes, unitTypeOptions, getUnitTypes } = usePropertyMetadata();
 
   // Form
   const {
@@ -154,7 +154,7 @@ export default function EditUnitPage() {
         const unitData = unitRes.data[0];
         
         setUnit(unitData);
-        setCurrentPropertyType(unitData.propertyType);
+        await getUnitTypes(unitData.propertyType);
         console.log("Unit Data: ", unitData)
         setValue("uniqueRef", unitData.ref);
         setValue("unitTypeId", unitData.unitType);

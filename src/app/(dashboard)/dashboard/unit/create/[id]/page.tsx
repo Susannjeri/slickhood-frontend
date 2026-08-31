@@ -84,7 +84,7 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
   } = useApi();
 
   // Options state
-  const {isLoadingTypes, unitTypeOptions, setCurrentPropertyType } = usePropertyMetadata();
+  const {isLoadingTypes, unitTypeOptions, getUnitTypes } = usePropertyMetadata();
   const [utilityOptions, setUtilityOptions] = useState<SelectOption[]>([]);
   const [measurementOptions, setMeasurementOptions] = useState<SelectOption[]>([]);
   const [leaseTemplateOptions, setLeaseTemplateOptions] = useState<SelectOption[]>([]);
@@ -175,11 +175,11 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
   const loadAllOptions = async () => {
     try {
       setIsLoadingOptions(true);
-      setCurrentPropertyType(propertyType);
       setValue("currency", propertyCurrency);
       if (presetFormLeaseMode) setValue("leaseMode", presetFormLeaseMode);
       // Load all options in parallel
-      const [utilitiesRes, measurementsRes, leaseTemplateRes] = await Promise.all([
+      const [, utilitiesRes, measurementsRes, leaseTemplateRes] = await Promise.all([
+        getUnitTypes(propertyType),
         fetchSupportedUtilities(),
         fetchMeasurementUnits(),
         handleListLeaseTemplates({page: 0, size: 100, sort: 'name,asc'}),
