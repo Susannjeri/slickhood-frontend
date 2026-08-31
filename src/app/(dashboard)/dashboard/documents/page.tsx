@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useSearchParams } from "next/navigation";
 import { Download, FilePlus2, Pencil, Send, Signature } from "lucide-react";
 import { leaseDocumentService } from "@/services/lease-document.service";
 import { GenerateLeaseDocumentRequest, LeaseDocument, LeaseDocumentTemplate, LeaseDocumentType } from "@/types/lease-document";
@@ -14,19 +15,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { apiErrorMessage } from "@/lib/api-error";
 
-const rentalTypes: LeaseDocumentType[] = ["RESIDENTIAL_LEASE_AGREEMENT", "COMMERCIAL_LEASE_AGREEMENT", "LATE_RENT_NOTICE",
+const rentalTypes: LeaseDocumentType[] = ["RENTAL_LETTER_OF_OFFER", "RESIDENTIAL_LEASE_AGREEMENT", "COMMERCIAL_LEASE_AGREEMENT", "LATE_RENT_NOTICE",
   "RENT_DEFAULT_CURE_NOTICE", "LANDLORD_TERMINATION_NOTICE", "TENANT_TERMINATION_NOTICE"];
 const allTypes: LeaseDocumentType[] = [...rentalTypes, "ESTATE_AGREEMENT", "PROPERTY_SALE_AGREEMENT"];
 const label = (value: string) => value.toLowerCase().replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
 export default function DocumentsPage() {
+  const searchParams = useSearchParams();
   const activeRole = useAuthStore((state) => state.activeRole);
   const permissions = useAuthStore((state) => state.permissions);
   const [documents, setDocuments] = useState<LeaseDocument[]>([]);
   const [templates, setTemplates] = useState<LeaseDocumentTemplate[]>([]);
   const [busy, setBusy] = useState(false);
-  const [type, setType] = useState<LeaseDocumentType>(activeRole?.title?.toLowerCase() === "tenant" ? "TENANT_TERMINATION_NOTICE" : "RESIDENTIAL_LEASE_AGREEMENT");
-  const [leaseId, setLeaseId] = useState("");
+  const requestedType = searchParams.get("type") as LeaseDocumentType | null;
+  const [type, setType] = useState<LeaseDocumentType>(activeRole?.title?.toLowerCase() === "tenant" ? "TENANT_TERMINATION_NOTICE" : requestedType && allTypes.includes(requestedType) ? requestedType : "RENTAL_LETTER_OF_OFFER");
+  const [leaseId, setLeaseId] = useState(searchParams.get("leaseId") ?? "");
   const [propertyId, setPropertyId] = useState("");
   const [recipientUserId, setRecipientUserId] = useState("");
   const [effectiveDate, setEffectiveDate] = useState("");
@@ -118,18 +121,18 @@ export default function DocumentsPage() {
       <p className="text-muted-foreground">Versioned agreements and notices with delivery, acknowledgement, signatures, and audit-safe snapshots.</p></div>
 
     {canCreate && <Card><CardHeader><CardTitle className="flex items-center gap-2"><FilePlus2 className="h-5 w-5 text-[#EF4217]" />Create draft</CardTitle>
-      <CardDescription>Use the lease ID for rental documents. Estate and sale agreements use a property and recipient user.</CardDescription></CardHeader>
+      <CardDescription>For a new tenancy, issue and sign the Letter of Offer before creating the Residential or Commercial Tenancy Agreement.</CardDescription></CardHeader>
       <CardContent><form onSubmit={generate} className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-2 md:col-span-2"><Label>Document type</Label><select value={type} onChange={(e) => setType(e.target.value as LeaseDocumentType)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+        <div className="space-y-2 md:col-span-2"><Label htmlFor="document-type">Document type</Label><select id="document-type" value={type} onChange={(e) => setType(e.target.value as LeaseDocumentType)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
           {visibleTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></div>
-        {!isPropertyDocument ? <div className="space-y-2"><Label>Lease ID</Label><Input required type="number" min="1" value={leaseId} onChange={(e) => setLeaseId(e.target.value)} /></div> : <>
+        {!isPropertyDocument ? <div className="space-y-2"><Label htmlFor="lease-id">Lease ID</Label><Input id="lease-id" required type="number" min="1" value={leaseId} onChange={(e) => setLeaseId(e.target.value)} /></div> : <>
           <div className="space-y-2"><Label>Property ID</Label><Input required type="number" min="1" value={propertyId} onChange={(e) => setPropertyId(e.target.value)} /></div>
           <div className="space-y-2"><Label>Recipient user ID</Label><Input required type="number" min="1" value={recipientUserId} onChange={(e) => setRecipientUserId(e.target.value)} /></div></>}
-        <div className="space-y-2"><Label>Effective date</Label><Input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} /></div>
-        <div className="space-y-2"><Label>Response due</Label><Input type="date" value={responseDueDate} onChange={(e) => setResponseDueDate(e.target.value)} /></div>
-        <div className="space-y-2"><Label>Amount</Label><Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
-        <div className="space-y-2"><Label>Currency</Label><Input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} /></div>
-        <div className="space-y-2 md:col-span-3"><Label>Reason / additional terms</Label><Textarea maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+        <div className="space-y-2"><Label htmlFor="effective-date">Effective date</Label><Input id="effective-date" type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} /></div>
+        <div className="space-y-2"><Label htmlFor="response-due">Response due</Label><Input id="response-due" type="date" value={responseDueDate} onChange={(e) => setResponseDueDate(e.target.value)} /></div>
+        <div className="space-y-2"><Label htmlFor="document-amount">Amount</Label><Input id="document-amount" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+        <div className="space-y-2"><Label htmlFor="document-currency">Currency</Label><Input id="document-currency" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} /></div>
+        <div className="space-y-2 md:col-span-3"><Label htmlFor="document-reason">Reason / additional terms</Label><Textarea id="document-reason" maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} /></div>
         <div className="md:col-span-3"><Button disabled={busy} className="bg-[#EF4217] hover:bg-[#d83a13]">Create draft</Button></div>
       </form></CardContent></Card>}
 
@@ -151,6 +154,7 @@ export default function DocumentsPage() {
         <Button size="sm" variant="outline" onClick={() => setEditing({...template})}><Pencil className="mr-1 h-4 w-4" />Edit</Button></div>)}</div> :
         <form onSubmit={saveTemplate} className="space-y-4"><div className="space-y-2"><Label>Name</Label><Input value={editing.displayName} onChange={(e) => setEditing({...editing, displayName: e.target.value})} /></div>
           <div className="space-y-2"><Label>Template HTML with Mustache fields</Label><Textarea className="min-h-80 font-mono text-xs" value={editing.bodyHtml} onChange={(e) => setEditing({...editing, bodyHtml: e.target.value})} /></div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!editing.legalReviewRequired} onChange={(e) => setEditing({...editing, legalReviewRequired: !e.target.checked})} />Approved for issue after legal review</label>
           <div className="flex gap-2"><Button disabled={busy}>Save new version</Button><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button></div></form>}
       </CardContent></Card>}
   </div>;
