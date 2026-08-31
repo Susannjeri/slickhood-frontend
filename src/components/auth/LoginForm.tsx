@@ -125,10 +125,10 @@ export default function LoginForm() {
     setToken(result.token || null);
     setmfaEnabled(result.mfaEnabled);
     settotpEnabled(result.totpEnabled);
-    setEmail(values.email);
+    setEmail(values.email.trim().toLowerCase());
     setSuccess("Welcome back — checking where you left off...");
     setLoading(false);
-    setTimeout(() => router.push("/continue-setup"), 900);
+    router.replace("/continue-setup");
   }
 
   const inputClass = "h-11 rounded-lg text-base focus-visible:ring-[#EF4217]";
@@ -158,7 +158,7 @@ export default function LoginForm() {
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                       <Mail className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                     </div>
-                    <Input aria-label="Email Address" placeholder="you@example.com" {...field} className={`pl-10 ${inputClass}`} />
+                    <Input aria-label="Email Address" autoComplete="username" inputMode="email" placeholder="you@example.com" {...field} className={`pl-10 ${inputClass}`} />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -180,6 +180,7 @@ export default function LoginForm() {
                     </div>
                     <Input
                       aria-label="Password"
+                      autoComplete="current-password"
                       type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
                       {...field}

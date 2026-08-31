@@ -69,6 +69,71 @@ test("an unverified account is sent to email verification instead of a tokenless
   await expect(page.getByText("owner@example.test")).toBeVisible();
 });
 
+test("a successful credential login creates the secure session and leaves the login page", async ({ page, context }) => {
+  const jwt = testToken([
+    { title: "Landlord", permissions: [] },
+    { title: "ServiceProvider", permissions: [] },
+  ]);
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/auth/login", route => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(envelope([{
+      jwt,
+      refreshToken: "refresh-token-longer-than-sixteen-characters",
+      totpEnabled: false,
+      mfaSetup: true,
+    }])),
+  }));
+  await page.route("**/kyc/current", route => route.fulfill({ json: envelope([{
+    status: "APPROVED", accountStatus: "ACTIVE", phoneVerified: true,
+    requirements: [], missingRequirements: [], documents: [],
+  }]) }));
+  await page.route("**/subscription/current**", route => route.fulfill({ json: envelope([]) }));
+
+  await page.goto("/login");
+  await page.getByPlaceholder("you@example.com").fill("  Owner@Example.com ");
+  await page.getByPlaceholder("••••••••").fill("ValidPass1!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page).not.toHaveURL(/\/login$/);
+  const cookies = await context.cookies();
+  expect(cookies.find(cookie => cookie.name === "token")?.httpOnly).toBe(true);
+  expect(cookies.find(cookie => cookie.name === "refreshToken")?.httpOnly).toBe(true);
+});
+
+test("an expired access cookie cannot trap the user in a login-dashboard redirect loop", async ({ page, context }) => {
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const expired = `${encode({ alg: "none" })}.${encode({ sub: "expired", exp: 1, roles: [] })}.expired`;
+  await context.addCookies([{ name: "token", value: expired, domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
+  await page.route("https://accounts.google.com/**", route => route.abort());
+
+  await page.goto("/login");
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+});
+
+test("a valid-looking stale cookie cannot make the sign-in page unreachable", async ({ page, context }) => {
+  const stale = testToken([{ title: "Landlord", permissions: [] }]);
+  await context.addCookies([{ name: "token", value: stale, domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
+  await page.route("https://accounts.google.com/**", route => route.abort());
+
+  await page.goto("/login");
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
+});
+
+test("the browser session endpoint rejects malformed tokens", async ({ request }) => {
+  const response = await request.post("/browser-session/set-cookie", {
+    data: { token: "not-a-jwt", refreshToken: "long-but-invalid-refresh-token" },
+  });
+  expect(response.status()).toBe(400);
+  await expect(response.json()).resolves.toMatchObject({ success: false });
+});
+
 test("password reset verifies ownership and enforces the registration password policy", async ({ page }) => {
   await page.route("**/otp/options**", route => route.fulfill({ json: envelope([{ email: true, phone: false, google: false, preferred: "EMAIL" }]) }));
   await page.route("**/otp/send**", route => route.fulfill({ json: envelope(["sent"]) }));

@@ -11,8 +11,6 @@ export async function middleware(req: NextRequest) {
   // }
   
   const { pathname } = req.nextUrl;
-  // Define all routes that logged-in users should NOT see
-  const authRoutes = ["/role", "/login", "/register", "/verify","/verify-code", "/auth_select","/reset","/forgot-password"];
   // Paths that non logged-in users should not access can be added here
   const dashboardRoutes = ["/dashboard", "/callback/fw/payments"];
   const onboardingRoutes = ["/account-activated", "/business-areas", "/continue-setup", "/kyc"];
@@ -38,9 +36,6 @@ export async function middleware(req: NextRequest) {
   const protectedRoutes = allLinks
     .filter((link) => link.protected && link.href)
     .map((link) => link.href as string);
-  const isAuthRoute = authRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
   const isDashboardRoute = dashboardRoutes.some((route) => 
     pathname.startsWith(route)
   );
@@ -54,15 +49,13 @@ export async function middleware(req: NextRequest) {
 
 
   if (token) {
-
-      if (isAuthRoute) {
-        return NextResponse.redirect(new URL("/dashboard", req.url));
-      }
-
       try {
         const payload = decodeServerToken(token);
         if (!payload || !payload.exp || payload.exp * 1000 <= Date.now()) {
-          const response = NextResponse.redirect(new URL("/login", req.url));
+          const requiresAuthentication = isProtectedRoute || isDashboardRoute || isOnboardingRoute;
+          const response = requiresAuthentication
+            ? NextResponse.redirect(new URL("/login", req.url))
+            : NextResponse.next();
           response.cookies.delete("token");
           return response;
         }
@@ -83,9 +76,12 @@ export async function middleware(req: NextRequest) {
             }
           }
         }
-      }
+    }
     catch {
-      const response = NextResponse.redirect(new URL("/login", req.url));
+      const requiresAuthentication = isProtectedRoute || isDashboardRoute || isOnboardingRoute;
+      const response = requiresAuthentication
+        ? NextResponse.redirect(new URL("/login", req.url))
+        : NextResponse.next();
       response.cookies.delete("token");
       return response;
       }

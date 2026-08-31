@@ -5,6 +5,13 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+concurrency:
+  group: slickhood-frontend-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -29,6 +36,15 @@ jobs:
           ${{ secrets.ENV_PRODUCTION }}
           EOF
 
+      - name: Install Chromium for authentication regression tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Build the exact production frontend
+        run: npm run build
+
+      - name: Run mandatory authentication and onboarding regression gate
+        run: npx playwright test e2e/auth.spec.ts e2e/auth-layout.spec.ts e2e/registration-subscription.spec.ts
+
       - name: Build and package deployment binaries
         run:  |
           chmod +x ./build.sh
@@ -51,3 +67,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             ./gangnam.sh
+
+      - name: Verify production authentication contract
+        run: bash ./scripts/verify-auth-production.sh

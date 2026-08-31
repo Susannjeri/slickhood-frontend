@@ -1,5 +1,6 @@
 import axios from "axios";
 import { NextRequest, NextResponse } from "next/server";
+import { accessTokenMaxAge } from "@/lib/session-token";
 
 export async function POST(req: NextRequest) {
   const refreshToken = req.cookies.get("refreshToken")?.value;
@@ -14,16 +15,20 @@ export async function POST(req: NextRequest) {
     const tokenData = provider.data?.[0] ?? provider.data;
     const accessToken = tokenData?.jwt;
     const newRefreshToken = tokenData?.refreshToken;
-    if (!provider.success || !accessToken || !newRefreshToken) throw new Error(provider.description || "Invalid token response from backend");
+    const maxAge = typeof accessToken === "string" ? accessTokenMaxAge(accessToken) : null;
+    if (!provider.success || !accessToken || !newRefreshToken || !maxAge) throw new Error(provider.description || "Invalid token response from backend");
 
     const res = NextResponse.json({ success: true, description: provider.description, code: provider.code });
     const secure = process.env.NODE_ENV === "production";
-    res.cookies.set("token", accessToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 15 });
+    res.cookies.set("token", accessToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge });
     res.cookies.set("refreshToken", newRefreshToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7 });
     return res;
   } catch (error: unknown) {
     const providerDescription = axios.isAxiosError(error) ? error.response?.data?.description : undefined;
     const localDescription = error instanceof Error ? error.message : undefined;
-    return NextResponse.json({ success: false, description: providerDescription || localDescription || "Failed to refresh token", code: "E0000", data: null }, { status: 401 });
+    const res = NextResponse.json({ success: false, description: providerDescription || localDescription || "Failed to refresh token", code: "E0000", data: null }, { status: 401 });
+    res.cookies.set("token", "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 0 });
+    res.cookies.set("refreshToken", "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 0 });
+    return res;
   }
 }

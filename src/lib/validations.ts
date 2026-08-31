@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const loginSchema = z.object({
-  email: z.email("Invalid email"),
+  email: z.string().trim().toLowerCase().email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   totp: z.string().optional(), // for later when backend requests TOTP
 });
@@ -12,7 +12,7 @@ export const registerSchema = z.object({
   profileType: z.enum(["INDIVIDUAL", "COMPANY"]),
   fullName: z.string().trim().min(2, "Enter your full name").max(120, "Name is too long"),
   organizationName: z.string().trim().max(160, "Organization name is too long"),
-  email: z.email("Invalid email"),
+  email: z.string().trim().toLowerCase().email("Invalid email"),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")

@@ -14,7 +14,12 @@ export default function SessionHydrator() {
         return;
       }
       try {
-        const response = await fetch("/browser-session/get-token", { cache: "no-store" });
+        let response = await fetch("/browser-session/get-token", { cache: "no-store" });
+        if (!response.ok) {
+          const refreshed = await fetch("/browser-session/refresh", { method: "POST", cache: "no-store" });
+          if (!refreshed.ok || cancelled) return;
+          response = await fetch("/browser-session/get-token", { cache: "no-store" });
+        }
         if (!response.ok || cancelled) return;
         const body = await response.json();
         const token = body.data?.jwt as string | undefined;

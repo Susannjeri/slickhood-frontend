@@ -547,7 +547,7 @@ function applyRolesToStore(
 type AuthRole = NonNullable<ReturnType<typeof decodeServerToken>>["roles"][number];
 
 function apiErrorMessage(error: unknown, fallback: string): string {
-  if (!axios.isAxiosError(error)) return fallback;
+  if (!axios.isAxiosError(error)) return error instanceof Error ? error.message : fallback;
   const data = error.response?.data as { description?: string } | undefined;
   return data?.description ?? fallback;
 }
@@ -620,7 +620,8 @@ export function useAuth() {
   const login = async (email: string, password: string) => {
     try {
       const { inviteToken } = useAuthStore.getState();
-      const payload: { email: string; password: string; token?: string } = { email, password };
+      const normalizedEmail = email.trim().toLowerCase();
+      const payload: { email: string; password: string; token?: string } = { email: normalizedEmail, password };
       if (inviteToken) payload.token = inviteToken;
 
       const response = await loginUser(payload);
@@ -633,7 +634,7 @@ export function useAuth() {
       // That is a successful verification hand-off, not an authenticated session.
       // Never attempt to decode or persist it as a login token.
       if (success && (!loginData || typeof loginData !== "object" || !loginData.jwt)) {
-        setEmail(email);
+        setEmail(normalizedEmail);
         setToken(null);
         setStep("verify");
         return {
@@ -656,7 +657,10 @@ export function useAuth() {
 
         console.log("Auth store roles applied on login");
 
-        await setCookie({ token, refreshToken });
+        const cookieResponse = await setCookie({ token, refreshToken });
+        if (!cookieResponse.ok) {
+          throw new Error("The secure browser session could not be created.");
+        }
         console.log("Token set in cookie");
 
         if (inviteToken) {
@@ -667,7 +671,7 @@ export function useAuth() {
 
       setmfaEnabled(mfaEnabled);
       settotpEnabled(totpEnabled);
-      setEmail(email);
+      setEmail(normalizedEmail);
 
       return {
         success,
@@ -679,11 +683,6 @@ export function useAuth() {
       };
     } catch (error: unknown) {
       console.log("Login error: ", error);
-      const { inviteToken } = useAuthStore.getState();
-      if (inviteToken) {
-        console.log("Clearing invite token after failed login attempt");
-        setInviteToken(null);
-      }
       return { success: false, message: apiErrorMessage(error, "Login failed") };
     }
   };

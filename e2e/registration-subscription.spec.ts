@@ -167,6 +167,7 @@ test("trial duration comes from policy and activation remains attached to the se
     displayName: "Bronze",
     planCategory: "RENTAL",
     roleFamily: "LANDLORD",
+    productKey: "LANDLORD",
     billingCycle: "MONTHLY",
     price: 1000,
     currency: "KES",
