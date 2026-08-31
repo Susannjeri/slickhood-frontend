@@ -34,6 +34,11 @@ test("manager termination requires a reason and sends the structured request", a
   await page.route("**/estate/operations/properties/11/**", route => route.fulfill({ json: envelope([]) }));
 
   await page.goto("/dashboard/estate");
+  const scopedChargeRequest = page.waitForRequest(request => request.url().includes("/estate/service-charges")
+    && new URL(request.url()).searchParams.get("propertyId") === "11");
+  await page.getByLabel("Estate").click();
+  await page.getByRole("option", { name: "Silverwood Estate" }).click();
+  expect(new URL((await scopedChargeRequest).url()).searchParams.get("propertyId")).toBe("11");
   await page.getByRole("button", { name: "End ownership" }).click();
   await page.getByLabel("Reason").fill("Property sale completed");
   await page.route("**/estate/ownership/9/end", route => route.fulfill({ json: envelope({ id: 9, active: false }) }));

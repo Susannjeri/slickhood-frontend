@@ -6,7 +6,8 @@ export const estateService = {
     API.get("/estate/ownership", { params: { page: 0, size: 50, ...params } }),
   createOwnership: (data:{propertyId:number;unitId?:number;homeownerUserId:number;ownershipStart:string;source?:string}) => API.post("/estate/ownership",data),
   endOwnership: (id:number,data:{endDate:string;reason:string}) => API.post(`/estate/ownership/${id}/end`,data),
-  listServiceCharges: (page=0,size=50) => API.get("/estate/service-charges",{params:{page,size,sort:"dueDate,desc"}}),
+  listServiceCharges: (params: {page?:number;size?:number;propertyId?:number} = {}) =>
+    API.get("/estate/service-charges",{params:{page:0,size:50,sort:"dueDate,desc",...params}}),
   createServiceCharge: (data:{ownershipId:number;amount:number;currency:string;dueDate:string;description:string}) => API.post("/estate/service-charges",data),
 };
 export const salesService = {

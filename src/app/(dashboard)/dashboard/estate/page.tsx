@@ -33,6 +33,8 @@ export default function EstatePage() {
   const requestedPropertyId = Number(searchParams.get("propertyId"));
   const initialPropertyId = Number.isSafeInteger(requestedPropertyId) && scopedPropertyIds.includes(requestedPropertyId)
     ? String(requestedPropertyId) : "all";
+  const requestedScopedPropertyId = Number.isSafeInteger(requestedPropertyId) && scopedPropertyIds.includes(requestedPropertyId)
+    ? requestedPropertyId : undefined;
 
   const [propertyFilter, setPropertyFilter] = useState(initialPropertyId);
   const [items, setItems] = useState<PropertyOwnership[]>([]);
@@ -63,24 +65,26 @@ export default function EstatePage() {
 
   const load = useCallback(async () => {
     try {
-      const propertyId = propertyFilter === "all" ? undefined : Number(propertyFilter);
+      const browserPropertyParam = new URLSearchParams(window.location.search).get("propertyId");
+      const browserRequestedPropertyId = browserPropertyParam ? Number(browserPropertyParam) : Number.NaN;
+      const safeBrowserPropertyId = Number.isSafeInteger(browserRequestedPropertyId) && browserRequestedPropertyId > 0
+        ? browserRequestedPropertyId : undefined;
+      const propertyId = propertyFilter === "all" ? (requestedScopedPropertyId ?? safeBrowserPropertyId) : Number(propertyFilter);
       const [ownershipResponse, chargeResponse] = await Promise.all([
         estateService.listOwnership({ propertyId }),
-        estateService.listServiceCharges(),
+        estateService.listServiceCharges({ propertyId }),
       ]);
       setItems(ownershipResponse.data?.data ?? []);
       setCharges(chargeResponse.data?.data ?? []);
     } catch (error: unknown) {
       toast.error(apiErrorMessage(error, "Could not load estate records."));
     }
-  }, [propertyFilter]);
+  }, [propertyFilter, requestedScopedPropertyId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   useEffect(() => {
     if (!canManage || propertyFilter === "all") {
-      setUnits([]);
-      setAssignmentUnitId("");
       return;
     }
     let current = true;
@@ -144,7 +148,7 @@ export default function EstatePage() {
 
     <Card><CardHeader><CardTitle>Service charges</CardTitle><CardDescription>Balances update only after verified payment reconciliation. Checkout and receipts are available in Invoices.</CardDescription></CardHeader><CardContent className="space-y-3">{charges.length === 0 && <p className="py-6 text-center text-muted-foreground">No service charges for this role.</p>}{charges.map(charge => <div key={charge.id} className="flex flex-col justify-between gap-3 rounded border p-4 sm:flex-row sm:items-center"><div><div className="flex flex-wrap items-center gap-2"><strong>{charge.currency} {charge.pendingAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {charge.paid ? "paid" : "outstanding"}</strong><Badge variant={charge.status === "PAID" ? "default" : "outline"} className={charge.status === "OVERDUE" ? "border-red-200 bg-red-50 text-red-700" : charge.status === "PAID" ? "bg-emerald-600" : ""}>{charge.status}</Badge></div><p className="mt-1 text-sm text-muted-foreground">{charge.description} · {charge.propertyName} / {charge.unitRef} · Due {charge.dueDate} · {charge.invoiceRef}</p></div><Button asChild size="sm" variant="outline"><Link href="/dashboard/invoices">View invoice</Link></Button></div>)}</CardContent></Card>
 
-    <EstateOperationsPanel propertyIds={estatePropertyIds} canManage={canManage} />
+    <EstateOperationsPanel properties={estatePropertyIds.map(id => ({ id, name: properties.find(property => property.id === id)?.name ?? currentOwnerships.find(item => item.propertyId === id)?.propertyName ?? `Property #${id}` }))} canManage={canManage} />
     <Dialog open={Boolean(endingOwnership)} onOpenChange={open => { if (!open && !busy) { setEndingOwnership(null); setEndReason(""); } }}><DialogContent><form onSubmit={endOwnership} className="space-y-4"><DialogHeader><DialogTitle>End ownership</DialogTitle><DialogDescription>This immediately removes homeowner access while preserving ownership and financial history. The homeowner will be notified.</DialogDescription></DialogHeader><div><Label htmlFor="ownership-end-date">End date</Label><Input id="ownership-end-date" required type="date" min={endingOwnership?.ownershipStart} max={new Date().toISOString().slice(0, 10)} value={endDate} onChange={event => setEndDate(event.target.value)} /></div><div><Label htmlFor="ownership-end-reason">Reason</Label><Textarea id="ownership-end-reason" required maxLength={500} value={endReason} onChange={event => setEndReason(event.target.value)} placeholder="For example: property sale completed" /></div><DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setEndingOwnership(null)}>Cancel</Button><Button type="submit" variant="destructive" disabled={busy || !endReason.trim()}>End ownership</Button></DialogFooter></form></DialogContent></Dialog>
   </div>;
 }
