@@ -14,7 +14,7 @@ import { apiErrorMessage } from "@/lib/api-error";
 import { EstateBudgetView, EstateCommonWork, EstateMeeting, EstateResolution, estateOperationsService } from "@/services/estate-operations.service";
 
 export function EstateOperationsPanel({propertyIds,canManage}:{propertyIds:number[];canManage:boolean}) {
-  const [propertyId,setPropertyId]=useState<number|undefined>(propertyIds[0]);
+  const [propertyIdSelection,setPropertyId]=useState<number|undefined>(propertyIds[0]);
   const [meetings,setMeetings]=useState<EstateMeeting[]>([]),[budgets,setBudgets]=useState<EstateBudgetView[]>([]),[works,setWorks]=useState<EstateCommonWork[]>([]);
   const [resolutions,setResolutions]=useState<Record<number,EstateResolution[]>>({});
   const [loading,setLoading]=useState(false),[busy,setBusy]=useState(false);
@@ -28,7 +28,8 @@ export function EstateOperationsPanel({propertyIds,canManage}:{propertyIds:numbe
   const [resolutionVotes,setResolutionVotes]=useState<Record<number,{votesFor:string;votesAgainst:string;votesAbstain:string}>>({});
   const [workNotes,setWorkNotes]=useState<Record<number,string>>({});
 
-  const selectedPropertyId=propertyIds.includes(propertyId??-1)?propertyId:propertyIds[0];
+  const propertyId=propertyIds.includes(propertyIdSelection??-1)?propertyIdSelection:propertyIds[0];
+  const selectedPropertyId=propertyId;
   const load=useCallback(async()=>{if(!selectedPropertyId)return;setLoading(true);try{const [m,b,w]=await Promise.all([estateOperationsService.meetings(selectedPropertyId),estateOperationsService.budgets(selectedPropertyId),estateOperationsService.workOrders(selectedPropertyId)]);setMeetings(m.data?.data??[]);setBudgets(b.data?.data??[]);setWorks(w.data?.data??[])}catch(error:unknown){toast.error(apiErrorMessage(error,"Could not load estate operations."))}finally{setLoading(false)}},[selectedPropertyId]);
   useEffect(()=>{void Promise.resolve().then(load)},[load]);
   async function showResolutions(id:number){if(resolutions[id]){setResolutions(current=>{const next={...current};delete next[id];return next})}else try{const response=await estateOperationsService.resolutions(id);setResolutions(current=>({...current,[id]:response.data?.data??[]}))}catch(error:unknown){toast.error(apiErrorMessage(error,"Could not load meeting resolutions."))}}

@@ -1,6 +1,11 @@
 import { BrowserContext, Page } from "@playwright/test";
 
-export interface TestRole { title: string; permissions: string[] }
+export interface TestRole {
+  title: string;
+  permissions: string[];
+  propertyIds?: number[];
+  propertyNames?: string[];
+}
 
 const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
 
@@ -25,8 +30,8 @@ export async function authenticated(context: BrowserContext, page: Page, role: T
         roles: [persistedRole],
         roleName: [persistedRole.title],
         permissions: persistedRole.permissions,
-        propertyIds: [],
-        propertyNames: [],
+        propertyIds: persistedRole.propertyIds ?? [],
+        propertyNames: persistedRole.propertyNames ?? [],
         activeRole: persistedRole,
       },
       version: 0,

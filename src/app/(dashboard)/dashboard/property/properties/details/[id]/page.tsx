@@ -75,6 +75,7 @@ import {toast} from "sonner";
 import Can from "@/components/auth/Can";
 import CanProperty, {usePropertyPermissions} from "@/components/auth/CanProperty";
 import PropertyAccountsSheet from "@/components/property/PropertyAccountsSheet";
+import EstateSetupChecklist from "@/components/estate/EstateSetupChecklist";
 
 interface PropertyDetails {
     id: number;
@@ -581,6 +582,14 @@ export default function PropertyDetailsPage() {
                         </div>
                     </div>
                 </div>
+
+                <EstateSetupChecklist
+                    propertyId={Number(propertyId)}
+                    propertyName={property.name}
+                    currency={property.currency}
+                    propertyType={property.type}
+                    onLinkAccount={() => setAccountsSheetOpen(true)}
+                />
 
                 {/* Create Invite Modal */}
                 <Dialog open={createInviteOpen} onOpenChange={setCreateInviteOpen}>
