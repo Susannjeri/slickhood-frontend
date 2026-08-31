@@ -1400,7 +1400,7 @@ export const activePaymentChannels = (token: string) => {
   })
 } 
 
-export type paymentChannel = "MPESA" | "FLUTTER_WAVE" | "PESA_LINK" | "PAYSTACK";
+export type paymentChannel = "MPESA" | "MPESA_BANK" | "PESA_LINK" | "PAYSTACK";
 
 export type accountCategory = "LANDLORD" | "SLICKHOOD" | "MERCHANT";
 
