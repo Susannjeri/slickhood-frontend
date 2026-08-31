@@ -32,11 +32,14 @@ export function AuthSplitLayout({ children, rightPanel, backLink }: AuthSplitLay
     <div className="flex flex-col lg:flex-row min-h-screen lg:h-screen lg:overflow-hidden">
 
       {/* ── Left panel: form (35% on desktop) ──────────────────── */}
-      <div className="w-full lg:w-[35%] shrink-0 flex flex-col bg-white dark:bg-[#1A1740] transition-colors lg:h-full lg:overflow-y-auto">
+      <div
+        data-testid="auth-form-panel"
+        className="w-full lg:w-[42%] xl:w-[40%] 2xl:w-[38%] shrink-0 flex flex-col bg-white dark:bg-[#1A1740] transition-colors lg:h-full lg:overflow-y-auto"
+      >
 
         {/* Back link — pinned at very top, its own row */}
         {backLink && (
-          <div className="px-8 pt-5 shrink-0">
+          <div className="shrink-0 px-6 pt-5 sm:px-10 lg:px-12 2xl:px-16">
             <Link
               href={backLink.href}
               className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-[#EF4217] transition-colors"
@@ -48,7 +51,7 @@ export function AuthSplitLayout({ children, rightPanel, backLink }: AuthSplitLay
         )}
 
         {/* Logo */}
-        <div className="px-8 pt-5 pb-2 shrink-0">
+        <div className="shrink-0 px-6 pb-2 pt-5 sm:px-10 lg:px-12 2xl:px-16">
           <Link href="/" aria-label="SlickHood home" className="inline-block">
             <Image src="/slickhood.png" alt="SlickHood" width={140} height={40} className="h-9 w-auto" priority />
           </Link>
@@ -58,8 +61,8 @@ export function AuthSplitLayout({ children, rightPanel, backLink }: AuthSplitLay
         </div>
 
         {/* Form — vertically centered in remaining space */}
-        <div className="flex-1 flex items-center justify-center px-8 py-8">
-          <div className="w-full max-w-[370px]">
+        <div className="flex flex-1 items-center justify-center px-6 py-8 sm:px-10 lg:px-12 2xl:px-16">
+          <div data-testid="auth-form-shell" className="w-full max-w-[520px] 2xl:max-w-[600px]">
             {children}
           </div>
         </div>
@@ -68,7 +71,7 @@ export function AuthSplitLayout({ children, rightPanel, backLink }: AuthSplitLay
       {/* ── Right panel (65% on desktop) ─────────────────────────
            flex-col so slider/content and services band stack
            top-to-bottom with no padding or gaps.               */}
-      <div className="hidden lg:flex flex-1 flex-col overflow-hidden">
+      <div data-testid="auth-visual-panel" className="hidden lg:flex flex-1 flex-col overflow-hidden">
         {rightPanel ?? <DefaultRightPanel />}
       </div>
 

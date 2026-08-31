@@ -131,15 +131,15 @@ export default function LoginForm() {
     setTimeout(() => router.push("/continue-setup"), 900);
   }
 
-  const inputClass = "rounded-lg text-sm focus-visible:ring-[#EF4217]";
+  const inputClass = "h-11 rounded-lg text-base focus-visible:ring-[#EF4217]";
 
   return (
-    <div className="w-full flex flex-col gap-5">
+    <div data-testid="login-form" className="flex w-full flex-col gap-6">
 
       {/* Heading */}
       <div className="space-y-1">
-        <h1 className="text-2xl sm:text-3xl font-bold text-[#14235C] dark:text-white">Sign in</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Welcome back! Please enter your details.</p>
+        <h1 className="text-3xl font-bold text-[#14235C] dark:text-white sm:text-4xl">Sign in</h1>
+        <p className="text-base text-gray-500 dark:text-gray-400">Welcome back! Please enter your details.</p>
       </div>
 
       {/* Form */}
@@ -154,11 +154,11 @@ export default function LoginForm() {
               <FormItem>
                 <FormLabel className="text-xs font-semibold text-[#14235C] dark:text-white">Email Address</FormLabel>
                 <FormControl>
-                  <div className="relative h-9">
+                  <div className="relative h-11">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                       <Mail className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                     </div>
-                    <Input placeholder="you@example.com" {...field} className={`pl-10 ${inputClass}`} />
+                    <Input aria-label="Email Address" placeholder="you@example.com" {...field} className={`pl-10 ${inputClass}`} />
                   </div>
                 </FormControl>
                 <FormMessage />
@@ -174,11 +174,12 @@ export default function LoginForm() {
               <FormItem>
                 <FormLabel className="text-xs font-semibold text-[#14235C] dark:text-white">Password</FormLabel>
                 <FormControl>
-                  <div className="relative h-9">
+                  <div className="relative h-11">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
                       <Lock className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                     </div>
                     <Input
+                      aria-label="Password"
                       type={showPassword ? "text" : "password"}
                       placeholder="••••••••"
                       {...field}
