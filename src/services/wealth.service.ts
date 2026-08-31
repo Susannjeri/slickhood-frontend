@@ -1,6 +1,6 @@
 import {API} from "@/lib/api";
 
-export type AssetPayload={propertyId?:number;assetType:string;name:string;reference?:string;location?:string;currency:string;acquisitionCost:number;acquisitionDate?:string;currentValue:number;valuationDate:string;status:string};
+export type AssetPayload={propertyId?:number;assetType:string;name:string;reference?:string;location?:string;currency:string;acquisitionCost:number;acquisitionDate?:string;currentValue:number;valuationDate:string;status:string;exchangeCode?:string;instrumentSymbol?:string;quantity?:number;averageUnitCost?:number;pricingMode?:"MANUAL"|"MARKET"};
 export type WealthPropertyOption={id:number;name:string;description?:string};
 export const wealthService={
  dashboard:(years=5,valueGrowth=5,incomeGrowth=3,expenseGrowth=3)=>API.get("/wealth/dashboard",{params:{years,valueGrowth,incomeGrowth,expenseGrowth}}),
@@ -9,6 +9,7 @@ export const wealthService={
  createAsset:(data:AssetPayload)=>API.post("/wealth/assets",data),
  updateAsset:(id:number,data:AssetPayload)=>API.put(`/wealth/assets/${id}`,data),
  archiveAsset:(id:number)=>API.delete(`/wealth/assets/${id}`),
+ refreshMarket:(id:number)=>API.post(`/wealth/assets/${id}/market/refresh`),
  addValuation:(id:number,data:{amount:number;valuationDate:string;source:string;notes?:string})=>API.post(`/wealth/assets/${id}/valuations`,data),
  addCashFlow:(id:number,data:{flowType:"INCOME"|"EXPENSE";category:string;amount:number;entryDate:string;description?:string;recurring:boolean})=>API.post(`/wealth/assets/${id}/cash-flows`,data),
  updateCashFlow:(id:number,data:{flowType:"INCOME"|"EXPENSE";category:string;amount:number;entryDate:string;description?:string;recurring:boolean})=>API.put(`/wealth/cash-flows/${id}`,data),
@@ -25,5 +26,7 @@ export const wealthService={
  uploadDocument:(id:number,data:FormData)=>API.post(`/wealth/assets/${id}/vault`,data),
  documents:(id:number)=>API.get(`/wealth/assets/${id}/vault`),
  ledger:(id:number)=>API.get(`/wealth/assets/${id}/ledger`),
+ vault:()=>API.get("/wealth/vault"),
+ uploadVaultDocument:(data:FormData)=>API.post("/wealth/vault",data),
  archiveDocument:(id:number)=>API.delete(`/wealth/vault/${id}`),
 };
