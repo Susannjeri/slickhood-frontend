@@ -75,11 +75,13 @@ import {toast} from "sonner";
 import Can from "@/components/auth/Can";
 import CanProperty, {usePropertyPermissions} from "@/components/auth/CanProperty";
 import PropertyAccountsSheet from "@/components/property/PropertyAccountsSheet";
+import EstateSetupChecklist from "@/components/estate/EstateSetupChecklist";
 
 interface PropertyDetails {
     id: number;
     name: string;
     type: string;
+    managementMode: "RENTAL" | "SALE" | "SERVICE_CHARGE";
     address: string;
     mapLocation: string;
     currency: string;
@@ -158,7 +160,7 @@ export default function PropertyDetailsPage() {
         handleUpdateInvite,
         handleDeleteStaff,
     } = useApi();
-    const {getPropertyTypeName, isLoadingTypes, getUnitTypes, resolveUnitTypeLabel } = usePropertyMetadata();
+    const {getPropertyTypeName, getUnitTypes, resolveUnitTypeLabel } = usePropertyMetadata();
 
     // Permission checking hook
     const {checkPermissions, getPropertyRoles} = usePropertyPermissions(Number(propertyId));
@@ -216,28 +218,21 @@ export default function PropertyDetailsPage() {
 
     // Load property details
     useEffect(() => {
-        if (!propertyId) {
-            return;
-        }
-        const initAndLoad = async () => {
-            if (!isLoadingTypes) {
-                loadPropertyDetails()
-                    .then((details) => {
-                        console.log("Type details will use: ", details);
-                        if (details && details.type) {
-                            console.log("Calling endpoint to fetch unit types under : " + details.type);
-                            return getUnitTypes(details.type);
-                        }
-                    })
-                    .catch((error) => {
-                        console.error("Failed to load property or unit types:", error);
-                    });
-            } else {
-                console.log("Loading Types...")
-            }
-        };
-        initAndLoad();
-    }, [propertyId, isLoadingTypes]);
+        if (!propertyId) return;
+
+        // Loading unit types toggles the metadata hook's loading state. Depending on
+        // that state here creates a fetch/remount loop: getUnitTypes() changes the
+        // flag, this effect reloads the property, and child setup widgets remount.
+        // A property route change is the only event that should restart this chain.
+        void loadPropertyDetails()
+            .then((details) => details?.type ? getUnitTypes(details.type) : undefined)
+            .catch((requestError) => {
+                console.error("Failed to load property or unit types:", requestError);
+            });
+        // The API helpers are intentionally excluded: useApi/usePropertyMetadata do
+        // not currently guarantee stable function identities.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [propertyId]);
 
     // Load units
     useEffect(() => {
@@ -485,7 +480,8 @@ export default function PropertyDetailsPage() {
         const nameSlug = property.name.replace(/\s+/g, "-").toLowerCase();
         const currency = property?.currency || "";
         const propertyType = property?.type || "";
-        router.push(`/dashboard/unit/create/${propertyId}?name=${nameSlug}&currency=${currency}&propertyType=${propertyType}&from=property`);
+        const leaseMode = property.managementMode === "RENTAL" ? "RENT" : property.managementMode;
+        router.push(`/dashboard/unit/create/${propertyId}?name=${nameSlug}&currency=${currency}&propertyType=${propertyType}&leaseMode=${leaseMode}&from=property`);
     };
 
     const handleEdit = () => {
@@ -581,6 +577,14 @@ export default function PropertyDetailsPage() {
                         </div>
                     </div>
                 </div>
+
+                <EstateSetupChecklist
+                    propertyId={Number(propertyId)}
+                    propertyName={property.name}
+                    currency={property.currency}
+                    propertyType={property.type}
+                    onLinkAccount={() => setAccountsSheetOpen(true)}
+                />
 
                 {/* Create Invite Modal */}
                 <Dialog open={createInviteOpen} onOpenChange={setCreateInviteOpen}>

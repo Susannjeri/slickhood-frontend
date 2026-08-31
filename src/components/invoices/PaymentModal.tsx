@@ -25,8 +25,9 @@ interface Props {
 type ModalStep = "accounts" | "confirm";
 
 const MPESA_CODE     = "S0091";
-const FW_CODE        = "S00115";
-const FLUTTERWAVE_ID = "FLUTTER_WAVE";
+const HOSTED_CHECKOUT_CODE = "S00115";
+const PESALINK_CODE  = "S00268";
+const MPESA_BANK_CODE = "S00280";
 const PAYSTACK_ID    = "PAYSTACK";
 
 // Presigned account icon URLs can expire/break (same gotcha as the rest of
@@ -80,8 +81,8 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
       try {
         const active = invoice.paymentAccountId
           ? [((await API.get("/payment/invoice/payment-account",{params:{invoiceId:invoice.id}})).data?.data as Account)].filter(a=>a?.active&&a.verified)
-          : ((await handleListAccounts({ propertyId: invoice.propertyId })).data ?? []).filter((a: Account) => a.active === true);
-        setAccounts(active);
+          : ((await handleListAccounts({ propertyId: invoice.propertyId ?? undefined })).data ?? []).filter((a: Account) => a.active === true);
+        setAccounts(active.filter((account: Account) => account.channel !== "FLUTTER_WAVE"));
       } catch {
         toast.error("Could not load payment accounts. Please try again.");
         onClose();
@@ -107,17 +108,27 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
       const desc: string  = res.description ?? "Payment initiated.";
 
       if (code === MPESA_CODE) {
-        toast.success(desc);
+        toast.message("M-Pesa request sent", {
+          description: "Enter your PIN on your phone. The invoice will update only after provider confirmation.",
+        });
         onPaymentSuccess();
         onClose();
 
-      } else if (code === FW_CODE) {
+      } else if (code === PESALINK_CODE || code === MPESA_BANK_CODE) {
+        const instructions = Array.isArray(res.data) ? res.data[0] : res.data;
+        toast.message(code === PESALINK_CODE ? "PesaLink payment instructions" : "Bank Paybill instructions", {
+          description: typeof instructions === "string" ? instructions : desc,
+          duration: 12000,
+        });
+        onClose();
+
+      } else if (code === HOSTED_CHECKOUT_CODE) {
         // Hosted checkout channels (FlutterWave and Paystack) return their
         // secure authorization URL as data[0].
         const redirectUrl: string | undefined = Array.isArray(res.data)
           ? res.data[0]
           : undefined;
-        const providerName = selected.channel === PAYSTACK_ID ? "Paystack" : "FlutterWave";
+        const providerName = "Paystack";
 
         if (redirectUrl) {
           window.open(redirectUrl, "_blank", "noopener,noreferrer");
@@ -165,7 +176,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
                 Invoice <span className="font-semibold text-[#EF4217]">{invoice.ref}</span>
                 {" · "}
                 <span className="font-semibold text-[#141130]">
-                  {invoice.currency} {invoice.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  {invoice.currency} {invoice.pendingAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
               </p>
             </div>
@@ -227,7 +238,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
               <div className="w-full rounded-xl bg-[#FEF3F0] border border-[#FDDDD6] p-4 text-center">
                 <p className="text-xs text-gray-500 mb-1">You are paying</p>
                 <p className="text-2xl font-bold text-[#EF4217]">
-                  {invoice.currency} {invoice.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  {invoice.currency} {invoice.pendingAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </p>
                 <p className="text-xs text-gray-400 mt-1">for invoice {invoice.ref}</p>
               </div>
@@ -238,9 +249,9 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
                   An STK push will be sent to your registered M-Pesa number. Enter your PIN to complete the payment.
                 </p>
               )}
-              {selected.channel === FLUTTERWAVE_ID && (
+              {selected.channel === "MPESA_BANK" && (
                 <p className="text-xs text-gray-400 text-center -mt-2">
-                  You&apos;ll be redirected to a secure FlutterWave checkout page in a new tab to complete your card payment.
+                  You&apos;ll receive the bank Paybill and account reference. SlickHood marks the invoice paid only after the bank callback is verified.
                 </p>
               )}
               {selected.channel === PAYSTACK_ID && (
@@ -268,9 +279,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
                     ? <Loader2 className="w-4 h-4 animate-spin" />
                     : selected.channel === PAYSTACK_ID
                       ? "Continue to Paystack"
-                      : selected.channel === FLUTTERWAVE_ID
-                        ? "Continue to Card Payment"
-                        : "Confirm Payment"
+                      : "Confirm Payment"
                   }
                 </Button>
               </div>

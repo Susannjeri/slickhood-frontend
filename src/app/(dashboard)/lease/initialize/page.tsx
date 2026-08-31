@@ -306,7 +306,6 @@ export default function LeaseInitializePage() {
         
         // Redirect to dashboard
         setTimeout(() => {
-          console.log("Authstore after lease creation:", useAuthStore.getState());
           router.push(`/dashboard/unit/details/${unitDetails?.unitId}?p=${unitDetails?.propertyId}`);
         }, 1000);
       } else {

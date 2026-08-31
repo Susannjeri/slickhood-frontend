@@ -40,6 +40,8 @@ import {
   DollarSign,
 } from "lucide-react";
 import { format } from "date-fns";
+import { useAuthStore } from "@/store/authStore";
+import { MyNotifications } from "@/components/notifications/MyNotifications";
 
 interface Notification {
   notificationId: number;
@@ -59,7 +61,7 @@ interface Notification {
   lastUpdateOn: string;
 }
 
-export default function NotificationsPage() {
+function AdminNotificationsPage() {
   const { getNotificationList } = useApi();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -516,4 +518,9 @@ function DetailCard({
       </div>
     </div>
   );
+}
+
+export default function NotificationsPage() {
+  const permissions = useAuthStore(state => state.permissions);
+  return permissions.includes("view_notifications") ? <AdminNotificationsPage /> : <MyNotifications />;
 }

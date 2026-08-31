@@ -249,6 +249,7 @@ export const createProperty = (data: {
   image: File;
   name: string;
   type: string;
+  managementMode: "RENTAL" | "SALE" | "SERVICE_CHARGE";
   address: string;
   currency: string;
   mapLocation: string;
@@ -257,6 +258,7 @@ export const createProperty = (data: {
   formData.append("image", data.image);
   formData.append("name", data.name);
   formData.append("type", data.type);
+  formData.append("managementMode", data.managementMode);
   formData.append("address", data.address);
   formData.append("currency", data.currency);
   formData.append("mapLocation", data.mapLocation);
@@ -360,7 +362,9 @@ export const createUnit = (data: {
   formData.append("leaseMode", data.leaseMode);
   formData.append("price", data.price);
   formData.append("image", data.image);
-  formData.append("currency", data.currency || '')
+  if (data.currency) {
+    formData.append("currency", data.currency);
+  }
   if (data.templateId) {
     formData.append("templateId", data.templateId.toString());
   }
@@ -1146,13 +1150,61 @@ export const listLeaseMessages = (
 }
 
 export const signLease = (leaseId: number, token: string) => {
-  return API.get(`/lease/sign?leaseId=${leaseId}`, {
+  return API.post(`/lease/sign?leaseId=${leaseId}`, undefined, {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
   });
 }
+
+export interface TypeCatalogOption {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  displayOrder: number;
+  common: boolean;
+}
+
+export interface PropertyUnitTypeCatalog {
+  propertyType: TypeCatalogOption;
+  enabledUnitTypeIds: string[];
+}
+
+export interface UnitTypeCatalog {
+  propertyTypes: PropertyUnitTypeCatalog[];
+  availableUnitTypes: TypeCatalogOption[];
+}
+
+export const getUnitTypeCatalog = () => API.get("/property/unit/type/catalog");
+export const updateUnitTypeCatalog = (propertyType: string, unitTypeIds: string[]) =>
+  API.put(`/property/unit/type/catalog/${encodeURIComponent(propertyType)}`, unitTypeIds);
+
+export interface ActiveLease {
+  id: number;
+  name: string;
+  leaseMode: "RENT" | "SALE";
+  selfRenew: boolean;
+  expiryDate?: string;
+  signed: boolean;
+  tenantName?: string;
+  lifecycleStatus?: "DRAFT" | "ACTIVE" | "NOTICE_GIVEN" | "TERMINATED";
+  terminationEffectiveDate?: string;
+}
+
+export const listActiveLeases = (page: number, size: number, token: string) =>
+  API.get(`/lease/list?page=${page}&size=${size}&sort=id,desc`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+export const requestLeaseTermination = (
+  leaseId: number,
+  payload: { effectiveDate: string; reason: string },
+  token: string,
+) => API.post(`/lease/${leaseId}/termination`, payload, {
+  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+});
 
 
 //Invoice APIs
@@ -1400,7 +1452,7 @@ export const activePaymentChannels = (token: string) => {
   })
 } 
 
-export type paymentChannel = "MPESA" | "FLUTTER_WAVE" | "PESA_LINK" | "PAYSTACK";
+export type paymentChannel = "MPESA" | "MPESA_BANK" | "PESA_LINK" | "PAYSTACK";
 
 export type accountCategory = "LANDLORD" | "SLICKHOOD" | "MERCHANT";
 

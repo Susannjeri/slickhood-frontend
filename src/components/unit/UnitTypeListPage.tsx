@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search, Plus, Loader2, Home,
 } from "lucide-react";
@@ -81,6 +81,7 @@ export default function UnitTypeListPage({
   bulkActionLabel,
 }: UnitTypeListPageProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { getUnits, viewPropertyDetails } = useApi();
   const { getUnitTypes, resolveUnitTypeLabel } = usePropertyMetadata();
 
@@ -97,7 +98,12 @@ export default function UnitTypeListPage({
   const origin = originFromLeaseMode(leaseMode);
 
   // Selected property state
-  const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(null);
+  const requestedPropertyId = Number(searchParams.get("propertyId"));
+  const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(() =>
+    Number.isSafeInteger(requestedPropertyId) && propertyIds.includes(requestedPropertyId)
+      ? requestedPropertyId
+      : null
+  );
   const [selectedProperty, setSelectedProperty] = useState<{
     name: string; currency: string; type: string;
   } | null>(null);

@@ -66,6 +66,22 @@ export function InvoiceCard({ invoice, isSelected, onClick, onPaymentSuccess }: 
           <InvoiceStatusBadge status={invoice.status} isSelected={isSelected} />
         </div>
 
+        {/* Process owner / issuer */}
+        <div className={`flex items-center gap-2 mb-2 ${isSelected ? "text-white" : "text-[#141130]"}`}>
+          <div className={`h-7 w-7 rounded-full flex items-center justify-center overflow-hidden text-[10px] font-bold ${isSelected ? "bg-white/20" : "bg-white border border-orange-100"}`}>
+            {invoice.issuerLogoUrl
+              // eslint-disable-next-line @next/next/no-img-element
+              ? <img src={invoice.issuerLogoUrl} alt="" className="h-full w-full object-contain p-1" />
+              : invoice.issuerName.slice(0, 2).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold truncate">{invoice.issuerName}</p>
+            <p className={`text-[10px] uppercase tracking-wide ${isSelected ? "text-orange-100" : "text-gray-400"}`}>
+              {invoice.issuerType.replaceAll("_", " ")}
+            </p>
+          </div>
+        </div>
+
         {/* Property + Unit */}
         <div className={`flex items-center gap-1.5 mb-2 ${isSelected ? "text-orange-100" : "text-gray-500"}`}>
           <Building2 className="w-3 h-3 shrink-0" />
@@ -87,11 +103,11 @@ export function InvoiceCard({ invoice, isSelected, onClick, onPaymentSuccess }: 
 
           <div className="flex flex-col items-end gap-1.5 shrink-0">
             <p className={`text-base font-bold ${isSelected ? "text-white" : "text-[#EF4217]"}`}>
-              {invoice.currency} {invoice.amount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {invoice.currency} {invoice.pendingAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </p>
 
             {/* Pay button — non-Landlords only, UNPAID invoices only */}
-            {invoice.status === "UNPAID" && (
+            {invoice.status !== "PAID" && (
               <>
                 <Can roles={["Tenant"]} >
                   <button onClick={handlePayClick} className={btnBase}>

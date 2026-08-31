@@ -4,13 +4,21 @@ export interface InvoiceListItem {
   id: number;
   createdOn: string;
   propertyDetails: string;
-  propertyId: number;
+  propertyId: number | null;
+  propertyName?: string;
+  unitRef?: string;
   tenantName: string;
   ref: string;
   currency: string;
   amount: number;
+  pendingAmount?: number;
   paid: boolean;
   paymentAccountId?: number;
+  billingType?: string;
+  dueDate?: string | null;
+  issuerName?: string;
+  issuerType?: string;
+  issuerLogoUrl?: string | null;
 }
 
 export interface InvoiceListResponse {
@@ -32,20 +40,26 @@ export interface SearchOption {
 
 // ─── UI shape ─────────────────────────────────────────────────────────────────
 
-export type InvoiceStatus = "PAID" | "UNPAID";
+export type InvoiceStatus = "PAID" | "PARTIALLY PAID" | "OVERDUE" | "UNPAID";
 
 export interface Invoice {
   id: number;
   ref: string;
   currency: string;
   status: InvoiceStatus;
-  propertyId: number;
+  propertyId: number | null;
   propertyName: string;
   unit: string;
   tenantName: string;
   date: string;
   amount: number;
+  pendingAmount: number;
   paymentAccountId?: number;
+  billingType: string;
+  dueDate?: string | null;
+  issuerName: string;
+  issuerType: string;
+  issuerLogoUrl?: string | null;
 }
 
 // ─── Active filters — what gets sent to the API ───────────────────────────────
@@ -75,26 +89,41 @@ const formatDate = (isoString: string): string =>
   });
 
 export const transformInvoice = (item: InvoiceListItem): Invoice => {
-  const { propertyName, unit } = parsePropertyDetails(item.propertyDetails);
+  const parsed = parsePropertyDetails(item.propertyDetails);
+  const propertyName = item.propertyName ?? parsed.propertyName;
+  const unit = item.unitRef ?? parsed.unit;
+  const pendingAmount = item.pendingAmount ?? (item.paid ? 0 : item.amount);
+  const isOverdue = !item.paid && !!item.dueDate && new Date(item.dueDate).getTime() < Date.now();
+  const status: InvoiceStatus = item.paid
+    ? "PAID"
+    : pendingAmount > 0 && pendingAmount < item.amount
+      ? "PARTIALLY PAID"
+      : isOverdue ? "OVERDUE" : "UNPAID";
   return {
     id: item.id,
     ref: item.ref,
     currency:item.currency, // default to BND if currency is missing
-    status: item.paid ? "PAID" : "UNPAID",
+    status,
     propertyId: item.propertyId,
     propertyName,
     unit,
     tenantName: item.tenantName,
     date: formatDate(item.createdOn),
     amount: item.amount,
+    pendingAmount,
     paymentAccountId: item.paymentAccountId,
+    billingType: item.billingType ?? "RENTAL",
+    dueDate: item.dueDate,
+    issuerName: item.issuerName ?? propertyName,
+    issuerType: item.issuerType ?? "LANDLORD",
+    issuerLogoUrl: item.issuerLogoUrl,
   };
 };
 
 
 export interface PaymentChannel {
-  id: string;       // e.g. "MPESA" | "FLUTTER_WAVE" | "PAYSTACK"
-  name: string;     // e.g. "M-Pesa" | "Card Payment" | "Paystack"
+  id: string;       // e.g. "MPESA" | "PESA_LINK" | "PAYSTACK"
+  name: string;     // e.g. "M-Pesa" | "PesaLink" | "Paystack"
   description: string;
   iconUrl: string;
 }
@@ -152,9 +181,3 @@ export const transformPayment = (item: PaymentItem): Payment => ({
     minute: "2-digit",
   }),
 });
-export interface PaymentChannel {
-  id: string;       // e.g. "MPESA" | "FLUTTER_WAVE" | "PAYSTACK"
-  name: string;     // e.g. "M-Pesa" | "Card Payment" | "Paystack"
-  description: string;
-  iconUrl: string;
-}
