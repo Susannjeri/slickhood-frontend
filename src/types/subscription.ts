@@ -20,6 +20,9 @@ export interface SubscriptionPlan {
   price: number;
   currency: string;
   active: boolean;
+  productKey: string;
+  purchaseMode: "FREE" | "SELF_SERVICE" | "SALES_MANAGED";
+  tierRank: number;
   features: PlanFeature[];
   quotas: PlanQuota[];
 }

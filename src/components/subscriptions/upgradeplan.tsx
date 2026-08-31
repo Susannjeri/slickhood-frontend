@@ -14,17 +14,19 @@ import { SubscriptionPlan } from "@/types/subscription";
 import SubscriptionCheckoutModal from "./SubscriptionCheckoutModal";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { businessAreas } from "@/config/businessAreas";
 
 interface CurrentSubscription {
     planCode?: string;
     status?: string;
-    planDetails: { code: string; displayName: string; price: number };
+    planDetails: { code: string; displayName: string; price: number; tierRank?: number };
 }
 
 export default function UpgradePlan() {
 
     const token = useAuthStore((s) => s.token);
     const activeRole = useAuthStore((s) => s.activeRole);
+    const selectedBusinessAreaId = useAuthStore((s) => s.selectedBusinessAreaId);
     const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null);
@@ -38,6 +40,7 @@ export default function UpgradePlan() {
     const category = activeRole?.title === "Superadmin"
         ? ""
         : subscriptionRoleForTitle(activeRole?.title) ?? "";
+    const selectedProduct = businessAreas.find(area => area.id === selectedBusinessAreaId)?.subscriptionProduct;
 
 
     useEffect(() => {
@@ -45,7 +48,7 @@ export default function UpgradePlan() {
             if (!token) return;
 
             try {
-                const response = await getCurrentSubscription(token, category || undefined);
+                const response = await getCurrentSubscription(token, category || undefined, selectedProduct);
 
                 setCurrentSubscription(
                     response.data?.data?.[0] || null
@@ -59,7 +62,7 @@ export default function UpgradePlan() {
         };
 
         loadCurrentSubscription();
-    }, [token, category]);
+    }, [token, category, selectedProduct]);
 
     useEffect(() => {
         const loadPlans = async () => {
@@ -67,7 +70,7 @@ export default function UpgradePlan() {
 
             try {
                 const response = category
-                    ? await getSubscriptionCatalog(token, category)
+                    ? await getSubscriptionCatalog(token, category, selectedProduct)
                     : await getSubscriptionPlans(token, 0, 50);
 
                 setPlans(
@@ -83,7 +86,7 @@ export default function UpgradePlan() {
         };
 
         loadPlans();
-    }, [token, category]);
+    }, [token, category, selectedProduct]);
 
     const sortedPlans = [...plans].sort((a, b) => {
         const currentPlanCode =
@@ -134,8 +137,8 @@ export default function UpgradePlan() {
                         const isCurrentPlan =
                             currentSubscription?.planDetails?.code === plan.code;
                         const isDowngrade = currentSubscription?.status === "ACTIVE"
-                            && Number(plan.price) < Number(currentSubscription.planDetails.price);
-                        const isCustomPlan = /custom/i.test(`${plan.code} ${plan.displayName}`);
+                            && Number(plan.tierRank ?? 0) < Number(currentSubscription.planDetails.tierRank ?? 0);
+                        const isCustomPlan = plan.purchaseMode === "SALES_MANAGED";
 
                         return (
                             <div
@@ -292,9 +295,10 @@ export default function UpgradePlan() {
                     open={!!checkoutPlan}
                     plan={checkoutPlan}
                     role={category}
+                    product={checkoutPlan?.productKey ?? selectedProduct}
                     token={token}
                     onClose={() => setCheckoutPlan(null)}
-                    onComplete={() => getCurrentSubscription(token, category || undefined).then(response =>
+                    onComplete={() => getCurrentSubscription(token, category || undefined, checkoutPlan?.productKey ?? selectedProduct).then(response =>
                         setCurrentSubscription(response.data?.data?.[0] || null))}
                 />
             )}
@@ -309,7 +313,7 @@ export default function UpgradePlan() {
                             if (!token || !downgradePlan) return;
                             setMutating(true);
                             try {
-                                await scheduleSubscriptionPlanChange(token, category, downgradePlan.code);
+                                await scheduleSubscriptionPlanChange(token, category, downgradePlan.productKey ?? selectedProduct, downgradePlan.code);
                                 toast.success(`Downgrade to ${downgradePlan.displayName} scheduled.`);
                                 setDowngradePlan(null);
                             } catch {

@@ -75,11 +75,12 @@ export default function BusinessAreaPlans() {
     setLoading(true);
     try {
       const [catalogResponse, policyResponse, currentResponse] = await Promise.all([
-        getSubscriptionCatalog(token, subscriptionRole),
+        getSubscriptionCatalog(token, subscriptionRole, area.subscriptionProduct),
         getSubscriptionTrialPolicy(token),
-        getCurrentSubscription(token, subscriptionRole),
+        getCurrentSubscription(token, subscriptionRole, area.subscriptionProduct),
       ]);
-      setPlans((catalogResponse.data.data ?? []).filter((plan: SubscriptionPlan) => plan.active));
+      setPlans((catalogResponse.data.data ?? []).filter((plan: SubscriptionPlan) =>
+        plan.active && plan.productKey === area.subscriptionProduct));
       setTrialDays(policyResponse.data.data?.[0]?.durationDays ?? 14);
       setCurrent(currentResponse.data.data?.[0] ?? null);
     } catch {

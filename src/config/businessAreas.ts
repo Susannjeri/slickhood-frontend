@@ -8,6 +8,7 @@ export interface BusinessArea {
   roleTitles: string[];
   registrationRoleName: string;
   subscriptionRole: "LANDLORD" | "ESTATE_MANAGER" | "SALES_AGENT" | "SERVICE_PROVIDER" | "AFFILIATE" | "ASSET_PORTFOLIO_MANAGER";
+  subscriptionProduct: "LANDLORD" | "ESTATE_MANAGEMENT" | "PROPERTY_SALES" | "SERVICES" | "SOKO" | "AFFILIATE" | "MY_WEALTH";
   workspaceHref: string;
   highlights: string[];
 }
@@ -21,6 +22,7 @@ export const businessAreas: BusinessArea[] = [
     roleTitles: ["landlord"],
     registrationRoleName: "Landlord",
     subscriptionRole: "LANDLORD",
+    subscriptionProduct: "LANDLORD",
     workspaceHref: "/dashboard",
     highlights: ["Rentals and tenant operations", "Rent collection and notices", "Payments, gates and listings"],
   },
@@ -32,6 +34,7 @@ export const businessAreas: BusinessArea[] = [
     roleTitles: ["salesagent"],
     registrationRoleName: "SalesAgent",
     subscriptionRole: "SALES_AGENT",
+    subscriptionProduct: "PROPERTY_SALES",
     workspaceHref: "/dashboard/sales",
     highlights: ["Buyer and offer pipeline", "Due diligence and sale documents", "Completion and handover"],
   },
@@ -43,6 +46,7 @@ export const businessAreas: BusinessArea[] = [
     roleTitles: ["estatemanager"],
     registrationRoleName: "EstateManager",
     subscriptionRole: "ESTATE_MANAGER",
+    subscriptionProduct: "ESTATE_MANAGEMENT",
     workspaceHref: "/dashboard/estate",
     highlights: ["Homeowner onboarding", "Service-charge operations", "Visitors, notices and common areas"],
   },
@@ -54,6 +58,7 @@ export const businessAreas: BusinessArea[] = [
     roleTitles: ["serviceprovider"],
     registrationRoleName: "ServiceProvider",
     subscriptionRole: "SERVICE_PROVIDER",
+    subscriptionProduct: "SERVICES",
     workspaceHref: "/dashboard/services",
     highlights: ["Service listings", "Provider verification", "Bookings and customer access"],
   },
@@ -65,6 +70,7 @@ export const businessAreas: BusinessArea[] = [
     roleTitles: ["serviceprovider"],
     registrationRoleName: "ServiceProvider",
     subscriptionRole: "SERVICE_PROVIDER",
+    subscriptionProduct: "SOKO",
     workspaceHref: "/dashboard/soko",
     highlights: ["Shop and product catalogue", "Orders and preferred riders", "Secure delivery-code handover"],
   },
@@ -76,6 +82,7 @@ export const businessAreas: BusinessArea[] = [
     roleTitles: ["affiliate"],
     registrationRoleName: "Affiliate",
     subscriptionRole: "AFFILIATE",
+    subscriptionProduct: "AFFILIATE",
     workspaceHref: "/dashboard/affiliate",
     highlights: ["Campaign referral links", "Conversion tracking", "Commission and payout visibility"],
   },
@@ -87,6 +94,7 @@ export const businessAreas: BusinessArea[] = [
     roleTitles: ["assetportfoliomanager"],
     registrationRoleName: "AssetPortfolioManager",
     subscriptionRole: "ASSET_PORTFOLIO_MANAGER",
+    subscriptionProduct: "MY_WEALTH",
     workspaceHref: "/dashboard/wealth",
     highlights: ["Net worth and asset performance", "Debt, cash flow and projections", "Compliance reminders and digital vault"],
   },

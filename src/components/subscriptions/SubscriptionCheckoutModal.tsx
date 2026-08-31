@@ -20,6 +20,7 @@ interface Props {
   open: boolean;
   plan: SubscriptionPlan | null;
   role: string;
+  product?: string;
   token: string;
   onClose: () => void;
   onComplete: () => void;
@@ -41,7 +42,7 @@ function accountIcon(account: Account) {
   );
 }
 
-export default function SubscriptionCheckoutModal({ open, plan, role, token, onClose, onComplete, mode = "subscribe" }: Props) {
+export default function SubscriptionCheckoutModal({ open, plan, role, product, token, onClose, onComplete, mode = "subscribe" }: Props) {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [phone, setPhone] = useState("");
@@ -50,6 +51,8 @@ export default function SubscriptionCheckoutModal({ open, plan, role, token, onC
   const [checkout, setCheckout] = useState<SubscriptionCheckout | null>(null);
   const [paymentInstructions, setPaymentInstructions] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [baselineTermVersion, setBaselineTermVersion] = useState(0);
+  const [baselinePlanCode, setBaselinePlanCode] = useState<string | null>(null);
   const selected = useMemo(() => accounts.find(account => account.id === selectedId) ?? null, [accounts, selectedId]);
   const isFree = plan ? Number(plan.price) <= 0 : false;
 
@@ -78,9 +81,12 @@ export default function SubscriptionCheckoutModal({ open, plan, role, token, onC
     const timer = window.setInterval(async () => {
       checks += 1;
       try {
-        const response = await getCurrentSubscription(token, role);
+        const response = await getCurrentSubscription(token, role, product);
         const current = response.data?.data?.[0];
-        if (current?.planDetails?.code === plan.code || current?.planCode === plan.code) {
+        const currentPlanCode = current?.planDetails?.code ?? current?.planCode;
+        const planChanged = baselinePlanCode !== plan.code && currentPlanCode === plan.code;
+        const termAdvanced = Number(current?.termVersion ?? 0) > baselineTermVersion;
+        if (currentPlanCode === plan.code && (planChanged || termAdvanced)) {
           window.clearInterval(timer);
           setStep("success");
           onComplete();
@@ -91,7 +97,7 @@ export default function SubscriptionCheckoutModal({ open, plan, role, token, onC
       if (checks >= 24) window.clearInterval(timer);
     }, 5000);
     return () => window.clearInterval(timer);
-  }, [step, plan, token, role, onComplete]);
+  }, [step, plan, token, role, product, onComplete, baselinePlanCode, baselineTermVersion]);
 
   if (!plan) return null;
 
@@ -103,8 +109,12 @@ export default function SubscriptionCheckoutModal({ open, plan, role, token, onC
     }
     setLoading(true);
     try {
+      const beforeResponse = await getCurrentSubscription(token, role, product);
+      const before = beforeResponse.data?.data?.[0];
+      setBaselineTermVersion(Number(before?.termVersion ?? 0));
+      setBaselinePlanCode(before?.planDetails?.code ?? before?.planCode ?? null);
       const subscribeResponse = mode === "renew"
-        ? await renewSubscription(token, role, selected?.id ?? null)
+        ? await renewSubscription(token, role, product, selected?.id ?? null)
         : await subscribeToPlan(token, {
             role,
             planCode: plan.code,

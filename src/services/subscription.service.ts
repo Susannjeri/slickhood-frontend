@@ -30,6 +30,8 @@ export interface CurrentSubscription {
   startAt: string;
   endAt: string | null;
   autoRenew: boolean;
+  productKey: string;
+  termVersion: number;
   planDetails: import("@/types/subscription").SubscriptionPlan;
 }
 
@@ -134,19 +136,19 @@ export const updatePlanStatus = (
   );
 };
 
-export const getCurrentSubscription = (token: string, role?: string | null) => {
+export const getCurrentSubscription = (token: string, role?: string | null, product?: string | null) => {
   return API.get("/subscription/current", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    params: role ? { role } : undefined,
+    params: product ? { product } : role ? { role } : undefined,
   });
 };
 
-export const getSubscriptionCatalog = (token: string, role: string) =>
+export const getSubscriptionCatalog = (token: string, role: string, product?: string | null) =>
   API.get("/subscription/plans", {
     headers: { Authorization: `Bearer ${token}` },
-    params: { role: role.trim().toUpperCase() },
+    params: product ? { product } : { role: role.trim().toUpperCase() },
   });
 
 export const subscribeToPlan = (
@@ -169,10 +171,10 @@ export const getSubscriptionPaymentAccounts = (token: string) =>
     headers: { Authorization: `Bearer ${token}` },
   });
 
-export const getSubscriptionOverview = (token: string, role: string) =>
+export const getSubscriptionOverview = (token: string, role: string, product?: string) =>
   API.get<{ data: SubscriptionOverview[] }>("/subscription/overview", {
     headers: { Authorization: `Bearer ${token}` },
-    params: { role },
+    params: { role, product },
   });
 
 export const getSubscriptionBillingHistory = (token: string, page = 0, size = 20) =>
@@ -181,40 +183,40 @@ export const getSubscriptionBillingHistory = (token: string, page = 0, size = 20
     params: { page, size, sort: "createdOn,desc" },
   });
 
-export const updateSubscriptionAutoRenew = (token: string, role: string, enabled: boolean) =>
+export const updateSubscriptionAutoRenew = (token: string, role: string, product: string | undefined, enabled: boolean) =>
   API.post("/subscription/auto-renew", { enabled }, {
     headers: { Authorization: `Bearer ${token}` },
-    params: { role },
+    params: { role, product },
   });
 
-export const cancelSubscription = (token: string, role: string, reason: string) =>
+export const cancelSubscription = (token: string, role: string, product: string | undefined, reason: string) =>
   API.post("/subscription/cancel", { reason }, {
     headers: { Authorization: `Bearer ${token}` },
-    params: { role },
+    params: { role, product },
   });
 
-export const restoreSubscriptionCancellation = (token: string, role: string) =>
+export const restoreSubscriptionCancellation = (token: string, role: string, product?: string) =>
   API.post("/subscription/cancel/restore", {}, {
     headers: { Authorization: `Bearer ${token}` },
-    params: { role },
+    params: { role, product },
   });
 
-export const renewSubscription = (token: string, role: string, paymentAccountId: number | null) =>
+export const renewSubscription = (token: string, role: string, product: string | undefined, paymentAccountId: number | null) =>
   API.post("/subscription/renew", { paymentAccountId }, {
     headers: { Authorization: `Bearer ${token}` },
-    params: { role },
+    params: { role, product },
   });
 
-export const scheduleSubscriptionPlanChange = (token: string, role: string, planCode: string) =>
+export const scheduleSubscriptionPlanChange = (token: string, role: string, product: string | undefined, planCode: string) =>
   API.post("/subscription/change-plan", { planCode }, {
     headers: { Authorization: `Bearer ${token}` },
-    params: { role },
+    params: { role, product },
   });
 
-export const revokeSubscriptionPlanChange = (token: string, role: string) =>
+export const revokeSubscriptionPlanChange = (token: string, role: string, product?: string) =>
   API.post("/subscription/change-plan/revoke", {}, {
     headers: { Authorization: `Bearer ${token}` },
-    params: { role },
+    params: { role, product },
   });
 
 export const getSubscriptionTrialPolicy = (token: string) =>

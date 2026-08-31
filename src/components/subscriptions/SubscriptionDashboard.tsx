@@ -18,6 +18,7 @@ import {
 } from "@/services/subscription.service";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import SubscriptionCheckoutModal from "./SubscriptionCheckoutModal";
+import { businessAreas } from "@/config/businessAreas";
 
 type View = "overview" | "billing";
 
@@ -47,7 +48,9 @@ function UsageCard({ label, used, limit, color }: { label: string; used: number;
 export default function SubscriptionDashboard() {
   const token = useAuthStore(state => state.token);
   const activeRole = useAuthStore(state => state.activeRole);
+  const selectedBusinessAreaId = useAuthStore(state => state.selectedBusinessAreaId);
   const subscriptionRole = subscriptionRoleForTitle(activeRole?.title);
+  const selectedProduct = businessAreas.find(area => area.id === selectedBusinessAreaId)?.subscriptionProduct;
   const router = useRouter();
   const [overview, setOverview] = useState<SubscriptionOverview | null>(null);
   const [billing, setBilling] = useState<SubscriptionBillingItem[]>([]);
@@ -66,7 +69,7 @@ export default function SubscriptionDashboard() {
     setLoading(true);
     try {
       const [overviewResponse, billingResponse] = await Promise.all([
-        getSubscriptionOverview(token, subscriptionRole),
+        getSubscriptionOverview(token, subscriptionRole, selectedProduct),
         getSubscriptionBillingHistory(token),
       ]);
       setOverview(overviewResponse.data.data?.[0] ?? null);
@@ -76,7 +79,7 @@ export default function SubscriptionDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [token, subscriptionRole]);
+  }, [token, subscriptionRole, selectedProduct]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -104,6 +107,7 @@ export default function SubscriptionDashboard() {
   }
 
   const subscription = overview.subscription;
+  const product = subscription.productKey ?? selectedProduct;
   const plan = subscription.planDetails;
   const status = subscription.status;
   const needsRenewal = status === "EXPIRED" || status === "SUSPENDED" || status === "CANCELLED";
@@ -184,18 +188,18 @@ export default function SubscriptionDashboard() {
 
       <section><h2 className="mb-5 text-2xl font-bold text-[#08184a]">Included Features</h2><div className="grid gap-3 rounded-3xl border border-slate-200 bg-white p-7 md:grid-cols-2">{plan.features?.filter(feature => feature.enabled).map(feature => <div key={feature.featureKey} className="flex gap-3 text-slate-600"><Check className="h-5 w-5 text-emerald-500" /> {feature.featureKey.replaceAll("_", " ")}</div>)}</div></section>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-7"><div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-xl font-bold text-[#08184a]">Automatic renewal</h2><p className="mt-1 text-sm text-slate-500">Prepare the next renewal and notify you when provider authorization is required.</p></div><button disabled={mutating || needsRenewal} onClick={() => void mutate(() => updateSubscriptionAutoRenew(token!, subscriptionRole, !subscription.autoRenew), `Automatic renewal ${subscription.autoRenew ? "disabled" : "enabled"}.`)} className={`relative h-8 w-14 rounded-full transition ${subscription.autoRenew ? "bg-emerald-500" : "bg-slate-300"}`}><span className={`absolute top-1 h-6 w-6 rounded-full bg-white transition ${subscription.autoRenew ? "left-7" : "left-1"}`} /></button></div></section>
+      <section className="rounded-3xl border border-slate-200 bg-white p-7"><div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-xl font-bold text-[#08184a]">Automatic renewal</h2><p className="mt-1 text-sm text-slate-500">Prepare the next renewal and notify you when provider authorization is required.</p></div><button disabled={mutating || needsRenewal} onClick={() => void mutate(() => updateSubscriptionAutoRenew(token!, subscriptionRole, product, !subscription.autoRenew), `Automatic renewal ${subscription.autoRenew ? "disabled" : "enabled"}.`)} className={`relative h-8 w-14 rounded-full transition ${subscription.autoRenew ? "bg-emerald-500" : "bg-slate-300"}`}><span className={`absolute top-1 h-6 w-6 rounded-full bg-white transition ${subscription.autoRenew ? "left-7" : "left-1"}`} /></button></div></section>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {needsRenewal ? <button onClick={() => setRenewOpen(true)} className="rounded-xl bg-[#ff4b1f] px-5 py-4 font-bold text-white">Restore Subscription</button> : <button onClick={() => router.push("/dashboard/upgrade-plan")} className="rounded-xl bg-[#08184a] px-5 py-4 font-bold text-white">Change Plan</button>}
         <button onClick={() => setView("billing")} className="rounded-xl border-2 border-[#ff4b1f] px-5 py-4 font-bold text-[#ff4b1f]">Billing History</button>
-        {overview.cancellationScheduled ? <button disabled={mutating} onClick={() => void mutate(() => restoreSubscriptionCancellation(token!, subscriptionRole), "Cancellation removed.")} className="flex items-center justify-center gap-2 rounded-xl border border-emerald-300 px-5 py-4 font-bold text-emerald-700"><RotateCcw className="h-4 w-4" /> Keep My Plan</button> : !needsRenewal && <button onClick={() => setCancelOpen(true)} className="rounded-xl border border-slate-300 px-5 py-4 font-bold text-slate-500">Cancel Plan</button>}
-        {overview.scheduledPlanCode ? <button disabled={mutating} onClick={() => void mutate(() => revokeSubscriptionPlanChange(token!, subscriptionRole), "Scheduled plan change removed.")} className="flex items-center justify-center gap-2 rounded-xl border border-amber-300 px-5 py-4 font-bold text-amber-700"><RotateCcw className="h-4 w-4" /> Keep Current Tier</button> : !needsRenewal && <button onClick={() => setRenewOpen(true)} className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-4 font-bold text-slate-600"><CalendarClock className="h-4 w-4" /> Renew Early</button>}
+        {overview.cancellationScheduled ? <button disabled={mutating} onClick={() => void mutate(() => restoreSubscriptionCancellation(token!, subscriptionRole, product), "Cancellation removed.")} className="flex items-center justify-center gap-2 rounded-xl border border-emerald-300 px-5 py-4 font-bold text-emerald-700"><RotateCcw className="h-4 w-4" /> Keep My Plan</button> : !needsRenewal && <button onClick={() => setCancelOpen(true)} className="rounded-xl border border-slate-300 px-5 py-4 font-bold text-slate-500">Cancel Plan</button>}
+        {overview.scheduledPlanCode ? <button disabled={mutating} onClick={() => void mutate(() => revokeSubscriptionPlanChange(token!, subscriptionRole, product), "Scheduled plan change removed.")} className="flex items-center justify-center gap-2 rounded-xl border border-amber-300 px-5 py-4 font-bold text-amber-700"><RotateCcw className="h-4 w-4" /> Keep Current Tier</button> : !needsRenewal && <button onClick={() => setRenewOpen(true)} className="flex items-center justify-center gap-2 rounded-xl border border-slate-300 px-5 py-4 font-bold text-slate-600"><CalendarClock className="h-4 w-4" /> Renew Early</button>}
       </div>
 
-      <Dialog open={cancelOpen} onOpenChange={setCancelOpen}><DialogContent className="max-w-lg rounded-3xl"><DialogTitle className="text-2xl font-bold text-[#08184a]">Cancel {plan.displayName}?</DialogTitle><p className="text-slate-500">Your premium features will remain available until {formatDate(subscription.endAt)}.</p><textarea value={reason} onChange={event => setReason(event.target.value)} maxLength={500} placeholder="Tell us your reason (optional)" className="min-h-28 w-full rounded-xl border border-slate-300 p-4 outline-none focus:border-[#ff4b1f]" /><div className="flex gap-3"><button onClick={() => setCancelOpen(false)} className="flex-1 rounded-xl bg-[#08184a] py-3 font-bold text-white">Keep My Plan</button><button disabled={mutating} onClick={() => void mutate(() => cancelSubscription(token!, subscriptionRole, reason), "Cancellation scheduled.").then(() => setCancelOpen(false))} className="flex-1 rounded-xl border border-red-300 py-3 font-bold text-red-600">Confirm Cancellation</button></div></DialogContent></Dialog>
+      <Dialog open={cancelOpen} onOpenChange={setCancelOpen}><DialogContent className="max-w-lg rounded-3xl"><DialogTitle className="text-2xl font-bold text-[#08184a]">Cancel {plan.displayName}?</DialogTitle><p className="text-slate-500">Your premium features will remain available until {formatDate(subscription.endAt)}.</p><textarea value={reason} onChange={event => setReason(event.target.value)} maxLength={500} placeholder="Tell us your reason (optional)" className="min-h-28 w-full rounded-xl border border-slate-300 p-4 outline-none focus:border-[#ff4b1f]" /><div className="flex gap-3"><button onClick={() => setCancelOpen(false)} className="flex-1 rounded-xl bg-[#08184a] py-3 font-bold text-white">Keep My Plan</button><button disabled={mutating} onClick={() => void mutate(() => cancelSubscription(token!, subscriptionRole, product, reason), "Cancellation scheduled.").then(() => setCancelOpen(false))} className="flex-1 rounded-xl border border-red-300 py-3 font-bold text-red-600">Confirm Cancellation</button></div></DialogContent></Dialog>
 
-      <SubscriptionCheckoutModal open={renewOpen} plan={plan} role={subscription.role} token={token!} mode="renew" onClose={() => setRenewOpen(false)} onComplete={() => void load()} />
+      <SubscriptionCheckoutModal open={renewOpen} plan={plan} role={subscription.role} product={product} token={token!} mode="renew" onClose={() => setRenewOpen(false)} onComplete={() => void load()} />
     </div>
   );
 }
