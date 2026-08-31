@@ -12,6 +12,7 @@ const command = useStandalone ? process.execPath : (process.platform === "win32"
 const args = useStandalone ? [standalone] : ["run", "start", "--", "--hostname", "127.0.0.1", "--port", "3100"];
 const child = spawn(command, args, {
   stdio: "inherit",
+  shell: !useStandalone && process.platform === "win32",
   env: { ...process.env, HOSTNAME: "127.0.0.1", PORT: "3100" },
 });
 
