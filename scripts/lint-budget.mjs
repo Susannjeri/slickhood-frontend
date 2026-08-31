@@ -1,12 +1,15 @@
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
 
 const warningBudget = Number.parseInt(process.env.ESLINT_WARNING_BUDGET ?? "478", 10);
 if (!Number.isInteger(warningBudget) || warningBudget < 0) {
   throw new Error("ESLINT_WARNING_BUDGET must be a non-negative integer");
 }
 
-const command = process.platform === "win32" ? "npx.cmd" : "npx";
-const result = spawnSync(command, ["--no-install", "eslint", ".", "--format", "json"], {
+const require = createRequire(import.meta.url);
+const eslintCli = resolve(dirname(require.resolve("eslint/package.json")), "bin", "eslint.js");
+const result = spawnSync(process.execPath, [eslintCli, ".", "--format", "json"], {
   encoding: "utf8",
   maxBuffer: 32 * 1024 * 1024,
   shell: false,

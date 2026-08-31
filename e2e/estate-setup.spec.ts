@@ -29,7 +29,10 @@ test.beforeEach(async ({ context, page }) => {
 });
 
 test("new service-charge property starts a guided estate setup journey", async ({ page }) => {
-  await page.route("**/estate/setup/properties/41", route => route.fulfill({ json: envelope({
+  let setupStatusRequests = 0;
+  await page.route("**/estate/setup/properties/41", route => {
+    setupStatusRequests += 1;
+    return route.fulfill({ json: envelope({
     propertyId: 41,
     propertyName: "Green Court",
     managementMode: "SERVICE_CHARGE",
@@ -43,13 +46,15 @@ test("new service-charge property starts a guided estate setup journey", async (
     homeownerOperationsConfigured: false,
     readyForHomeownerOperations: false,
     nextAction: "ADD_UNITS",
-  }) }));
+    }) });
+  });
 
   await page.goto("/dashboard/property/properties/details/41");
 
   await expect(page.getByText("Estate setup", { exact: true })).toBeVisible();
   await expect(page.getByText("0%", { exact: true })).toBeVisible();
   await expect(page.getByText("Next: Add units")).toBeVisible();
+  expect(setupStatusRequests).toBe(1);
   await page.getByRole("button", { name: "Add units" }).click();
   await expect(page).toHaveURL(/\/dashboard\/unit\/create\/41\?/);
   await expect(page).toHaveURL(/currency=KES/);
