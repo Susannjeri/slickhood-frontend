@@ -4,7 +4,7 @@
 
 "use client";
 
-import {useState, useEffect} from "react";
+import {useState, useEffect, useRef} from "react";
 import {useRouter, useParams} from "next/navigation";
 import {useApi} from "@/hooks/useApi";
 import {Button} from "@/components/ui/button";
@@ -173,6 +173,7 @@ export default function PropertyDetailsPage() {
     const [property, setProperty] = useState<PropertyDetails | null>(null);
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const propertyLoadStartedRef = useRef<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [mapCenter, setMapCenter] = useState({lat: -1.286389, lng: 36.817223});
     const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(null);
@@ -218,25 +219,23 @@ export default function PropertyDetailsPage() {
 
     // Load property details
     useEffect(() => {
-        if (!propertyId) {
+        if (!propertyId || isLoadingTypes || propertyLoadStartedRef.current === propertyId) {
             return;
         }
+        propertyLoadStartedRef.current = propertyId;
         const initAndLoad = async () => {
-            if (!isLoadingTypes) {
-                loadPropertyDetails()
-                    .then((details) => {
-                        console.log("Type details will use: ", details);
-                        if (details && details.type) {
-                            console.log("Calling endpoint to fetch unit types under : " + details.type);
-                            return getUnitTypes(details.type);
-                        }
-                    })
-                    .catch((error) => {
-                        console.error("Failed to load property or unit types:", error);
-                    });
-            } else {
-                console.log("Loading Types...")
-            }
+            loadPropertyDetails()
+                .then((details) => {
+                    console.log("Type details will use: ", details);
+                    if (details && details.type) {
+                        console.log("Calling endpoint to fetch unit types under : " + details.type);
+                        return getUnitTypes(details.type);
+                    }
+                })
+                .catch((error) => {
+                    propertyLoadStartedRef.current = null;
+                    console.error("Failed to load property or unit types:", error);
+                });
         };
         initAndLoad();
     }, [propertyId, isLoadingTypes]);

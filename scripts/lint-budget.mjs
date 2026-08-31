@@ -9,7 +9,7 @@ const command = process.platform === "win32" ? "npx.cmd" : "npx";
 const result = spawnSync(command, ["--no-install", "eslint", ".", "--format", "json"], {
   encoding: "utf8",
   maxBuffer: 32 * 1024 * 1024,
-  shell: false,
+  shell: process.platform === "win32",
 });
 if (result.error) throw result.error;
 
