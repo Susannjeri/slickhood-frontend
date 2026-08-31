@@ -5,19 +5,21 @@ export type SokoProduct={id:number;storeId:number;name:string;description?:strin
 export type SokoRider={id:number;storeId:number;riderType:"INDIVIDUAL"|"DELIVERY_COMPANY";displayName:string;phoneNumber:string;email?:string;vehicleType?:string;vehiclePlate?:string;availability:"AVAILABLE"|"BUSY"|"OFFLINE";status:string;verified:boolean;completedDeliveries:number;notes?:string};
 export type CatalogProduct={product:SokoProduct;storeName:string;deliveryEnabled:boolean;pickupEnabled:boolean;distanceKm?:number;imageUrls?:string[]};
 export type SokoOrderItem={id:number;productId:number;productName:string;unit:string;unitPrice:number;quantity:number;lineTotal:number};
-export type SokoOrder={id:number;orderNumber:string;storeId:number;status:string;paymentStatus:string;invoiceRef:string;deliveryMethod:string;deliveryAddress?:string;customerPhone:string;subtotal:number;deliveryFee:number;total:number;currency:string;destinationUnitId?:number;placedAt:string;riderId?:number;courierName?:string;courierPhone?:string;courierVehiclePlate?:string;deliveryCodeVerified:boolean;deliveryCodeAttempts:number};
+export type SokoOrder={id:number;orderNumber:string;storeId:number;status:string;paymentStatus:string;invoiceRef:string;deliveryMethod:string;deliveryAddress?:string;customerPhone:string;subtotal:number;deliveryFee:number;total:number;currency:string;destinationUnitId?:number;placedAt:string;riderId?:number;courierName?:string;courierPhone?:string;courierVehiclePlate?:string;deliveryCodeVerified:boolean;deliveryCodeAttempts:number;expectedArrivalAt?:string;deliveryProofReference?:string;deliveryProofAt?:string};
 export type SokoOrderDetail={order:SokoOrder;storeName:string;paymentAccountId:number;paymentChannel:string;items:SokoOrderItem[]};
 export type StorePayload={name:string;description?:string;phoneNumber?:string;address?:string;latitude?:number;longitude?:number;serviceRadiusKm:number;pickupEnabled:boolean;deliveryEnabled:boolean;deliveryFee:number;currency:string;paymentAccountId?:number};
 export type ProductPayload={storeId:number;name:string;description?:string;category:string;unit:string;price:number;stockQuantity:number;imageUrl?:string};
 export type RiderPayload={storeId:number;riderType:"INDIVIDUAL"|"DELIVERY_COMPANY";displayName:string;phoneNumber:string;email?:string;vehicleType?:string;vehiclePlate?:string;notes?:string};
 
 export const searchSoko=(params:{query?:string;category?:string;latitude?:number;longitude?:number;radiusKm?:number})=>API.get("/soko/catalog",{params:{page:0,size:60,...params}});
-export const mySokoOrders=()=>API.get("/soko/order/my");
-export const merchantSokoOrders=()=>API.get("/soko/order/merchant");
+export const mySokoOrders=()=>API.get("/soko/order/my",{params:{page:0,size:100,sort:"createdOn,desc"}});
+export const merchantSokoOrders=()=>API.get("/soko/order/merchant",{params:{page:0,size:100,sort:"createdOn,desc"}});
 export const checkoutSoko=(payload:{storeId:number;items:{productId:number;quantity:number}[];deliveryMethod:string;deliveryAddress?:string;customerPhone:string;notes?:string;destinationUnitId?:number})=>API.post("/soko/order/checkout",payload);
 export const updateSokoOrder=(id:number,status:string,dispatch?:{riderId?:number;courierName?:string;courierPhone?:string;vehiclePlate?:string;expectedArrivalTime:string})=>API.put(`/soko/order/${id}/status`,dispatch??null,{params:{status}});
 export const getSokoDeliveryCode=(id:number)=>API.get(`/soko/order/${id}/delivery-code`);
 export const confirmSokoDelivery=(id:number,code:string)=>API.put(`/soko/order/${id}/delivery/confirm`,{code});
+export const uploadSokoDeliveryProof=(id:number,proof:File)=>{const data=new FormData();data.append("proof",proof);return API.put(`/soko/order/${id}/delivery/proof`,data);};
+export const getSokoDeliveryProof=(id:number)=>API.get(`/soko/order/${id}/delivery/proof`);
 export const mySokoStores=()=>API.get("/soko/store/my");
 export const createSokoStore=(payload:StorePayload)=>API.post("/soko/store",payload);
 export const updateSokoStore=(id:number,payload:StorePayload)=>API.put(`/soko/store/${id}`,payload);
