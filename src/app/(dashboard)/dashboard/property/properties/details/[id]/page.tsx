@@ -75,11 +75,13 @@ import {toast} from "sonner";
 import Can from "@/components/auth/Can";
 import CanProperty, {usePropertyPermissions} from "@/components/auth/CanProperty";
 import PropertyAccountsSheet from "@/components/property/PropertyAccountsSheet";
+import EstateSetupChecklist from "@/components/estate/EstateSetupChecklist";
 
 interface PropertyDetails {
     id: number;
     name: string;
     type: string;
+    managementMode: "RENTAL" | "SALE" | "SERVICE_CHARGE";
     address: string;
     mapLocation: string;
     currency: string;
@@ -485,7 +487,8 @@ export default function PropertyDetailsPage() {
         const nameSlug = property.name.replace(/\s+/g, "-").toLowerCase();
         const currency = property?.currency || "";
         const propertyType = property?.type || "";
-        router.push(`/dashboard/unit/create/${propertyId}?name=${nameSlug}&currency=${currency}&propertyType=${propertyType}&from=property`);
+        const leaseMode = property.managementMode === "RENTAL" ? "RENT" : property.managementMode;
+        router.push(`/dashboard/unit/create/${propertyId}?name=${nameSlug}&currency=${currency}&propertyType=${propertyType}&leaseMode=${leaseMode}&from=property`);
     };
 
     const handleEdit = () => {
@@ -581,6 +584,14 @@ export default function PropertyDetailsPage() {
                         </div>
                     </div>
                 </div>
+
+                <EstateSetupChecklist
+                    propertyId={Number(propertyId)}
+                    propertyName={property.name}
+                    currency={property.currency}
+                    propertyType={property.type}
+                    onLinkAccount={() => setAccountsSheetOpen(true)}
+                />
 
                 {/* Create Invite Modal */}
                 <Dialog open={createInviteOpen} onOpenChange={setCreateInviteOpen}>

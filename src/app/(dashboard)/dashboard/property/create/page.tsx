@@ -1,665 +1,287 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { useApi } from "@/hooks/useApi";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {usePropertyMetadata} from "@/app/(dashboard)/dashboard/property/propertyMetadata";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
-
-import {
-  CheckCircle2,
-  XCircle,
-  Upload,
-  MapPin,
-  Loader2,
-} from "lucide-react";
-import {
-  GoogleMap,
-  Marker,
-  useLoadScript
-  
-} from "@react-google-maps/api";
-import { useRouter } from "next/navigation";
-import { currencyOptions } from "@/lib/actions";
-import Can from "@/components/auth/Can";
-import { ProfileGateResult } from "@/hooks/useApi"
-
-import ProfileGateModal, { ProfileGateFields } from "@/components/auth/ProfileGateModal";
-
-
 import dynamic from "next/dynamic";
-import { useAuth } from "@/hooks/useAuth";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Building2, Check, Home, Landmark, Loader2, MapPin, Navigation, Upload, X } from "lucide-react";
 import { toast } from "sonner";
-import PlaceAutocompleteInput from "@/components/maps/PlaceAutocompleteInput";
-const CurrencySelect = dynamic(() => import("@/components/util/CurrencySelect"), { ssr: false });
-const Select = dynamic(() => import("react-select"), { ssr: false });
+import axios from "axios";
 
-type SelectOption = {
-  value: string;
-  label: string;
-  description?: string;
-};
+import Can from "@/components/auth/Can";
+import ProfileGateModal, { ProfileGateFields } from "@/components/auth/ProfileGateModal";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useApi, ProfileGateResult } from "@/hooks/useApi";
+import { useAuth } from "@/hooks/useAuth";
+import { currencyOptions } from "@/lib/actions";
+import { usePropertyMetadata } from "@/app/(dashboard)/dashboard/property/propertyMetadata";
+import {
+  managementJourneys,
+  parseCoordinates,
+  PropertyFormData,
+  PropertyManagementMode,
+  propertySchema,
+  validatePropertyImage,
+} from "./propertyCreation";
 
-// ✅ Validation schema
-const propertySchema = z.object({
-  name: z.string().min(1, "Property name is required"),
-  type: z.string().min(1, "Property type is required"),
-  address: z.string().min(1, "Address is required"),
-  mapLocation: z
-    .string()
-    .min(1, "Location is required")
-    .regex(/^\s*-?\d+\.?\d*\s*,\s*-?\d+\.?\d*\s*$/, "Invalid coordinates format (lat,lng)"),
-  currency: z.string().optional(),
+const PropertyLocationPicker = dynamic(() => import("./PropertyLocationPicker"), {
+  ssr: false,
+  loading: () => <div className="flex h-48 items-center justify-center rounded-lg border bg-slate-50"><Loader2 className="size-6 animate-spin text-[#EF4217]" /></div>,
 });
 
-type PropertyFormData = z.infer<typeof propertySchema>;
+const journeyIcons = {
+  RENTAL: Home,
+  SALE: Landmark,
+  SERVICE_CHARGE: Building2,
+} satisfies Record<PropertyManagementMode, typeof Home>;
 
-const libraries: (
-  "places" | "drawing" | "geometry" | "visualization"
-)[] = ["places"];
+const DEFAULT_LOCATION = { lat: -1.286389, lng: 36.817223 };
 
-type Coordinates = { lat: number; lng: number };
+type CreatePropertyResponse = ProfileGateResult | {
+  success: boolean;
+  description?: string;
+  message?: string;
+  data?: unknown[];
+};
 
-interface GoogleLocationPickerProps {
-  apiKey: string;
-  center: Coordinates;
-  marker: Coordinates | null;
-  onCoordinatesSelected: (coordinates: Coordinates) => void;
-}
-
-function GoogleLocationPicker({ apiKey, center, marker, onCoordinatesSelected }: GoogleLocationPickerProps) {
-  const { isLoaded, loadError } = useLoadScript({ googleMapsApiKey: apiKey, libraries });
-
-  if (loadError) {
-    return (
-      <Alert className="border-amber-300 bg-amber-50">
-        <AlertDescription className="text-amber-900">
-          Google Maps is temporarily unavailable. Enter the property coordinates below or use your current location.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  if (!isLoaded) {
-    return <div className="flex h-40 items-center justify-center rounded-lg border bg-gray-50"><Loader2 className="size-7 animate-spin text-[#EF4217]"/><span className="ml-3 text-sm text-gray-600">Loading map…</span></div>;
-  }
-
-  return (
-    <>
-      <div className="space-y-2">
-        <Label>Search Location</Label>
-        <PlaceAutocompleteInput
-          isLoaded={isLoaded}
-          onCoordinatesSelected={onCoordinatesSelected}
-        />
-        <p className="text-xs text-gray-500">Search or click on the map to pin a location</p>
-      </div>
-      <div className="h-[400px] w-full overflow-hidden rounded-lg border-2" style={{ borderColor: marker ? "#EF4217" : "#e5e7eb" }}>
-        <GoogleMap
-          mapContainerStyle={{ width: "100%", height: "100%" }}
-          center={center}
-          zoom={marker ? 15 : 10}
-          onClick={(event) => {
-            const lat = event.latLng?.lat();
-            const lng = event.latLng?.lng();
-            if (lat !== undefined && lng !== undefined) onCoordinatesSelected({ lat, lng });
-          }}
-          options={{ streetViewControl: false, mapTypeControl: false }}
-        >
-          {marker && <Marker position={marker} animation={google.maps.Animation.DROP} />}
-        </GoogleMap>
-      </div>
-    </>
-  );
-}
-
-
-export default function CreatePropertyForm() {
+export default function CreatePropertyPage() {
   const router = useRouter();
+  const imageInput = useRef<HTMLInputElement>(null);
   const { handleTokenRefresh } = useAuth();
   const { createNewProperty } = useApi();
-  const {isLoadingTypes, propertyTypeOptions } = usePropertyMetadata();
-
+  const { isLoadingTypes, propertyTypeOptions } = usePropertyMetadata();
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY?.trim() ?? "";
 
-  // 🖼️ Image state
+  const [step, setStep] = useState<"journey" | "details">("journey");
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-
-  // 📍 Map state
-  const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(
-    null
-  );
-  const [mapCenter, setMapCenter] = useState({
-    lat: -1.286389,
-    lng: 36.817223, // Nairobi
-  });
-
-  //Profile Gate
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapCenter, setMapCenter] = useState(DEFAULT_LOCATION);
   const [profileGate, setProfileGate] = useState<ProfileGateFields | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Form setup
   const {
     register,
     handleSubmit,
     setValue,
-    formState: { errors },
     watch,
-    control,
+    formState: { errors, isSubmitting },
   } = useForm<PropertyFormData>({
     resolver: zodResolver(propertySchema),
+    defaultValues: { currency: "KES", mapLocation: "" },
   });
 
+  const managementMode = watch("managementMode");
   const mapLocation = watch("mapLocation");
 
-  // 📸 Handle image upload
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImage(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
+  useEffect(() => () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+  }, [imagePreview]);
+
+  const selectJourney = (mode: PropertyManagementMode) => {
+    setValue("managementMode", mode, { shouldValidate: true });
+    setStep("details");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const chooseImage = async (file?: File) => {
+    if (!file) return;
+    setImageError(null);
+    const validationError = await validatePropertyImage(file);
+    if (validationError) {
+      setImageError(validationError);
+      if (imageInput.current) imageInput.current.value = "";
+      return;
     }
+    setImage(file);
+    setImagePreview(URL.createObjectURL(file));
   };
 
-  const handleCoordinatesSelected = ({ lat, lng }: Coordinates) => {
-    setMarker({ lat, lng });
-    setMapCenter({ lat, lng });
-    setValue("mapLocation", `${lat},${lng}`, { shouldValidate: true });
+  const removeImage = () => {
+    setImage(null);
+    setImagePreview(null);
+    setImageError(null);
+    if (imageInput.current) imageInput.current.value = "";
   };
 
-  const handleUseCurrentLocation = () => {
+  const setCoordinates = ({ lat, lng }: { lat: number; lng: number }) => {
+    const coordinates = { lat, lng };
+    setMarker(coordinates);
+    setMapCenter(coordinates);
+    setValue("mapLocation", `${lat.toFixed(6)},${lng.toFixed(6)}`, { shouldValidate: true });
+  };
+
+  const useCurrentLocation = () => {
     if (!navigator.geolocation) {
       toast.error("Location services are not supported by this browser.");
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => handleCoordinatesSelected({ lat: coords.latitude, lng: coords.longitude }),
+      ({ coords }) => setCoordinates({ lat: coords.latitude, lng: coords.longitude }),
       () => toast.error("We could not access your location. Enter the coordinates manually."),
-      { enableHighAccuracy: true, timeout: 10_000 }
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
     );
   };
 
-  // ✍️ Manual coordinate entry
-  const handleManualLocationChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const value = e.target.value;
-    setValue("mapLocation", value, { shouldValidate: true });
-
-    const coords = value.split(",").map((c) => parseFloat(c.trim()));
-    if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-      const [lat, lng] = coords;
-      setMarker({ lat, lng });
-      setMapCenter({ lat, lng });
-    }
-  };
-
-  // 🚀 Submit handler
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState<{
-    type: "success" | "error" | null;
-    message: string;
-  }>({ type: null, message: "" });
-
   const onSubmit = async (data: PropertyFormData) => {
     if (!image) {
-      toast.error("Please upload a property image");
-      setSubmitStatus({
-        type: "error",
-        message: "Please upload a property image",
-      });
+      setImageError("Upload a property image before continuing.");
       return;
     }
-
-    setIsSubmitting(true);
-    setSubmitStatus({ type: null, message: "" });
-
+    setSubmitError(null);
     try {
-       const response: any = await createNewProperty({
-        image,
-        name: data.name,
-        type: data.type,
-        address: data.address,
-        mapLocation: data.mapLocation,
-        currency: data.currency || "KES",
-      });
-
-      if (response?.profileGate) {
+      const response = await createNewProperty({ ...data, image }) as CreatePropertyResponse;
+      if ("profileGate" in response) {
         setProfileGate(response.fields);
         return;
       }
+      if (!response?.success) throw new Error(response?.description || response?.message || "The property could not be created.");
 
-     if (response?.success) {
-     const resp = await handleTokenRefresh();
-     console.log("Token refresh response:", resp);
-
-     toast.success("Property created successfully!");
-
-      setSubmitStatus({
-        type: "success",
-        message: "Property created successfully!",
-      });
-
-      setTimeout(() => router.push("/dashboard/property/properties"), 1000); 
-    }
-    } catch (error: any) {
-      toast.error(
-        error.response?.data?.message ||
-          "Failed to create property.  Please try again."
-      );
-
-      setSubmitStatus({
-        type: "error",
-        message:
-          error.response?.data?.message ||
-          "Failed to create property. Please try again.",
-      });
-    } finally {
-      setIsSubmitting(false);
+      try {
+        await handleTokenRefresh();
+      } catch {
+        // Property creation has already succeeded. Token refresh must not turn
+        // that success into a retryable-looking error and create duplicates.
+      }
+      toast.success("Property created successfully.");
+      const propertyId = Array.isArray(response.data) ? response.data[0] : undefined;
+      router.push(propertyId ? `/dashboard/property/properties/details/${propertyId}` : "/dashboard/property/properties");
+    } catch (error: unknown) {
+      const responseData = axios.isAxiosError(error) ? error.response?.data as { description?: string; message?: string } | undefined : undefined;
+      const message = responseData?.description || responseData?.message || (error instanceof Error ? error.message : null) || "Failed to create property. Please try again.";
+      setSubmitError(message);
+      toast.error(message);
     }
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6 p-6">
-      {/* Add custom styles for inputs */}
-      <style jsx global>
-        {`
-          input:not(.rs__input):focus,
-        textarea:focus {
-          outline: none !important;
-          border-color: #EF4217 !important;
-          box-shadow: 0 0 0 1px #EF4217 !important;
-        }
+    <div className="mx-auto w-full max-w-6xl space-y-6 p-4 sm:p-6">
+      <Breadcrumb items={[{ label: "Properties", href: "/dashboard/property/properties" }, { label: "Create property" }]} />
 
-        .rs__control {
-          box-shadow: none !important;
-        }
-        `}
-        </style>
-
-
-      {/* 🏷️ Header */}
-      <Breadcrumb items={[
-        { label: "Properties", href: "/dashboard/property/properties" },
-        { label: "Create New Property" },
-      ]} />
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold" style={{ color: "#141130" }}>
-              Create New Property
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Add a new property to your portfolio
-            </p>
-          </div>
-          <Can permissions={["view_property"]}>
-          <Button
-            onClick={() => router.push("/dashboard/property/properties")}
-            className="
-                group relative flex items-center px-5 py-2.5 
-                text-white font-medium rounded-lg
-                transition-all duration-300 ease-out
-                hover:bg-[#d93712] 
-                hover:shadow-[0_0_20px_rgba(239,66,23,0.4)]
-                hover:-translate-y-0.5
-                active:translate-y-0 active:scale-95
-                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#EF4217]
-              
-              "
-            style={{ backgroundColor: "#EF4217" }}
-          >
-            
-            View Properties
-          </Button>
-            </Can>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-[#EF4217]">Step {step === "journey" ? "1" : "2"} of 5</p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#141130]">{step === "journey" ? "Create property" : "Create new property"}</h1>
+          <p className="mt-1 text-slate-600">{step === "journey" ? "Choose the workflow this property needs." : "Add the core property details to your portfolio."}</p>
         </div>
+        <Can permissions={["view_property"]}>
+          <Button type="button" onClick={() => router.push("/dashboard/property/properties")} className="bg-[#EF4217] hover:bg-[#d93712]">View properties</Button>
+        </Can>
+      </header>
 
-      {/* 🧾 FORM */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-        {/* 🖼️ Image + Basic Info Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Image Upload */}
-          <div className="space-y-3 p-6 border rounded-lg bg-white">
-            <Label className="text-base font-semibold" style={{ color: "#141130" }}>
-              Property Image *
-            </Label>
-            <div className="flex flex-col items-center gap-4">
+      {step === "journey" ? (
+        <section aria-labelledby="journey-heading" className="rounded-2xl border bg-white p-5 shadow-sm sm:p-8">
+          <h2 id="journey-heading" className="text-2xl font-semibold text-[#141130]">What do you want to manage?</h2>
+          <p className="mt-1 text-sm text-slate-600">This choice configures the right downstream workflow. You can still manage mixed portfolios.</p>
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            {managementJourneys.map(journey => {
+              const Icon = journeyIcons[journey.value];
+              return (
+                <button key={journey.value} type="button" onClick={() => selectJourney(journey.value)} className="group rounded-xl border-2 border-slate-200 p-5 text-left transition hover:border-[#EF4217] hover:bg-orange-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF4217] focus-visible:ring-offset-2">
+                  <span className="flex size-11 items-center justify-center rounded-lg bg-orange-50 text-[#EF4217]"><Icon className="size-6" /></span>
+                  <span className="mt-4 block text-lg font-semibold text-[#141130]">{journey.title}</span>
+                  <span className="mt-2 block text-sm leading-6 text-slate-600">{journey.description}</span>
+                  <span className="mt-4 block text-xs font-medium text-slate-500">{journey.capabilities}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ) : (
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+          <div className="flex items-center justify-between rounded-lg border bg-white px-4 py-3">
+            <div className="flex items-center gap-3 text-sm"><Check className="size-5 text-emerald-600" /><span className="font-medium text-[#141130]">{managementJourneys.find(item => item.value === managementMode)?.title}</span></div>
+            <Button type="button" variant="ghost" onClick={() => setStep("journey")}>Change</Button>
+          </div>
+
+          {submitError && <Alert variant="destructive"><AlertDescription>{submitError}</AlertDescription></Alert>}
+
+          <section className="rounded-xl border bg-white p-5 shadow-sm">
+            <Label htmlFor="image-upload" className="text-base font-semibold text-[#141130]">Property image *</Label>
+            <div className="mt-3 overflow-hidden rounded-lg border-2 border-dashed border-[#EF4217] bg-orange-50/20" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void chooseImage(event.dataTransfer.files[0]); }}>
               {imagePreview ? (
-                <div
-                  className="relative w-full h-64 rounded-lg overflow-hidden border-2"
-                  style={{ borderColor: "#EF4217" }}
-                >
-                  <img
-                    src={imagePreview}
-                    alt="Property preview"
-                    className="w-full h-full object-cover"
-                  />
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    className="absolute top-2 right-2"
-                    onClick={() => {
-                      setImage(null);
-                      setImagePreview(null);
-                    }}
-                  >
-                    Remove
-                  </Button>
+                <div className="relative h-64">
+                  <Image src={imagePreview} alt="Selected property" fill sizes="(max-width: 768px) 100vw, 1152px" unoptimized className="object-cover" />
+                  <Button type="button" size="icon" variant="destructive" className="absolute right-3 top-3" onClick={removeImage} aria-label="Remove property image"><X className="size-4" /></Button>
                 </div>
               ) : (
-                <label
-                  htmlFor="image-upload"
-                  className="w-full h-64 flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                  style={{ borderColor: "#EF4217" }}
-                >
-                  <Upload className="w-12 h-12 mb-3" style={{ color: "#EF4217" }} />
-                  <span className="text-sm font-medium" style={{ color: "#141130" }}>
-                    Click to upload property image
-                  </span>
-                  <span className="text-xs text-gray-500 mt-1">
-                    PNG, JPG up to 10MB
-                  </span>
+                <label htmlFor="image-upload" className="flex h-44 cursor-pointer flex-col items-center justify-center px-4 text-center">
+                  <Upload className="size-9 text-[#EF4217]" />
+                  <span className="mt-3 text-sm font-medium text-[#141130]">Choose an image or drag it here</span>
+                  <span className="mt-1 text-xs text-slate-500">JPG, PNG or WebP · up to 10 MB · at least 300 × 200 px</span>
                 </label>
               )}
-              <Input
-                id="image-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="hidden"
-              />
+              <Input ref={imageInput} id="image-upload" type="file" accept="image/jpeg,image/png,image/webp" onChange={event => void chooseImage(event.target.files?.[0])} className="sr-only" />
             </div>
+            {imageError && <p className="mt-2 text-sm text-red-600" role="alert">{imageError}</p>}
+          </section>
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            <section className="space-y-5 rounded-xl border bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-semibold text-[#141130]">Basic information</h2>
+              <Field htmlFor="name" label="Property name" required error={errors.name?.message}><Input id="name" autoComplete="organization" maxLength={160} placeholder="e.g., Sunset Villa" aria-invalid={!!errors.name} {...register("name")} /></Field>
+              <Field htmlFor="type" label="Property type" required error={errors.type?.message}>
+                <select id="type" disabled={isLoadingTypes} aria-invalid={!!errors.type} {...register("type")} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50">
+                  <option value="">{isLoadingTypes ? "Loading property types…" : "Select property type"}</option>
+                  <optgroup label="Common property types">
+                    {propertyTypeOptions.filter(option => option.common || !option.category).map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </optgroup>
+                  {["RESIDENTIAL", "COMMERCIAL", "HOSPITALITY", "MIXED", "INDUSTRIAL", "LAND"].map(category => {
+                    const options = propertyTypeOptions.filter(option => !option.common && option.category === category);
+                    return options.length > 0 ? <optgroup key={category} label={category.replaceAll("_", " ").toLowerCase().replace(/^./, c => c.toUpperCase())}>
+                      {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </optgroup> : null;
+                  })}
+                </select>
+              </Field>
+              <Field htmlFor="address" label="Address" required error={errors.address?.message}><Input id="address" autoComplete="street-address" maxLength={500} placeholder="e.g., 123 Main Street, Nairobi" aria-invalid={!!errors.address} {...register("address")} /></Field>
+              <Field htmlFor="currency" label="Operating currency" required error={errors.currency?.message}>
+                <select id="currency" aria-invalid={!!errors.currency} {...register("currency")} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                  {currencyOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </Field>
+            </section>
+
+            <section className="space-y-5 rounded-xl border bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-2"><MapPin className="size-5 text-[#EF4217]" /><h2 className="text-lg font-semibold text-[#141130]">Location</h2></div>
+              {googleMapsKey ? <PropertyLocationPicker apiKey={googleMapsKey} center={mapCenter} marker={marker} onCoordinatesSelected={setCoordinates} /> : <Alert className="border-amber-300 bg-amber-50"><AlertDescription className="text-amber-900">Map search is temporarily unavailable. Enter coordinates manually or use your current location.</AlertDescription></Alert>}
+              <Field htmlFor="mapLocation" label="Coordinates (Latitude, Longitude)" required error={errors.mapLocation?.message}>
+                <Input id="mapLocation" inputMode="decimal" placeholder="-1.286389, 36.817223" value={mapLocation || ""} aria-invalid={!!errors.mapLocation} onChange={event => {
+                  const value = event.target.value;
+                  setValue("mapLocation", value, { shouldValidate: true });
+                  const coordinates = parseCoordinates(value);
+                  if (coordinates) { setMarker(coordinates); setMapCenter(coordinates); }
+                }} />
+              </Field>
+              <Button type="button" variant="outline" onClick={useCurrentLocation}><Navigation className="mr-2 size-4" />Use current location</Button>
+            </section>
           </div>
 
-          {/* Basic Info */}
-          <div className="space-y-4 p-6 border rounded-lg bg-white">
-            <h3 className="text-lg font-semibold" style={{ color: "#141130" }}>
-              Basic Information
-            </h3>
-
-            <div className="space-y-2">
-              <Label htmlFor="name">Property Name *</Label>
-              <Input
-                id="name"
-                placeholder="e.g., Sunset Villa"
-                {...register("name")}
-                className={errors.name ? "border-red-500" : ""}
-              />
-              {errors.name && (
-                <p className="text-sm text-red-600">{errors.name.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="type">Property Type *</Label>
-              <Controller
-                name="type"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    {...field}
-                    options={propertyTypeOptions}
-                    isClearable
-                    isSearchable
-                    isLoading={isLoadingTypes}
-                    classNamePrefix="rs"
-                    placeholder={isLoadingTypes ? <span><Loader2 className="w-4 h-4 mr-2 animate-spin" />  </span> : "Select property type"}
-                    value={propertyTypeOptions.find(opt => opt.value === field.value) || null}
-                    onChange={(selectedOption:any) => field.onChange(selectedOption ? selectedOption.value : "")}
-                    className={errors.type ? "border-red-500" : ""}
-
-                    // ✅ Custom option renderer to show descriptions
-                    formatOptionLabel={(option: any) => (
-                      <div>
-                        <div className="font-medium">{option.label}</div>
-                        {option.description && (
-                          <div className="text-xs text-gray-500">{option.description}</div>
-                        )}
-                      </div>
-                    )}
-                    styles={{
-                      control: (base: any, state: any) => ({
-                        ...base,
-                        borderColor: errors.type ? '#ef4444' : state.isFocused ? '#EF4217' : base.borderColor,
-                        boxShadow: 'none',
-                        '&:hover': {
-                          borderColor: state.isFocused ? '#EF4217' : base.borderColor,
-                        },
-                      }),
-                      option: (base: any, state: any) => ({
-                        ...base,
-                        backgroundColor: state.isSelected 
-                          ? '#EF4217' 
-                          : state.isFocused 
-                          ? '#FEE2E2' 
-                          : base.backgroundColor,
-                        color: state.isSelected ? 'white' : base.color,
-                        '&:active': {
-                          backgroundColor: '#EF4217',
-                        },
-                      }),
-                      multiValue: (base: any) => ({
-                        ...base,
-                        backgroundColor: '#FEE2E2',
-                      }),
-                      multiValueLabel: (base: any) => ({
-                        ...base,
-                        color: '#EF4217',
-                      }),
-                      multiValueRemove: (base: any) => ({
-                        ...base,
-                        color: '#EF4217',
-                        '&:hover': {
-                          backgroundColor: '#EF4217',
-                          color: 'white',
-                        },
-                      }),
-                    }}
-                  />
-                )}
-              />
-              {errors.type && (
-                <p className="text-sm text-red-600">{errors.type.message}</p>
-              )}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => router.push("/dashboard/property/properties")}>Cancel</Button>
+            <Button type="submit" disabled={isSubmitting || isLoadingTypes} className="min-w-44 bg-[#EF4217] hover:bg-[#d93712]">{isSubmitting ? <><Loader2 className="mr-2 size-4 animate-spin" />Creating property…</> : "Create property"}</Button>
           </div>
+        </form>
+      )}
 
+      <ProfileGateModal open={!!profileGate} fields={profileGate ?? {}} onClose={() => {}} />
+    </div>
+  );
+}
 
-            <div className="space-y-2">
-              <Label htmlFor="address">Address *</Label>
-              <Input
-                id="address"
-                placeholder="e.g., 123 Main Street, Nairobi"
-                {...register("address")}
-                className={errors.address ? "border-red-500" : ""}
-              />
-              {errors.address && (
-                <p className="text-sm text-red-600">{errors.address.message}</p>
-              )}
-            </div>
-
-            {/* Currency Selector */}
-            <div className="space-y-2">
-              <Label htmlFor="currency">Currency (optional defaults to KES)</Label>
-              <Controller
-                name="currency"
-                control={control}
-                render={({ field }) => (
-                  <Select
-                    {...field}
-                    options={currencyOptions}
-                    isClearable
-                    classNamePrefix="rs"
-                    placeholder="Select currency"
-                    onChange={(selected: any) =>
-                      field.onChange(selected ? selected.value : "")
-                    }
-                    value={
-                      currencyOptions.find(
-                        (opt) => opt.value === field.value
-                      ) || null
-                    }
-                    styles={{
-                      control: (base: any, state: any) => ({
-                        ...base,
-                        borderColor: state.isFocused ? '#EF4217' : base.borderColor,
-                        boxShadow: state.isFocused ? '0 0 0 1px #EF4217' : base.boxShadow,
-                        '&:hover': {
-                          borderColor: state.isFocused ? '#EF4217' : base.borderColor,
-                        },
-                      }),
-                      option: (base: any, state: any) => ({
-                        ...base,
-                        backgroundColor: state.isSelected 
-                          ? '#EF4217' 
-                          : state.isFocused 
-                          ? '#FEE2E2' 
-                          : base.backgroundColor,
-                        color: state.isSelected ? 'white' : base.color,
-                        '&:active': {
-                          backgroundColor: '#EF4217',
-                        },
-                      }),
-                    }}
-                  />
-                )}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* 📍 Location Picker */}
-        <div className="space-y-4 p-6 border rounded-lg bg-white">
-          <div className="flex items-center gap-2">
-            <MapPin style={{ color: "#EF4217" }} />
-            <h3 className="text-lg font-semibold" style={{ color: "#141130" }}>
-              Location *
-            </h3>
-          </div>
-
-            <div className="space-y-4">
-              {googleMapsKey ? (
-                <GoogleLocationPicker apiKey={googleMapsKey} center={mapCenter} marker={marker} onCoordinatesSelected={handleCoordinatesSelected} />
-              ) : (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <AlertDescription className="text-blue-900">
-                    Map search is temporarily unavailable. Use your current location or enter latitude and longitude below.
-                  </AlertDescription>
-                </Alert>
-              )}
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Label htmlFor="mapLocation">Coordinates (Latitude, Longitude)</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={handleUseCurrentLocation}><MapPin className="mr-2 size-4"/>Use my current location</Button>
-                </div>
-                <Input id="mapLocation" type="text" inputMode="decimal" placeholder="-1.286389, 36.817223" value={mapLocation || ""} onChange={handleManualLocationChange} className={errors.mapLocation ? "border-red-500" : ""} />
-                {errors.mapLocation && (
-                  <p className="text-sm text-red-600">
-                    {errors.mapLocation.message}
-                  </p>
-                )}
-              </div>
-            </div>
-        </div>
-
-        {/* Buttons */}
-        <div className="flex gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.back()}
-            disabled={isSubmitting}
-            className="
-            flex-1
-            group relative flex items-center px-5 py-2.5 
-            font-medium rounded-lg
-            transition-all duration-300 ease-out
-            hover:bg-[#BFC9D1] 
-            hover:shadow-[0_0_20px_rgba(191,201,209,0.1)]
-            hover:-translate-y-0.5
-            active:translate-y-0 active:scale-95
-            focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#EF4217]
-            "
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="
-            flex-1 
-            group relative flex items-center px-5 py-2.5 
-            text-white font-medium rounded-lg
-            transition-all duration-300 ease-out
-            hover:bg-[#d93712] 
-            hover:shadow-[0_0_20px_rgba(239,66,23,0.4)]
-            hover:-translate-y-0.5
-            active:translate-y-0 active:scale-95
-            focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#EF4217]
-            "
-            style={{ backgroundColor: "#EF4217" }}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              "Create Property"
-            )}
-          </Button>
-        </div>
-      </form>
-
-    
-      {/* {submitStatus.type && (
-        <Alert
-          className={`relative flex items-start justify-between gap-2 ${
-            submitStatus.type === "success"
-              ? "border-green-500 bg-green-50"
-              : "border-red-500 bg-red-50"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {submitStatus.type === "success" ? (
-              <CheckCircle2 className="h-5 w-5 text-green-600" />
-            ) : (
-              <XCircle className="h-5 w-5 text-red-600" />
-            )}
-            <AlertDescription
-              className={`${
-                submitStatus.type === "success"
-                  ? "text-green-800"
-                  : "text-red-800"
-              }`}
-            >
-              {submitStatus.message}
-            </AlertDescription>
-          </div> */}
-
-          {/* Close button */}
-          {/* <button
-            type="button"
-            onClick={() => setSubmitStatus({ type: null, message: "" })}
-            className="absolute top-2 right-2 text-gray-500 hover:text-gray-800"
-          >
-            <XCircle className="w-5 h-5" />
-          </button>
-        </Alert> */}
-      {/* )} */}
-      <ProfileGateModal
-        open={!!profileGate}
-        fields={profileGate ?? {}}
-        onClose={() => {}} 
-      />
+function Field({ htmlFor, label, required, error, children }: { htmlFor: string; label: string; required?: boolean; error?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={htmlFor}>{label}{required && <span aria-hidden="true"> *</span>}</Label>
+      {children}
+      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
     </div>
   );
 }

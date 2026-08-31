@@ -69,6 +69,7 @@ import {
   Wrench,
 } from "lucide-react";
 import CanProperty, { usePropertyPermissions } from "@/components/auth/CanProperty";
+import Can from "@/components/auth/Can";
 import { useAuthStore } from "@/store/authStore";
 import ManageChargesDrawer from "@/components/unit/ManageChargesDrawer";
 import { usePropertyMetadata } from "@/app/(dashboard)/dashboard/property/propertyMetadata";
@@ -293,6 +294,7 @@ export default function ViewUnitPage() {
 
   const { checkPermissions } = usePropertyPermissions(Number(propertyId));
   const activeRole = useAuthStore((state) => state.activeRole);
+  const canAdvanceMaintenance = activeRole?.permissions.some(permission => ["manage_estate","edit_unit"].includes(permission)) ?? false;
   const token = useAuthStore((state) => state.token);
   const [maintenance, setMaintenance] = useState<MaintenanceWorkOrder[]>([]);
   const [maintenanceLoading, setMaintenanceLoading] = useState(false);
@@ -341,10 +343,8 @@ export default function ViewUnitPage() {
       const hasViewTenants = checkPermissions(["view_tenants"]);
       const hasViewManagers = checkPermissions(["view_landlord_and_managers"]);
 
-      if (hasViewTenants) {
-        loadTenants();
-        loadUnitInvites();
-      }
+      if (hasViewTenants) loadTenants();
+      if (checkPermissions(["view_invite_list"])) loadUnitInvites();
       if (hasViewManagers) {
         loadManagers();
       }
@@ -476,17 +476,20 @@ export default function ViewUnitPage() {
     setIsChargesDrawerOpen(false);
   };
 
-  const onCreateTenantInvite = async () => {
+  const onCreateOccupantInvite = async () => {
+    const inviteType = unit?.leaseMode === "SERVICE_CHARGE" || origin === "homeowners" ? "HOMEOWNER" : "TENANT";
+    const inviteLabel = inviteType === "HOMEOWNER" ? "Homeowner" : "Tenant";
     try {
       setActionLoading(true);
-      const response = await handleCreateInvite("TENANT", Number(unitId));
+      const response = await handleCreateInvite(inviteType, Number(unitId));
       if (response.success && response.data && response.data.length > 0) {
         setCreatedInviteLink(response.data[0]);
-        toast.success("Tenant invite created successfully");
+        toast.success(`${inviteLabel} invite created successfully`);
         loadUnitInvites();
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.description || "Failed to create tenant invite");
+    } catch (err: unknown) {
+      const apiError = err as { response?: { data?: { description?: string } } };
+      toast.error(apiError.response?.data?.description || `Failed to create ${inviteLabel.toLowerCase()} invite`);
     } finally {
       setActionLoading(false);
     }
@@ -717,6 +720,8 @@ export default function ViewUnitPage() {
   }
 
   const totalMonthly = unit.price + unitCharges.reduce((sum, c) => sum + c.amount, 0);
+  const isHomeownerUnit = unit.leaseMode === "SERVICE_CHARGE" || origin === "homeowners";
+  const occupantLabel = isHomeownerUnit ? "Homeowner" : "Tenant";
 
   // ─── Main Render ──────────────────────────────────────────────────────────
 
@@ -731,9 +736,9 @@ export default function ViewUnitPage() {
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Send className="w-5 h-5" style={{ color: "#EF4217" }} />Share Tenant Invite
+                <Send className="w-5 h-5" style={{ color: "#EF4217" }} />Share Invite
               </DialogTitle>
-              <DialogDescription>Send this invitation link to the tenant via email or SMS.</DialogDescription>
+              <DialogDescription>Send this invitation link securely via email or SMS.</DialogDescription>
             </DialogHeader>
             <form onSubmit={(e) => { e.preventDefault(); if (!e.currentTarget.checkValidity()) { e.currentTarget.reportValidity(); return; } onShareInvite(); }}>
               <div className="space-y-4 py-4">
@@ -774,9 +779,9 @@ export default function ViewUnitPage() {
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5" style={{ color: "#EF4217" }} />Create Tenant Invite
+                <UserPlus className="w-5 h-5" style={{ color: "#EF4217" }} />Create {occupantLabel} Invite
               </DialogTitle>
-              <DialogDescription>Generate an invitation link for a tenant to join this unit.</DialogDescription>
+              <DialogDescription>Generate an invitation link for the {occupantLabel.toLowerCase()} of this unit.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               {createdInviteLink ? (
@@ -786,11 +791,11 @@ export default function ViewUnitPage() {
                     <Input value={createdInviteLink} readOnly className="font-mono text-sm" />
                     <Button size="icon" variant="outline" onClick={() => copyToClipboard(createdInviteLink)}><Copy className="w-4 h-4" /></Button>
                   </div>
-                  <p className="text-xs text-gray-500">Copy this link to share with the tenant</p>
+                  <p className="text-xs text-gray-500">Copy this link to share with the {occupantLabel.toLowerCase()}</p>
                 </div>
               ) : (
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-gray-700">This will create a unique invitation link for a tenant to register for Unit {unit.ref}.</p>
+                  <p className="text-sm text-gray-700">This will create a unique invitation link for the {occupantLabel.toLowerCase()} of Unit {unit.ref}.</p>
                 </div>
               )}
             </div>
@@ -799,7 +804,7 @@ export default function ViewUnitPage() {
                 {createdInviteLink ? "Close" : "Cancel"}
               </Button>
               {!createdInviteLink && (
-                <Button onClick={onCreateTenantInvite} disabled={actionLoading} className="text-white" style={{ backgroundColor: "#EF4217" }}>
+                <Button onClick={onCreateOccupantInvite} disabled={actionLoading} className="text-white" style={{ backgroundColor: "#EF4217" }}>
                   {actionLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</> : <><UserPlus className="w-4 h-4 mr-2" />Create Invite</>}
                 </Button>
               )}
@@ -903,13 +908,13 @@ export default function ViewUnitPage() {
                   </Button>
                 </CanProperty>
               )}
-              <CanProperty propertyId={Number(propertyId)} permissions={["view_tenants"]}>
+              <Can permissions={["create_invite"]}>
                 {!unit.occupied && tenants.length === 0 && (
                   <Button onClick={() => setCreateInviteOpen(true)} variant="outline">
-                    <UserPlus className="w-4 h-4 mr-2" />Assign Tenant
+                    <UserPlus className="w-4 h-4 mr-2" />Assign {occupantLabel}
                   </Button>
                 )}
-              </CanProperty>
+              </Can>
             </div>
           </div>
         </div>
@@ -1529,7 +1534,7 @@ export default function ViewUnitPage() {
               <CardHeader className="flex flex-row items-center justify-between"><div><CardTitle>Maintenance work orders</CardTitle><p className="mt-1 text-sm text-gray-500">Report, schedule and track repairs for this unit.</p></div><Button onClick={()=>setMaintenanceOpen(v=>!v)}><Plus className="mr-2 h-4 w-4"/>New request</Button></CardHeader>
               <CardContent className="space-y-4">
                 {maintenanceOpen&&<div className="grid gap-3 rounded-xl border bg-gray-50 p-4 md:grid-cols-2"><Input value={maintenanceForm.title} onChange={e=>setMaintenanceForm({...maintenanceForm,title:e.target.value})} placeholder="Issue title"/><Select value={maintenanceForm.priority} onValueChange={priority=>setMaintenanceForm({...maintenanceForm,priority})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{["LOW","MEDIUM","HIGH","EMERGENCY"].map(v=><SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectContent></Select><Select value={maintenanceForm.category} onValueChange={category=>setMaintenanceForm({...maintenanceForm,category})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{["PLUMBING","ELECTRICAL","APPLIANCE","STRUCTURAL","SECURITY","CLEANING","PEST_CONTROL","OTHER"].map(v=><SelectItem key={v} value={v}>{v.replaceAll("_"," ")}</SelectItem>)}</SelectContent></Select><Textarea value={maintenanceForm.description} onChange={e=>setMaintenanceForm({...maintenanceForm,description:e.target.value})} placeholder="Describe the problem and access considerations" className="md:col-span-2"/><div className="flex gap-2 md:col-span-2"><Button onClick={submitMaintenance}>Submit request</Button><Button variant="outline" onClick={()=>setMaintenanceOpen(false)}>Cancel</Button></div></div>}
-                {maintenanceLoading?<div className="py-10 text-center text-sm text-gray-500"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin"/>Loading work orders…</div>:maintenance.length===0?<div className="flex flex-col items-center py-12 text-center"><Wrench className="mb-3 h-10 w-10 text-gray-300"/><p className="font-medium text-gray-600">No maintenance requests</p><p className="mt-1 text-sm text-gray-400">Create the first work order when something needs attention.</p></div>:<div className="space-y-3">{maintenance.map(order=><div key={order.id} className="rounded-xl border p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><b>{order.title}</b><Badge variant="outline">{order.priority}</Badge></div><p className="mt-1 text-sm text-gray-500">{order.workOrderNumber} · {order.category.replaceAll("_"," ")} · {formatDate(order.createdOn)}</p><p className="mt-2 text-sm">{order.description}</p></div><div className="text-right"><Badge>{order.status.replaceAll("_"," ")}</Badge>{["OPEN","ACKNOWLEDGED","IN_PROGRESS"].includes(order.status)&&<button onClick={()=>advanceMaintenance(order)} className="mt-3 block text-xs font-semibold text-[#EF4217]">Advance status</button>}</div></div></div>)}</div>}
+                {maintenanceLoading?<div className="py-10 text-center text-sm text-gray-500"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin"/>Loading work orders…</div>:maintenance.length===0?<div className="flex flex-col items-center py-12 text-center"><Wrench className="mb-3 h-10 w-10 text-gray-300"/><p className="font-medium text-gray-600">No maintenance requests</p><p className="mt-1 text-sm text-gray-400">Create the first work order when something needs attention.</p></div>:<div className="space-y-3">{maintenance.map(order=><div key={order.id} className="rounded-xl border p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><b>{order.title}</b><Badge variant="outline">{order.priority}</Badge></div><p className="mt-1 text-sm text-gray-500">{order.workOrderNumber} · {order.category.replaceAll("_"," ")} · {formatDate(order.createdOn)}</p><p className="mt-2 text-sm">{order.description}</p></div><div className="text-right"><Badge>{order.status.replaceAll("_"," ")}</Badge>{canAdvanceMaintenance&&["OPEN","ACKNOWLEDGED","IN_PROGRESS"].includes(order.status)&&<button onClick={()=>advanceMaintenance(order)} className="mt-3 block text-xs font-semibold text-[#EF4217]">Advance status</button>}</div></div></div>)}</div>}
               </CardContent>
             </Card>
           </TabsContent>

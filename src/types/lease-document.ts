@@ -2,7 +2,7 @@ export type LeaseDocumentType =
   | "RESIDENTIAL_LEASE_AGREEMENT" | "COMMERCIAL_LEASE_AGREEMENT"
   | "LATE_RENT_NOTICE" | "RENT_DEFAULT_CURE_NOTICE"
   | "LANDLORD_TERMINATION_NOTICE" | "TENANT_TERMINATION_NOTICE"
-  | "ESTATE_AGREEMENT" | "PROPERTY_SALE_AGREEMENT";
+  | "ESTATE_RESIDENTIAL_AGREEMENT" | "PROPERTY_SALE_LETTER_OF_OFFER" | "PROPERTY_SALE_AGREEMENT";
 
 export type LeaseDocumentStatus =
   | "DRAFT" | "ISSUED" | "ACKNOWLEDGED" | "PARTIALLY_SIGNED"
@@ -11,6 +11,7 @@ export type LeaseDocumentStatus =
 export interface LeaseDocument {
   id: number;
   leaseId?: number;
+  saleId?: number;
   propertyId?: number;
   unitId?: number;
   documentType: LeaseDocumentType;
@@ -39,10 +40,14 @@ export interface LeaseDocumentTemplate {
   version: number;
   bodyHtml: string;
   legalReviewRequired: boolean;
+  contentSha256: string;
+  legalReviewedAt?: string;
+  legalReviewedBy?: number;
 }
 
 export interface GenerateLeaseDocumentRequest {
   leaseId?: number;
+  saleId?: number;
   propertyId?: number;
   recipientUserId?: number;
   documentType: LeaseDocumentType;

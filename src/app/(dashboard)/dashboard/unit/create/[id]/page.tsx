@@ -5,6 +5,8 @@ import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { validatePropertyImage } from "@/app/(dashboard)/dashboard/property/create/propertyCreation";
+import { apiErrorMessage } from "@/lib/api-error";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -41,13 +43,13 @@ type SelectOption = {
 
 // Validation schema
 const unitSchema = z.object({
-  uniqueRef: z.string().min(1, "Unit reference is required"),
+  uniqueRef: z.string().trim().min(1, "Unit reference is required").max(120, "Use 120 characters or fewer"),
   unitTypeId: z.string().min(1, "Unit type is required"),
-  size: z.string().min(1, "Size is required").regex(/^\d+\.?\d*$/, "Size must be a valid number"),
+  size: z.string().trim().min(1, "Size is required").regex(/^\d+\.?\d*$/, "Size must be a valid number").refine(value => Number(value) > 0, "Size must be greater than zero"),
   measurementUnits: z.string().min(1, "Measurement unit is required"),
   utilities: z.string().min(1, "At least one utility is required"),
   leaseMode: z.enum(["RENT", "SALE", "SERVICE_CHARGE"]).refine((val) => !!val, { message: "Lease mode is required" }),
-  price: z.string().min(1, "Price is required").regex(/^\d+\.?\d*$/, "Price must be a valid number"),
+  price: z.string().trim().min(1, "Price is required").regex(/^\d+\.?\d*$/, "Price must be a valid number").refine(value => Number(value) > 0, "Price must be greater than zero"),
   currency: z.string().optional(),
   templateId: z.string().optional(),
 });
@@ -68,13 +70,6 @@ export default function CreateUnitForm() {
   console.log("PROPERTYNAME: ", propertyName);
   console.log("PROPERTYCURR: ", propertyCurrency);
 
-  // This form's own Lease Mode field only knows "rent"/"lease" (the latter
-  // is the sale option — see filteredLeaseTemplates below); there's no
-  // SERVICE_CHARGE equivalent yet, so a Homeowners-origin visit can only be
-  // flagged, not pre-selected/locked, without inventing unverified backend
-  // semantics.
-  // const presetFormLeaseMode: "rent" | "lease" | null =
-  //   leaseModeParam === "RENT" ? "rent" : leaseModeParam === "SALE" ? "lease" : null;
 const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
   leaseModeParam === "RENT" || leaseModeParam === "SALE" || leaseModeParam === "SERVICE_CHARGE"
     ? leaseModeParam
@@ -89,7 +84,7 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
   } = useApi();
 
   // Options state
-  const {isLoadingTypes, unitTypeOptions, setCurrentPropertyType } = usePropertyMetadata();
+  const {isLoadingTypes, unitTypeOptions, getUnitTypes } = usePropertyMetadata();
   const [utilityOptions, setUtilityOptions] = useState<SelectOption[]>([]);
   const [measurementOptions, setMeasurementOptions] = useState<SelectOption[]>([]);
   const [leaseTemplateOptions, setLeaseTemplateOptions] = useState<SelectOption[]>([]);
@@ -180,11 +175,11 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
   const loadAllOptions = async () => {
     try {
       setIsLoadingOptions(true);
-      setCurrentPropertyType(propertyType);
       setValue("currency", propertyCurrency);
       if (presetFormLeaseMode) setValue("leaseMode", presetFormLeaseMode);
       // Load all options in parallel
-      const [utilitiesRes, measurementsRes, leaseTemplateRes] = await Promise.all([
+      const [, utilitiesRes, measurementsRes, leaseTemplateRes] = await Promise.all([
+        getUnitTypes(propertyType),
         fetchSupportedUtilities(),
         fetchMeasurementUnits(),
         handleListLeaseTemplates({page: 0, size: 100, sort: 'name,asc'}),
@@ -226,9 +221,17 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const validationError = await validatePropertyImage(file);
+      if (validationError) {
+        toast.error(validationError);
+        e.target.value = "";
+        setImage(null);
+        setImagePreview(null);
+        return;
+      }
       setImage(file);
       const reader = new FileReader();
       reader.onloadend = () => setImagePreview(reader.result as string);
@@ -258,10 +261,12 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
         price: data.price,
         image: image,
         currency: data.currency ?? "",
-        templateId: Number(data.templateId) ?? ""
+        templateId: data.templateId ? Number(data.templateId) : undefined
       });
 
-      const createdUnitId = result?.data?.id ?? result?.id ?? null;
+      const createdUnitId = Array.isArray(result?.data)
+        ? Number(result.data[0])
+        : result?.data?.id ?? result?.id ?? null;
       const unitTypeLabel = unitTypeOptions.find((o) => o.value === data.unitTypeId)?.label ?? data.unitTypeId ?? "";
       const measurementLabel = measurementOptions.find((o) => o.value === data.measurementUnits)?.label ?? data.measurementUnits ?? "";
       const currencyLabel = currencyOptions.find((o) => o.value === data.currency)?.label ?? data.currency ?? "";
@@ -275,8 +280,8 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
         currency: currencyLabel,
         leaseMode: data.leaseMode ?? "",
       });
-    } catch (error: any) {
-      toast.error("Failed to create unit. Please try again.");
+    } catch (error: unknown) {
+      toast.error(apiErrorMessage(error, "Failed to create unit. Please try again."));
     } finally {
       setIsSubmitting(false);
     }
@@ -414,14 +419,14 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
                     Click to upload unit image
                   </span>
                   <span className="text-xs text-gray-500 mt-1">
-                    PNG, JPG up to 10MB
+                    PNG, JPG or WebP up to 10MB
                   </span>
                 </label>
               )}
               <Input
                 id="image-upload"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleImageChange}
                 className="hidden"
               />

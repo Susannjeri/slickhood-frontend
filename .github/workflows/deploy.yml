@@ -1,8 +1,6 @@
 name: Deploy PMS to server
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
 
 concurrency:
@@ -11,11 +9,11 @@ concurrency:
 
 permissions:
   contents: read
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    environment: production
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,6 +27,15 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Static analysis
+        run: npm run lint:ci
+
+      - name: Install browser runtime
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser regression suite
+        run: npm run test:e2e
 
       - name: Copy env production configs
         run: |
@@ -50,13 +57,16 @@ jobs:
           chmod +x ./build.sh
           SKIP_BUILD=true ./build.sh
 
+      - name: Create release checksum
+        run: sha256sum deploy.tar.gz > release.sha256
+
       - name: SCP archive to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "deploy.tar.gz"
+          source: "deploy.tar.gz,release.sha256"
           target: /tmp/slickhood-frontend-release
 
       - name: Smoke candidate and perform rollback-safe cutover
@@ -65,8 +75,9 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 10m
           script: |
-            set -e
+            set -eu
             stamp="$(date -u +%Y%m%dT%H%M%SZ)"
             candidate="/home/silverocean/deploy.candidate-$stamp"
             rollback="/home/silverocean/deploy.rollback-$stamp"
@@ -95,6 +106,8 @@ jobs:
               exit "$status"
             }
             trap cleanup EXIT
+            cd /tmp/slickhood-frontend-release
+            sha256sum -c release.sha256
             sudo mkdir -p "$candidate"
             sudo tar -xzf /tmp/slickhood-frontend-release/deploy.tar.gz -C "$candidate"
             sudo chown -R silverocean:silverocean "$candidate"
