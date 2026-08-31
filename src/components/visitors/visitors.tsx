@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserPlus, Eye, X, Trash2, Ban, Check, ShieldX } from "lucide-react";
+import { UserPlus, Eye, Trash2, Ban, Check, ShieldX } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { cancelVisitor, deleteVisitor, decideVisitor, getVisitors } from "@/services/visitors.service";
 import type { Visitor } from "./types";
@@ -10,10 +10,15 @@ import SuccessModal from "../common/successmodal";
 
 
 const statusStyles: Record<string, string> = {
+    PENDING_APPROVAL: "bg-amber-50 text-amber-700 border border-amber-200",
     PENDING: "bg-yellow-50 text-yellow-700 border border-yellow-200",
+    APPROVED: "bg-blue-50 text-blue-700 border border-blue-200",
+    ARRIVED: "bg-cyan-50 text-cyan-700 border border-cyan-200",
+    DENIED: "bg-red-50 text-red-700 border border-red-200",
     CHECKED_IN: "bg-green-50 text-green-700 border border-green-200",
     CHECKED_OUT: "bg-gray-100 text-gray-600 border border-gray-200",
     CANCELLED: "bg-red-50 text-red-700 border border-red-200",
+    EXPIRED: "bg-gray-100 text-gray-500 border border-gray-200",
 };
 
 function formatDateTime(iso: string) {
@@ -30,7 +35,10 @@ function formatDateTime(iso: string) {
 
 export default function Visitors() {
 
-    const { token } = useAuthStore();
+    const { token, permissions } = useAuthStore();
+    const canRegister = permissions.includes("register_visitor");
+    const canCancel = permissions.includes("cancel_visitor");
+    const canDelete = permissions.includes("delete_visitor");
     const [visitors, setVisitors] = useState<Visitor[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -39,16 +47,20 @@ export default function Visitors() {
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [phoneSearch, setPhoneSearch] = useState("");
     const [debouncedPhone, setDebouncedPhone] = useState("");
+    const [page, setPage] = useState(0);
 
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [confirmAction, setConfirmAction] = useState<"cancel" | "delete" | null>(null);
     const [visitorToAction, setVisitorToAction] = useState<Visitor | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [denialVisitor, setDenialVisitor] = useState<Visitor | null>(null);
+    const [denialReason, setDenialReason] = useState("");
 
     // Debounce phone search input
     useEffect(() => {
         const timeout = setTimeout(() => {
             setDebouncedPhone(phoneSearch);
+            setPage(0);
         }, 400);
         return () => clearTimeout(timeout);
     }, [phoneSearch]);
@@ -60,7 +72,9 @@ export default function Visitors() {
 
         try {
             const res = await getVisitors(token, {
-                phone: debouncedPhone || undefined,
+                phoneNumber: debouncedPhone || undefined,
+                page,
+                size: 25,
             });
             setVisitors(res.data?.data ?? res.data ?? []);
         } catch (err) {
@@ -73,7 +87,7 @@ export default function Visitors() {
 
     useEffect(() => {
         fetchVisitors();
-    }, [token, debouncedPhone]);
+    }, [token, debouncedPhone, page]);
 
 
     
@@ -99,7 +113,7 @@ export default function Visitors() {
         if (!token || !visitorToAction) return;
 
         // A checked-out visitor cannot be cancelled
-        if (visitorToAction.status === "CHECKED_OUT") {
+        if (!["PENDING", "PENDING_APPROVAL", "APPROVED", "ARRIVED"].includes(visitorToAction.status)) {
             closeConfirmModal();
             return;
         }
@@ -143,13 +157,15 @@ export default function Visitors() {
         }
     };
 
-    const handleDecision = async (visitor: Visitor, decision: "APPROVE" | "DENY") => {
+    const handleDecision = async (visitor: Visitor, decision: "APPROVE" | "DENY", reason?: string) => {
         if (!token) return;
         try {
-            const response = await decideVisitor(visitor.id, decision, token);
+            const response = await decideVisitor(visitor.id, decision, token, reason);
             const accessCode = response.data?.data?.accessCode;
             setSuccessMessage(accessCode ? `Visit approved. Access code: ${accessCode}` : `Visit ${decision === "APPROVE" ? "approved" : "denied"}.`);
             await fetchVisitors();
+            setDenialVisitor(null);
+            setDenialReason("");
         } catch { setError("The visit decision could not be saved."); }
     };
 
@@ -171,20 +187,20 @@ export default function Visitors() {
 
                         <input
                             type="text"
-                            placeholder="Search by phone number"
+                            placeholder="Enter full phone number"
                             value={phoneSearch}
                             onChange={(e) => setPhoneSearch(e.target.value)}
                             className="rounded-xl border border-[#020B2D]/15 px-3 py-2.5 text-sm w-64 focus:outline-none focus:border-[#08184A]"
                         />
                     </div>
 
-                    <button
+                    {canRegister && <button
                         onClick={() => setShowRegisterModal(true)}
                         className="inline-flex items-center gap-2 rounded-xl bg-[#FF4B1F] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#ff5c35]"
                     >
                         <UserPlus className="h-4 w-4" />
                         Register Visitor
-                    </button>
+                    </button>}
                 </div>
 
                 {/* Table */}
@@ -246,8 +262,8 @@ export default function Visitors() {
                                     </td>
                                 </tr>
                             ) : (
-                                visitors.map((visitor, idx) => (
-                                    <tr key={`${visitor.unitId}-${idx}`} className="border-t border-gray-100">
+                                visitors.map((visitor) => (
+                                    <tr key={visitor.id} className="border-t border-gray-100">
                                         <td className="px-6 py-4 text-sm">
                                             {visitor.visitorName}
                                         </td>
@@ -294,16 +310,16 @@ export default function Visitors() {
                                                     View
                                                 </button>
 
-                                                {visitor.status === "PENDING_APPROVAL" && <>
+                                                {canRegister && visitor.status === "PENDING_APPROVAL" && <>
                                                     <button onClick={() => handleDecision(visitor, "APPROVE")} className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700"><Check className="h-4 w-4"/>Approve</button>
-                                                    <button onClick={() => handleDecision(visitor, "DENY")} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700"><ShieldX className="h-4 w-4"/>Deny</button>
+                                                    <button onClick={() => setDenialVisitor(visitor)} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700"><ShieldX className="h-4 w-4"/>Deny</button>
                                                 </>}
                                                 
                                                 {/* Cancel */}
                                                 <button
                                                     onClick={() => openConfirmModal(visitor, "cancel")}
-                                                    disabled={visitor.status === "CHECKED_OUT"}
-                                                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 ${visitor.status === "CHECKED_OUT"
+                                                    disabled={!['PENDING','PENDING_APPROVAL','APPROVED','ARRIVED'].includes(visitor.status)}
+                                                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 ${!['PENDING','PENDING_APPROVAL','APPROVED','ARRIVED'].includes(visitor.status)
                                                             ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400"
                                                             : "border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100 hover:shadow-sm"
                                                         }`}
@@ -313,13 +329,14 @@ export default function Visitors() {
                                                 </button>
 
                                                 {/* Delete */}
-                                                <button
+                                                {canCancel && <button
                                                     onClick={() => openConfirmModal(visitor, "delete")}
-                                                    className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-sm"
+                                                    disabled={visitor.status === "CHECKED_IN"}
+                                                    className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 transition-all duration-200 hover:border-red-300 hover:bg-red-100 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                     Delete
-                                                </button>
+                                                </button>}
 
                                             </div>
                                         </td>
@@ -329,6 +346,12 @@ export default function Visitors() {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4 text-sm">
+                    <button type="button" disabled={page === 0} onClick={() => setPage(current => Math.max(0, current - 1))} className="rounded-lg border px-3 py-2 disabled:opacity-40">Previous</button>
+                    <span className="text-gray-500">Page {page + 1}</span>
+                    <button type="button" disabled={visitors.length < 25} onClick={() => setPage(current => current + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Next</button>
                 </div>
 
             </div>
@@ -421,14 +444,14 @@ export default function Visitors() {
 
                         {/* Footer */}
                         <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
-                            <button
+                                                {canDelete && <button
                                 type="button"
                                 onClick={closeConfirmModal}
                                 disabled={isProcessing}
                                 className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 No, Keep It
-                            </button>
+                                                </button>}
 
                             <button
                                 type="button"
@@ -449,6 +472,21 @@ export default function Visitors() {
                                         ? "Yes, Delete"
                                         : "Yes, Cancel"}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {denialVisitor && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+                    <div role="dialog" aria-modal="true" aria-label="Deny visitor access" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+                        <h3 className="text-lg font-semibold text-[#020B2D]">Deny visitor access</h3>
+                        <p className="mt-1 text-sm text-gray-500">Record a clear reason for {denialVisitor.visitorName}. It will remain in the audit trail.</p>
+                        <label htmlFor="visitor-denial-reason" className="mt-5 block text-sm font-medium">Reason</label>
+                        <textarea id="visitor-denial-reason" maxLength={250} value={denialReason} onChange={event => setDenialReason(event.target.value)} className="mt-1 min-h-28 w-full rounded-xl border p-3 text-sm" />
+                        <div className="mt-5 flex justify-end gap-3">
+                            <button type="button" onClick={() => { setDenialVisitor(null); setDenialReason(""); }} className="rounded-xl border px-4 py-2 text-sm">Keep pending</button>
+                            <button type="button" disabled={!denialReason.trim() || isProcessing} onClick={async () => { setIsProcessing(true); await handleDecision(denialVisitor, "DENY", denialReason.trim()); setIsProcessing(false); }} className="rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Confirm denial</button>
                         </div>
                     </div>
                 </div>

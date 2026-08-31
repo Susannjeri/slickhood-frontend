@@ -15,11 +15,13 @@ import {
 export const statusStyles: Record<string, string> = {
     PENDING_APPROVAL: "bg-amber-50 text-amber-700 border border-amber-200",
     APPROVED: "bg-blue-50 text-blue-700 border border-blue-200",
+    ARRIVED: "bg-cyan-50 text-cyan-700 border border-cyan-200",
     DENIED: "bg-red-50 text-red-700 border border-red-200",
     PENDING: "bg-yellow-50 text-yellow-700 border border-yellow-200",
     CHECKED_IN: "bg-green-50 text-green-700 border border-green-200",
     CHECKED_OUT: "bg-gray-100 text-gray-600 border border-gray-200",
     CANCELLED: "bg-red-50 text-red-700 border border-red-200",
+    EXPIRED: "bg-gray-100 text-gray-500 border border-gray-200",
 };
 
 export function formatDateTime(iso: string) {
@@ -62,6 +64,9 @@ function ModalShell({ title, subtitle, onClose, children, footer }: ModalShellPr
             <div
                 className="w-full max-w-md rounded-2xl bg-white shadow-xl max-h-[90vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
             >
                 <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
                     <div>
@@ -132,6 +137,7 @@ export function VisitorDetailsModal({
             <DetailRow label="Property" value={visitor.propertyName} />
             <DetailRow label="Expected Arrival" value={formatDateTime(visitor.expectedArrivalTime)} />
             {visitor.validUntil && <DetailRow label="Access expires" value={formatDateTime(visitor.validUntil)} />}
+            {visitor.decisionReason && <DetailRow label="Decision reason" value={visitor.decisionReason} />}
             <DetailRow label="Entries used" value={`${visitor.entryCount ?? 0} of ${visitor.maxEntries ?? 1}`} />
             {visitor.credentialHint && <DetailRow label="Access code" value={`••••••${visitor.credentialHint}`} />}
             <DetailRow label="Registered On" value={formatDateTime(visitor.createdOn)} />
@@ -155,6 +161,7 @@ const initialForm: RegisterVisitorPayload = {
     companyName: "",
     trackingNumber: "",
     maxEntries: 1,
+    validUntil: "",
 };
 
 export function VisitorRegisterModal({
@@ -228,18 +235,19 @@ export function VisitorRegisterModal({
 
         if (!form.expectedArrivalTime) {
             errors.expectedArrivalTime = "Expected arrival time is required.";
+        } else if (new Date(form.expectedArrivalTime).getTime() <= Date.now()) {
+            errors.expectedArrivalTime = "Expected arrival time must be in the future.";
+        }
+        if (form.validUntil && new Date(form.validUntil) <= new Date(form.expectedArrivalTime)) {
+            errors.validUntil = "Access expiry must be after expected arrival.";
         }
 
         if (!phone) {
             errors.visitorPhoneNumber = "Phone number is required.";
-        } else if (!/^07\d{8}$/.test(phone)) {
+        } else if (!/^(?:01|07)\d{8}$/.test(phone)) {
             errors.visitorPhoneNumber =
                 "Enter a valid phone number, e.g. 0700000000.";
         }
-
-        setValidationErrors(errors);
-
-        return Object.keys(errors).length === 0;
 
         setValidationErrors(errors);
 
@@ -271,6 +279,7 @@ export function VisitorRegisterModal({
             const payload: RegisterVisitorPayload = {
                 ...form,
                 expectedArrivalTime: toApiDateTime(form.expectedArrivalTime),
+                validUntil: form.validUntil ? toApiDateTime(form.validUntil) : undefined,
                 visitorCategory: form.visitType === "DELIVERY" ? "DELIVERY" : "GUEST",
             };
 
@@ -332,11 +341,12 @@ export function VisitorRegisterModal({
                     )}
 
                     <div>
-                        <label className="text-sm font-medium text-[#020B2D]">
+                        <label htmlFor="visitor-name" className="text-sm font-medium text-[#020B2D]">
                             Visitor Name <span className="text-red-500">*</span>
                         </label>
 
                         <input
+                            id="visitor-name"
                             type="text"
                             value={form.visitorName}
                             onChange={(e) => {
@@ -360,11 +370,12 @@ export function VisitorRegisterModal({
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium text-[#020B2D]">
+                        <label htmlFor="visitor-phone" className="text-sm font-medium text-[#020B2D]">
                             Phone Number <span className="text-red-500">*</span>
                         </label>
 
                         <input
+                            id="visitor-phone"
                             type="tel"
                             inputMode="numeric"
                             maxLength={10}
@@ -408,11 +419,12 @@ export function VisitorRegisterModal({
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium text-[#020B2D]">
+                        <label htmlFor="visitor-unit" className="text-sm font-medium text-[#020B2D]">
                             Unit <span className="text-red-500">*</span>
                         </label>
 
                         <select
+                            id="visitor-unit"
                             value={form.unitId || ""}
                             onChange={(e) => {
                                 updateField("unitId", Number(e.target.value));
@@ -443,11 +455,12 @@ export function VisitorRegisterModal({
                     </div>
 
                     <div>
-                        <label className="text-sm font-medium text-[#020B2D]">
+                        <label htmlFor="visitor-arrival" className="text-sm font-medium text-[#020B2D]">
                             Expected Arrival <span className="text-red-500">*</span>
                         </label>
 
                         <input
+                            id="visitor-arrival"
                             type="datetime-local"
                             value={form.expectedArrivalTime}
                             onChange={(e) => {
@@ -468,6 +481,17 @@ export function VisitorRegisterModal({
                                 {validationErrors.expectedArrivalTime}
                             </p>
                         )}
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label htmlFor="visitor-valid-until" className="text-sm font-medium text-[#020B2D]">Access expires</label>
+                            <input id="visitor-valid-until" type="datetime-local" value={form.validUntil ?? ""} onChange={(e) => { updateField("validUntil", e.target.value); setValidationErrors(p => ({...p, validUntil: undefined})); }} className={`mt-1 w-full rounded-lg border px-3 py-2 text-xs ${validationErrors.validUntil ? "border-red-300" : "border-gray-200"}`} />
+                            {validationErrors.validUntil && <p className="mt-1 text-xs text-red-500">{validationErrors.validUntil}</p>}
+                        </div>
+                        <div>
+                            <label htmlFor="visitor-max-entries" className="text-sm font-medium text-[#020B2D]">Maximum entries</label>
+                            <input id="visitor-max-entries" type="number" min={1} max={20} value={form.maxEntries ?? 1} onChange={(e) => updateField("maxEntries", Math.min(20, Math.max(1, Number(e.target.value))))} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-xs" />
+                        </div>
                     </div>
                     <div className="pt-2">
                         <div className="space-y-4">

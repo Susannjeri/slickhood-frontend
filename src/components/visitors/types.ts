@@ -26,6 +26,7 @@ export type Visitor = {
     validFrom?: string;
     validUntil?: string;
     approvedAt?: string;
+    decisionReason?: string;
     checkedInAt?: string;
     checkedOutAt?: string;
     entryCount: number;

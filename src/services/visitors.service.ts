@@ -3,7 +3,9 @@ import { API } from "@/lib/api";
 
 
 export type GetVisitorsParams = {
-  phone?: string;
+  phoneNumber?: string;
+  page?: number;
+  size?: number;
 };
 
 export const getVisitors = (token: string, params?: GetVisitorsParams) => {
@@ -92,10 +94,10 @@ export const toggleVisitorStatus = (visitorId: number, token: string) => {
   });
 };
 
-export const updateVisitorStatus = (id: number, status: "CHECKED_IN" | "CHECKED_OUT",token: string) => {
+export const updateVisitorStatus = (id: number, status: "CHECKED_IN" | "CHECKED_OUT",token: string, vehiclePlate?: string) => {
   return API.put(
     `/visitor/${id}/status`,
-    { status },
+    { status, vehiclePlate },
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -104,8 +106,8 @@ export const updateVisitorStatus = (id: number, status: "CHECKED_IN" | "CHECKED_
   );
 };
 
-export const decideVisitor = (id: number, decision: "APPROVE" | "DENY", token: string) =>
-  API.put(`/visitor/${id}/decision`, { decision }, { headers: { Authorization: `Bearer ${token}` } });
+export const decideVisitor = (id: number, decision: "APPROVE" | "DENY", token: string, reason?: string) =>
+  API.put(`/visitor/${id}/decision`, { decision, reason }, { headers: { Authorization: `Bearer ${token}` } });
 
 export type GuardHostOption = { unitId: number; unitRef: string; propertyId: number; propertyName: string; hostUserId: number; hostName: string };
 export const getGuardHostOptions = (token: string) => API.get("/visitor/access/guard-options", { headers: { Authorization: `Bearer ${token}` } });

@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { getGuardHostOptions, getVisitors, GuardHostOption, registerUnplannedVisit, updateVisitorStatus } from "@/services/visitors.service";
 import { Eye, Clock, LogOut, UserCheck, Users, XCircle, LogIn, UserPlus, X } from "lucide-react";
 import SuccessModal from "../common/successmodal";
-import { formatDateTime, statusStyles, VisitorDetailsModal, VisitorRegisterModal } from "./visitordetails-modal";
+import { formatDateTime, statusStyles, VisitorDetailsModal } from "./visitordetails-modal";
 import SummaryCard from "./summarycard";
 
 
@@ -63,7 +63,8 @@ export default function VisitorManagement() {
 
         try {
             const res = await getVisitors(token, {
-                phone: debouncedPhone || undefined,
+                phoneNumber: debouncedPhone || undefined,
+                size: 50,
             });
             setVisitors(res.data?.data ?? res.data ?? []);
         } catch (err) {
@@ -82,10 +83,11 @@ export default function VisitorManagement() {
     const handleCheckIn = async (visitor: Visitor) => {
         if (!token) return;
         try {
-            await updateVisitorStatus(visitor.id, "CHECKED_IN", token);
+            await updateVisitorStatus(visitor.id, "CHECKED_IN", token, visitor.vehiclePlate);
             fetchVisitors();
-        } catch (error) {
-            console.error("Check-in failed:", error);
+        } catch (caught: unknown) {
+            const apiError = caught as { response?: { data?: { description?: string } } };
+            setError(apiError.response?.data?.description ?? "Check-in was denied. Confirm approval, access time, vehicle and entry limit.");
         }
     };
 
@@ -94,8 +96,9 @@ export default function VisitorManagement() {
         try {
             await updateVisitorStatus(visitor.id, "CHECKED_OUT", token);
             fetchVisitors();
-        } catch (error) {
-            console.error("Check-out failed:", error);
+        } catch (caught: unknown) {
+            const apiError = caught as { response?: { data?: { description?: string } } };
+            setError(apiError.response?.data?.description ?? "Check-out could not be completed.");
         }
     };
 
@@ -168,7 +171,7 @@ export default function VisitorManagement() {
 
                     <input
                         type="text"
-                        placeholder="Search by phone number"
+                        placeholder="Enter full phone number"
                         value={phoneSearch}
                         onChange={(e) => setPhoneSearch(e.target.value)}
                         className="rounded-xl border border-[#020B2D]/15 px-3 py-2.5 text-sm w-64 focus:outline-none focus:border-[#08184A]"
@@ -235,8 +238,8 @@ export default function VisitorManagement() {
                                     </td>
                                 </tr>
                             ) : (
-                                visitors.map((visitor, idx) => (
-                                    <tr key={`${visitor.unitId}-${idx}`} className="border-t border-gray-100">
+                                visitors.map((visitor) => (
+                                    <tr key={visitor.id} className="border-t border-gray-100">
                                         <td className="px-6 py-4 text-sm">
                                             {visitor.visitorName}
                                         </td>
@@ -283,8 +286,8 @@ export default function VisitorManagement() {
                                                     View
                                                 </button>
 
-                                                {/* Check In - only when PENDING */}
-                                                {visitor.status === "PENDING" && (
+                                                {/* Check in only after resident pre-registration or host approval. */}
+                                                {["PENDING", "APPROVED", "ARRIVED"].includes(visitor.status) && (
                                                     <button
                                                         onClick={() => handleCheckIn(visitor)}
                                                         className="inline-flex items-center gap-2 rounded-lg border border-[#FF4B1F]/20 bg-[#FF4B1F]/10 px-3 py-2 text-xs font-medium text-[#FF4B1F] transition-all duration-200 hover:border-[#FF4B1F]/40 hover:bg-[#FF4B1F]/20 hover:shadow-sm"
