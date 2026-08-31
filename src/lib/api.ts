@@ -1150,13 +1150,38 @@ export const listLeaseMessages = (
 }
 
 export const signLease = (leaseId: number, token: string) => {
-  return API.get(`/lease/sign?leaseId=${leaseId}`, {
+  return API.post(`/lease/sign?leaseId=${leaseId}`, undefined, {
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
   });
 }
+
+export interface ActiveLease {
+  id: number;
+  name: string;
+  leaseMode: "RENT" | "SALE";
+  selfRenew: boolean;
+  expiryDate?: string;
+  signed: boolean;
+  tenantName?: string;
+  lifecycleStatus?: "DRAFT" | "ACTIVE" | "NOTICE_GIVEN" | "TERMINATED";
+  terminationEffectiveDate?: string;
+}
+
+export const listActiveLeases = (page: number, size: number, token: string) =>
+  API.get(`/lease/list?page=${page}&size=${size}&sort=id,desc`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+export const requestLeaseTermination = (
+  leaseId: number,
+  payload: { effectiveDate: string; reason: string },
+  token: string,
+) => API.post(`/lease/${leaseId}/termination`, payload, {
+  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+});
 
 
 //Invoice APIs

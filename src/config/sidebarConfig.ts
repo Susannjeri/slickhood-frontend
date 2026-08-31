@@ -200,9 +200,12 @@ export const sidebarLinks: SidebarLink[] = [
   {
     icon: FileSignature,
     label: "Leases",
-    href: "/dashboard/lease/templates",
-    permissions: ["view_lease_template", "create_lease_template", "edit_lease_template", "delete_lease_template"],
+    permissions: ["view_active_lease", "view_lease_template", "create_lease_template", "edit_lease_template", "delete_lease_template"],
     protected: true,
+    subLinks: [
+      { label: "Lease operations", href: "/dashboard/lease/operations", permissions: ["view_active_lease"], protected: true },
+      { label: "Lease templates", href: "/dashboard/lease/templates", permissions: ["view_lease_template"], protected: true },
+    ],
   },
   {
     icon: FileSignature,
