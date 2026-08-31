@@ -11,6 +11,7 @@ export type InsurancePolicy={id:number;caseId:number;policyNumber:string;company
 export type InsuranceClaim={id:number;policyId:number;policyNumber:string;reference:string;status:string;incidentAt:string;incidentLocation?:string;description:string;estimatedAmount?:number;insurerReference?:string;resolutionNotes?:string};
 export type InsuranceDocument={id:number;caseId?:number;policyId?:number;claimId?:number;category:string;displayName:string;contentType:string;fileSize:number;checksumSha256:string;downloadUrl:string;versionNumber:number};
 export type InsuranceOperationsSummary={openCases:number;unassignedCases:number;paymentsAwaitingVerification:number;openClaims:number;renewalsDue:number};
+export type InsuranceStaff={id:number;fullName:string;email:string;roleName:string};
 export type PageResult<T>={content:T[];totalElements:number;totalPages:number;number:number;size:number};
 
 type ApiEnvelope<T>={data?:{data?:T}};
@@ -22,6 +23,7 @@ export const insuranceService={
  products:async()=>data<InsuranceProduct[]>(await API.get("/insurance/products"),[]),
  cases:async()=>data<InsuranceCase[]>(await API.get("/insurance/cases"),[]),
  createCase:async(payload:Record<string,unknown>)=>data<InsuranceCase>(await API.post("/insurance/cases",payload),{} as InsuranceCase),
+ withdrawCase:async(caseId:number)=>data<InsuranceCase>(await API.post(`/insurance/cases/${caseId}/withdraw`),{} as InsuranceCase),
  selectQuote:async(caseId:number,quoteId:number)=>data<InsuranceCase>(await API.post(`/insurance/cases/${caseId}/select-quote`,{quoteId}),{} as InsuranceCase),
  recordPayment:async(caseId:number,payload:Record<string,unknown>)=>data<InsurancePayment>(await API.post(`/insurance/cases/${caseId}/payments`,payload),{} as InsurancePayment),
  uploadPaymentProof:async(paymentId:number,file:File)=>{const f=new FormData();f.append("file",file);return data<InsurancePayment>(await API.post(`/insurance/payments/${paymentId}/proof`,f),{} as InsurancePayment)},
@@ -31,6 +33,7 @@ export const insuranceService={
  documents:async()=>data<InsuranceDocument[]>(await API.get("/insurance/documents"),[]),
  uploadDocument:async(payload:{caseId?:number;policyId?:number;claimId?:number;category:string;file:File})=>{const f=new FormData();if(payload.caseId)f.append("caseId",String(payload.caseId));if(payload.policyId)f.append("policyId",String(payload.policyId));if(payload.claimId)f.append("claimId",String(payload.claimId));f.append("category",payload.category);f.append("file",payload.file);return data<InsuranceDocument>(await API.post("/insurance/documents",f),{} as InsuranceDocument)},
  operationsSummary:async()=>data<InsuranceOperationsSummary>(await API.get("/insurance/admin/operations/summary"),{openCases:0,unassignedCases:0,paymentsAwaitingVerification:0,openClaims:0,renewalsDue:0}),
+ operationsStaff:async()=>data<InsuranceStaff[]>(await API.get("/insurance/admin/staff"),[]),
  operationsCases:async(status?:string)=>data<PageResult<InsuranceCase>>(await API.get("/insurance/admin/cases",{params:{status:status||undefined,size:100}}),{content:[],totalElements:0,totalPages:0,number:0,size:100}),
  operationsClaims:async(status?:string)=>data<PageResult<InsuranceClaim>>(await API.get("/insurance/admin/claims",{params:{status:status||undefined,size:100}}),{content:[],totalElements:0,totalPages:0,number:0,size:100}),
  operationsRenewals:async()=>data<PageResult<InsurancePolicy>>(await API.get("/insurance/admin/renewals",{params:{size:100}}),{content:[],totalElements:0,totalPages:0,number:0,size:100}),
