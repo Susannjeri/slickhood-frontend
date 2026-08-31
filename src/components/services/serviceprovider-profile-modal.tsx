@@ -114,7 +114,6 @@ export default function ServiceProviderProfileModal({
 
             const response = await setupServiceProviderProfile(token, payload);
 
-            console.log("Service provider setup response:", response.data);
 
             if (response.data?.success || response.status === 200 || response.status === 201) {
                 onSuccess?.();

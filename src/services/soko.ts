@@ -3,7 +3,7 @@ import {API} from "@/lib/api";
 export type SokoStore={id:number;name:string;description?:string;phoneNumber?:string;address?:string;latitude?:number;longitude?:number;serviceRadiusKm:number;status:string;pickupEnabled:boolean;deliveryEnabled:boolean;deliveryFee:number;currency:string;paymentAccountId?:number};
 export type SokoProduct={id:number;storeId:number;name:string;description?:string;category:string;unit:string;price:number;currency:string;stockQuantity:number;imageUrl?:string;status:string};
 export type SokoRider={id:number;storeId:number;riderType:"INDIVIDUAL"|"DELIVERY_COMPANY";displayName:string;phoneNumber:string;email?:string;vehicleType?:string;vehiclePlate?:string;availability:"AVAILABLE"|"BUSY"|"OFFLINE";status:string;verified:boolean;completedDeliveries:number;notes?:string};
-export type CatalogProduct={product:SokoProduct;storeName:string;deliveryEnabled:boolean;pickupEnabled:boolean;distanceKm?:number};
+export type CatalogProduct={product:SokoProduct;storeName:string;deliveryEnabled:boolean;pickupEnabled:boolean;distanceKm?:number;imageUrls?:string[]};
 export type SokoOrderItem={id:number;productId:number;productName:string;unit:string;unitPrice:number;quantity:number;lineTotal:number};
 export type SokoOrder={id:number;orderNumber:string;storeId:number;status:string;paymentStatus:string;invoiceRef:string;deliveryMethod:string;deliveryAddress?:string;customerPhone:string;subtotal:number;deliveryFee:number;total:number;currency:string;destinationUnitId?:number;placedAt:string;riderId?:number;courierName?:string;courierPhone?:string;courierVehiclePlate?:string;deliveryCodeVerified:boolean;deliveryCodeAttempts:number};
 export type SokoOrderDetail={order:SokoOrder;storeName:string;paymentAccountId:number;paymentChannel:string;items:SokoOrderItem[]};
@@ -24,6 +24,7 @@ export const updateSokoStore=(id:number,payload:StorePayload)=>API.put(`/soko/st
 export const publishSokoStore=(id:number)=>API.put(`/soko/store/${id}/publish`);
 export const mySokoProducts=(storeId:number)=>API.get("/soko/product/my",{params:{storeId}});
 export const createSokoProduct=(payload:ProductPayload)=>API.post("/soko/product",payload);
+export const uploadSokoProductImages=(id:number,images:File[])=>{const data=new FormData();images.forEach(image=>data.append("images",image));return API.put(`/soko/product/${id}/images`,data);};
 export const updateSokoProduct=(id:number,payload:ProductPayload)=>API.put(`/soko/product/${id}`,payload);
 export const publishSokoProduct=(id:number)=>API.put(`/soko/product/${id}/publish`);
 export const mySokoRiders=(storeId:number)=>API.get("/soko/rider/my",{params:{storeId}});
