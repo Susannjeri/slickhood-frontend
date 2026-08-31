@@ -27,11 +27,17 @@ esac
 
 ARCHIVE=deploy.tar.gz
 
-rm -rf .next deploy
+rm -rf deploy
 
-# Build in the same exported production environment used for packaging. This
-# prevents an ignored developer .env.local file from overriding public URLs.
-NODE_ENV=production npm run build
+if [ "${SKIP_BUILD:-false}" != "true" ]; then
+  rm -rf .next
+  # Build in the same exported production environment used for packaging. This
+  # prevents an ignored developer .env.local file from overriding public URLs.
+  NODE_ENV=production npm run build
+elif [ ! -f .next/BUILD_ID ]; then
+  echo "Refusing to package: SKIP_BUILD=true but no completed Next.js build exists." >&2
+  exit 1
+fi
 
 if [ ! -f .next/standalone/server.js ] || [ ! -d .next/standalone/.next ]; then
   echo "Refusing to package: Next.js standalone output is not rooted in this project." >&2

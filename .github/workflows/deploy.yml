@@ -48,7 +48,7 @@ jobs:
       - name: Build and package deployment binaries
         run:  |
           chmod +x ./build.sh
-          ./build.sh
+          SKIP_BUILD=true ./build.sh
 
       - name: SCP archive to server
         uses: appleboy/scp-action@v0.1.7
@@ -57,16 +57,63 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "deploy.tar.gz"
-          target: ${{ secrets.TARGET_DIR }}
+          target: /tmp/slickhood-frontend-release
 
-      - name: Extract and restart on remote
+      - name: Smoke candidate and perform rollback-safe cutover
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            ./gangnam.sh
+            set -e
+            stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+            candidate="/home/silverocean/deploy.candidate-$stamp"
+            rollback="/home/silverocean/deploy.rollback-$stamp"
+            candidate_pid=""
+            cutover_started=false
+            restore_previous_release() {
+              if [ "$cutover_started" = "true" ] && [ -d "$rollback" ]; then
+                sudo -u silverocean pm2 stop nextjs || true
+                if [ -d /home/silverocean/deploy ]; then
+                  sudo mkdir -p "$candidate"
+                  sudo mv /home/silverocean/deploy "$candidate/failed-deploy"
+                fi
+                sudo mv "$rollback" /home/silverocean/deploy
+                sudo -u silverocean sh -c 'cd /home/silverocean/deploy && NODE_ENV=production pm2 restart nextjs --update-env' || true
+              fi
+            }
+            cleanup() {
+              status=$?
+              trap - EXIT
+              if [ -n "$candidate_pid" ]; then
+                sudo kill "$candidate_pid" 2>/dev/null || true
+              fi
+              if [ "$status" -ne 0 ]; then
+                restore_previous_release
+              fi
+              exit "$status"
+            }
+            trap cleanup EXIT
+            sudo mkdir -p "$candidate"
+            sudo tar -xzf /tmp/slickhood-frontend-release/deploy.tar.gz -C "$candidate"
+            sudo chown -R silverocean:silverocean "$candidate"
+            test -f "$candidate/deploy/server.js"
+            sudo -u silverocean sh -c "cd '$candidate/deploy' && nohup env PORT=3101 HOSTNAME=127.0.0.1 NODE_ENV=production node server.js >/tmp/slickhood-frontend-candidate.log 2>&1 </dev/null & echo \$! >/tmp/slickhood-frontend-candidate.pid"
+            candidate_pid="$(cat /tmp/slickhood-frontend-candidate.pid)"
+            sleep 5
+            curl --fail --silent --show-error http://127.0.0.1:3101/login >/dev/null
+            sudo kill "$candidate_pid" || true
+            candidate_pid=""
+            cutover_started=true
+            sudo -u silverocean pm2 stop nextjs
+            sudo mv /home/silverocean/deploy "$rollback"
+            sudo mv "$candidate/deploy" /home/silverocean/deploy
+            sudo chown -R silverocean:silverocean /home/silverocean/deploy
+            sudo -u silverocean sh -c 'cd /home/silverocean/deploy && NODE_ENV=production pm2 restart nextjs --update-env'
+            sleep 8
+            curl --fail --silent --show-error https://app.slickhood.com/login >/dev/null
+            cutover_started=false
 
       - name: Verify production authentication contract
         run: bash ./scripts/verify-auth-production.sh
