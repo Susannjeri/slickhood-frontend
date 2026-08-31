@@ -84,12 +84,10 @@ test("admin reviews OCR and originals, accepts good evidence and returns only th
       },
     },
   ];
-  let review: Record<string, unknown> | undefined;
   await page.route("**/kyc/admin/queue", (route) =>
     route.fulfill({ json: envelope(queue) }),
   );
   await page.route("**/kyc/admin/44/review", async (route) => {
-    review = route.request().postDataJSON();
     queue = [];
     await route.fulfill({
       json: envelope([{ ...queue[0]?.kycCase, status: "REJECTED" }]),
@@ -119,9 +117,13 @@ test("admin reviews OCR and originals, accepts good evidence and returns only th
   await page
     .getByRole("button", { name: "Accept all remaining documents" })
     .click();
+  const reviewRequest = page.waitForRequest((request) =>
+    request.url().endsWith("/kyc/admin/44/review") && request.method() === "POST",
+  );
   await page
     .getByRole("button", { name: "Request document correction" })
     .click();
+  const review = (await reviewRequest).postDataJSON();
 
   expect(review).toMatchObject({
     decision: "REJECTED",
