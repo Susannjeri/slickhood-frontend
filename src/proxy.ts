@@ -1,10 +1,10 @@
-// middleware.ts
+// Next.js request boundary for authentication and route authorization.
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { sidebarLinks, settingsLinks, SidebarLink } from "./config/sidebarConfig";
 import { decodeServerToken } from "./lib/actions";
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const token = req.cookies.get("token")?.value;
   // if(!token){
   //   return NextResponse.redirect(new URL("/login", req.url));
