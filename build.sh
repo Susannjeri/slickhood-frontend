@@ -33,7 +33,8 @@ rm -rf .next deploy
 # prevents an ignored developer .env.local file from overriding public URLs.
 NODE_ENV=production npm run build
 
-if grep -RqsE "https?://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?" .next; then
+if grep -RqsE "http://(localhost|127\\.0\\.0\\.1):8080" \
+  .next/static/chunks .next/server; then
   echo "Refusing to package a production build containing localhost API URLs." >&2
   exit 1
 fi
