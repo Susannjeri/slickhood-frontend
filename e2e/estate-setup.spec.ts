@@ -53,6 +53,7 @@ test("new service-charge property starts a guided estate setup journey", async (
   await page.getByRole("button", { name: "Add units" }).click();
   await expect(page).toHaveURL(/\/dashboard\/unit\/create\/41\?/);
   await expect(page).toHaveURL(/currency=KES/);
+  await expect(page).toHaveURL(/leaseMode=SERVICE_CHARGE/);
 });
 
 test("completed estate foundation leads into homeowner operations", async ({ page }) => {

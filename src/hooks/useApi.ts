@@ -165,10 +165,6 @@ export function useApi() {
           try {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
-              console.log("headers for fetchUserList:", API.defaults.headers.common);
-              console.log("headers for fetchUserList (direct injection):", {
-                Authorization: `Bearer ${token}`,
-              });
               const res = await fetchUserList(params, {
                 headers: { Authorization: `Bearer ${token}` }, // 👈 injected here
               });
@@ -226,10 +222,6 @@ export function useApi() {
           try {
               const { token, activeRole } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
-              console.log("headers for getProperties:", API.defaults.headers.common);
-              console.log("headers for getProperties (direct injection):", {
-                Authorization: `Bearer ${token}`,
-              });
               const res = await fetchPropertyList(
                 { ...params, role: activeRole?.title },
                 { headers: { Authorization: `Bearer ${token}` } },
@@ -259,11 +251,6 @@ export function useApi() {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-              console.log("headers for getProperties:", API.defaults.headers.common);
-              console.log("headers for getProperties (direct injection):", {
-                Authorization: `Bearer ${token}`,
-              });
-              console.log("TOken from viewPropertyDetails:", token);
               const res = await viewProperty(propertyId, {
                 headers: { Authorization: `Bearer ${token}` }, // 👈 injected here
               });
@@ -295,7 +282,6 @@ export function useApi() {
         try {
 
           if (inviteToken){
-            console.log("Fetching image with invite token:", inviteToken);
             const res = await getImagePublic(imagePath, inviteToken);
             return res.data;
           }
@@ -337,9 +323,7 @@ export function useApi() {
         try {
           const { token } = useAuthStore.getState();  
           if (!token) throw new Error("No token available");
-          console.log("Creating unit with data:", data);
           const res = await createUnit(data, token);
-          console.log("Response from createUnit:", res);
           return res.data;
         }
         catch (error) {
@@ -744,8 +728,6 @@ export function useApi() {
         const handleGetUnitCharges = async(unitId: number, inviteToken?: string) => {
           try {
               if (inviteToken){
-                console.log("UNIT ID:", unitId, "Invite Token:", inviteToken);
-                console.log("Fetching unit charges with invite token:", inviteToken);
                 const res = await getUnitChargesPublic(unitId, inviteToken);
                 console.log("Response from getUnitChargesPublic:", res);
                 return res.data;
@@ -795,7 +777,6 @@ export function useApi() {
               const { token } = useAuthStore.getState();  
               if (!token) throw new Error("No token available");
               const res = await createInvite({inviteType, entityId}, token)
-              console.log("Response from createInvite:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
@@ -809,7 +790,6 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await listInvites(params, token)
-              console.log("Response from listInvites:", res);
               return res.data; // directly return the response payload
           }
 
@@ -824,7 +804,6 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await listUnitInvites(unitId, params, token)
-              console.log("Response from listUnitInvites:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
@@ -839,7 +818,6 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await shareInvite(inviteId, recipient, notificationChannel, token)
-              console.log("Response from shareInvite:", res);
               return res.data; // directly return the response payload
           }
           catch (error) { 
@@ -852,14 +830,11 @@ export function useApi() {
           try {
               const { token } = useAuthStore.getState();
               if (token){
-                  console.log("Validating invite token with user token:", token);
                   const res = await validateInviteToken(inviteToken, token )
-                  console.log("Response from validateInviteToken 1:", res);
                   return res.data; 
               }
               else {
                 const res = await validateInviteToken(inviteToken)
-                console.log("Response from validateInviteToken:", res);
                 return res.data; 
               }
               
@@ -876,7 +851,6 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await viewInviteUnit(inviteToken)
-              console.log("Response from viewInviteUnit:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
@@ -890,7 +864,6 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await supportedInvites(token)
-              console.log("Response from supportedInvites:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
@@ -904,7 +877,6 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await updateInvite(params, token)
-              console.log("Response from updateInvite:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
@@ -918,7 +890,6 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await getStaffAndInvites(propertyId, token)
-              console.log("Response from getStaffAndInvites:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {

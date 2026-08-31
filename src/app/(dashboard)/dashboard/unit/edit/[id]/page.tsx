@@ -340,7 +340,7 @@ export default function EditUnitPage() {
         leaseMode: data.leaseMode,
         price: data.price,
         images: [], // Backend handles existing images
-        templateId: Number(data.templateId) ?? ""
+        templateId: data.templateId ? Number(data.templateId) : undefined
       });
 
       // setSubmitStatus({

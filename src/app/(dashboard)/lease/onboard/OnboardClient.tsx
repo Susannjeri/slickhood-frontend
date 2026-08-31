@@ -34,8 +34,6 @@ export default function OnboardClient() {
     const tokens = searchParams.getAll('token');
     const token = tokens.filter(t => t && t.trim() !== '').pop() || null;
     
-    console.log('Selected token:', token);
-    
     if (!token) {
       setError('Invalid invite link. No token provided.');
       setLoading(false);
@@ -45,8 +43,6 @@ export default function OnboardClient() {
     try {
       // STEP 1: Validate the token to determine invite type
       const response = await handleValidateInviteToken(token);
-      console.log('Token validation response:', response);
-
       const code = response.code;
       const isTenantInvite = code === 'S0058';
 

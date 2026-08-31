@@ -81,6 +81,7 @@ interface PropertyDetails {
     id: number;
     name: string;
     type: string;
+    managementMode: "RENTAL" | "SALE" | "SERVICE_CHARGE";
     address: string;
     mapLocation: string;
     currency: string;
@@ -486,7 +487,8 @@ export default function PropertyDetailsPage() {
         const nameSlug = property.name.replace(/\s+/g, "-").toLowerCase();
         const currency = property?.currency || "";
         const propertyType = property?.type || "";
-        router.push(`/dashboard/unit/create/${propertyId}?name=${nameSlug}&currency=${currency}&propertyType=${propertyType}&from=property`);
+        const leaseMode = property.managementMode === "RENTAL" ? "RENT" : property.managementMode;
+        router.push(`/dashboard/unit/create/${propertyId}?name=${nameSlug}&currency=${currency}&propertyType=${propertyType}&leaseMode=${leaseMode}&from=property`);
     };
 
     const handleEdit = () => {

@@ -63,7 +63,8 @@ export default function EstateSetupChecklist({ propertyId, propertyName, currenc
   function runNextAction(action: EstateSetupNextAction) {
     const nameSlug = propertyName.replace(/\s+/g, "-").toLowerCase();
     if (action === "ADD_UNITS") {
-      router.push(`/dashboard/unit/create/${propertyId}?name=${encodeURIComponent(nameSlug)}&currency=${encodeURIComponent(currency)}&propertyType=${encodeURIComponent(propertyType)}&from=property`);
+      const leaseMode = status?.managementMode === "RENTAL" ? "RENT" : status?.managementMode;
+      router.push(`/dashboard/unit/create/${propertyId}?name=${encodeURIComponent(nameSlug)}&currency=${encodeURIComponent(currency)}&propertyType=${encodeURIComponent(propertyType)}&leaseMode=${leaseMode}&from=property`);
     } else if (action === "LINK_OPERATING_ACCOUNT") {
       onLinkAccount();
     } else if (action === "ASSIGN_HOMEOWNERS") {

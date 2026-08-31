@@ -362,7 +362,9 @@ export const createUnit = (data: {
   formData.append("leaseMode", data.leaseMode);
   formData.append("price", data.price);
   formData.append("image", data.image);
-  formData.append("currency", data.currency || '')
+  if (data.currency) {
+    formData.append("currency", data.currency);
+  }
   if (data.templateId) {
     formData.append("templateId", data.templateId.toString());
   }
