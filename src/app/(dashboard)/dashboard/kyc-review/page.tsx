@@ -362,8 +362,12 @@ export default function KycReviewPage() {
                     const warning =
                       document.extractedFields?._validationWarnings;
                     const issues = document.validationIssues ?? [];
-                    const blockingIssues = issues.filter((issue) => issue.blocking);
                     const choice = decisions[document.id];
+                    const isRecordedRejection = document.status === "REJECTED";
+                    const isReviewerRejection = choice?.approved === false;
+                    const isReviewerAcceptance = choice?.approved === true;
+                    const needsReviewerAttention =
+                      !isRecordedRejection && issues.length > 0;
                     const suggestedReason =
                       issues.length > 0
                         ? issues
@@ -378,8 +382,12 @@ export default function KycReviewPage() {
                       <article
                         key={document.id}
                         className={`rounded-2xl border p-5 ${
-                          blockingIssues.length
+                          isRecordedRejection || isReviewerRejection
                             ? "border-red-300 bg-red-50/30"
+                            : isReviewerAcceptance
+                              ? "border-emerald-300 bg-emerald-50/30"
+                              : needsReviewerAttention
+                                ? "border-amber-300 bg-amber-50/30"
                             : "border-slate-200"
                         }`}
                       >
@@ -399,27 +407,42 @@ export default function KycReviewPage() {
                           </div>
                           <Badge
                             variant={
-                              document.status === "REJECTED"
+                              isRecordedRejection || isReviewerRejection
                                 ? "destructive"
                                 : "secondary"
                             }
                           >
-                            {readable(document.status)}
+                            {isReviewerAcceptance
+                              ? "Accepted by reviewer"
+                              : isReviewerRejection
+                                ? "Rejected by reviewer"
+                                : needsReviewerAttention
+                                  ? "Reviewer attention"
+                                  : readable(document.status)}
                           </Badge>
                         </div>
                         {issues.length > 0 ? (
                           <div className="mt-3 space-y-2" aria-label="Document validation issues">
-                            {issues.map((issue) => (
-                              <div
-                                key={`${issue.field}-${issue.code}-${issue.message}`}
-                                className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900"
-                              >
-                                <p className="font-bold">
-                                  {issue.field === "document" ? "Document" : readable(issue.field)}: {issue.message}
-                                </p>
-                                <p className="mt-1 text-xs text-red-700">{issue.guidance}</p>
-                              </div>
-                            ))}
+                            {issues.map((issue) => {
+                              const isBlocking = isRecordedRejection || issue.blocking;
+                              return (
+                                <div
+                                  key={`${issue.field}-${issue.code}-${issue.message}`}
+                                  className={`rounded-lg border p-3 text-sm ${
+                                    isBlocking
+                                      ? "border-red-200 bg-red-50 text-red-900"
+                                      : "border-amber-200 bg-amber-50 text-amber-950"
+                                  }`}
+                                >
+                                  <p className="font-bold">
+                                    {issue.field === "document" ? "Document" : readable(issue.field)}: {issue.message}
+                                  </p>
+                                  <p className={`mt-1 text-xs ${isBlocking ? "text-red-700" : "text-amber-800"}`}>
+                                    {issue.guidance}
+                                  </p>
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : warning ? (
                           <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">{warning}</p>
@@ -433,16 +456,23 @@ export default function KycReviewPage() {
                               {fields.map(([key, value]) => (
                                 (() => {
                                   const fieldIssues = issues.filter((issue) => issue.field === key);
+                                  const hasBlockingFieldIssue =
+                                    isRecordedRejection || fieldIssues.some((issue) => issue.blocking);
                                   return (
                                     <div
                                       key={key}
                                       className={`flex justify-between gap-4 rounded-lg border-b pb-2 last:border-0 last:pb-0 ${
                                         fieldIssues.length
-                                          ? "border-red-300 bg-red-50 px-2 pt-2 text-red-900"
+                                          ? hasBlockingFieldIssue
+                                            ? "border-red-300 bg-red-50 px-2 pt-2 text-red-900"
+                                            : "border-amber-300 bg-amber-50 px-2 pt-2 text-amber-950"
                                           : "border-slate-200"
                                       }`}
                                     >
-                                      <dt className={fieldIssues.length ? "font-bold text-red-700" : "text-slate-500"}>
+                                      <dt className={fieldIssues.length
+                                        ? `font-bold ${hasBlockingFieldIssue ? "text-red-700" : "text-amber-800"}`
+                                        : "text-slate-500"}
+                                      >
                                         {readable(key)}
                                       </dt>
                                       <dd className="text-right font-semibold">
@@ -451,7 +481,14 @@ export default function KycReviewPage() {
                                           ? ` (${document.extractedFields[`_confidence.${key}`]}%)`
                                           : ""}
                                         {fieldIssues.map((issue) => (
-                                          <span key={issue.code} className="mt-1 block max-w-xs text-xs font-normal text-red-700">
+                                          <span
+                                            key={issue.code}
+                                            className={`mt-1 block max-w-xs text-xs font-normal ${
+                                              isRecordedRejection || issue.blocking
+                                                ? "text-red-700"
+                                                : "text-amber-800"
+                                            }`}
+                                          >
                                             {issue.message}
                                           </span>
                                         ))}
