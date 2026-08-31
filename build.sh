@@ -33,6 +33,11 @@ rm -rf .next deploy
 # prevents an ignored developer .env.local file from overriding public URLs.
 NODE_ENV=production npm run build
 
+if [ ! -f .next/standalone/server.js ] || [ ! -d .next/standalone/.next ]; then
+  echo "Refusing to package: Next.js standalone output is not rooted in this project." >&2
+  exit 1
+fi
+
 if grep -RqsE "http://(localhost|127\\.0\\.0\\.1):8080" \
   .next/static/chunks .next/server; then
   echo "Refusing to package a production build containing localhost API URLs." >&2
