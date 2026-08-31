@@ -8,8 +8,13 @@ if (useStandalone) {
   cpSync(".next/static", ".next/standalone/.next/static", { recursive: true, force: true });
   if (existsSync("public")) cpSync("public", ".next/standalone/public", { recursive: true, force: true });
 }
-const command = useStandalone ? process.execPath : (process.platform === "win32" ? "npm.cmd" : "npm");
-const args = useStandalone ? [standalone] : ["run", "start", "--", "--hostname", "127.0.0.1", "--port", "3100"];
+const windowsNpm = process.platform === "win32" && !useStandalone;
+const command = useStandalone ? process.execPath : (windowsNpm ? (process.env.ComSpec || "cmd.exe") : "npm");
+const args = useStandalone
+  ? [standalone]
+  : windowsNpm
+    ? ["/d", "/s", "/c", "npm run start -- --hostname 127.0.0.1 --port 3100"]
+    : ["run", "start", "--", "--hostname", "127.0.0.1", "--port", "3100"];
 const child = spawn(command, args, {
   stdio: "inherit",
   env: { ...process.env, HOSTNAME: "127.0.0.1", PORT: "3100" },

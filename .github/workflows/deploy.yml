@@ -34,9 +34,6 @@ jobs:
       - name: Install browser runtime
         run: npx playwright install --with-deps chromium
 
-      - name: Browser regression suite
-        run: npm run test:e2e
-
       - name: Copy env production configs
         run: |
           cat > .env.production <<'EOF'
@@ -48,6 +45,9 @@ jobs:
 
       - name: Build the exact production frontend
         run: npm run build
+
+      - name: Browser regression suite
+        run: npm run test:e2e
 
       - name: Run mandatory authentication and onboarding regression gate
         run: npx playwright test e2e/auth.spec.ts e2e/auth-layout.spec.ts e2e/registration-subscription.spec.ts
