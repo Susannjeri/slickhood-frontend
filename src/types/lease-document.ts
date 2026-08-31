@@ -40,6 +40,9 @@ export interface LeaseDocumentTemplate {
   version: number;
   bodyHtml: string;
   legalReviewRequired: boolean;
+  contentSha256: string;
+  legalReviewedAt?: string;
+  legalReviewedBy?: number;
 }
 
 export interface GenerateLeaseDocumentRequest {

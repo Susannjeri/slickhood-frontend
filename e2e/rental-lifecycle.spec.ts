@@ -51,7 +51,7 @@ test("landlord creates a residential lease agreement without a sales offer lette
   await expect(page.getByLabel("Lease ID")).toHaveValue("41");
   await page.getByLabel("Effective date").fill("2026-10-01");
   await page.getByLabel("Amount").fill("45000");
-  await page.getByLabel("Custom clauses / transaction-specific terms").fill("No smoking inside the residence");
+  await page.getByLabel("Additional schedule details").fill("No smoking inside the residence");
   await page.getByRole("button", { name: "Create draft" }).click();
   await expect.poll(() => generated).toEqual({
     leaseId: 41, documentType: "RESIDENTIAL_LEASE_AGREEMENT", effectiveDate: "2026-10-01",
