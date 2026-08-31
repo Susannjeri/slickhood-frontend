@@ -9,9 +9,10 @@ test.beforeEach(async ({ context, page }) => {
 });
 
 test("homeowner sees ownership, reconciled balances, and overdue state", async ({ page }) => {
-  await page.route("**/estate/ownership", route => route.fulfill({ json: envelope([{
+  await page.route("**/estate/ownership**", route => route.fulfill({ json: envelope([{
     id: 9, propertyId: 11, unitId: 77, homeownerUserId: 200,
-    ownershipStart: "2026-01-01", active: true,
+    propertyName: "Silverwood Estate", unitRef: "A-101", homeownerName: "Amina Owner",
+    homeownerEmail: "amina@example.com", ownershipStart: "2026-01-01", active: true,
   }]) }));
   await page.route("**/estate/service-charges**", route => route.fulfill({ json: {
     ...envelope([{
@@ -36,8 +37,8 @@ test("homeowner sees ownership, reconciled balances, and overdue state", async (
   await expect(page.getByRole("heading", { name: "My Home" })).toBeVisible();
   await expect(page.getByText("KES 2,500.00", { exact: true })).toBeVisible();
   await expect(page.getByText("OVERDUE", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Silverwood Estate \/ A-101/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add homeowner" })).toHaveCount(0);
+  await expect(page.getByText(/Silverwood Estate \/ A-101/).last()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open home & invite" })).toHaveCount(0);
   await expect(page.getByText("Annual homeowners meeting")).toBeVisible();
   await page.getByRole("tab", { name: "Budgets" }).click();
   await expect(page.getByText(/Planned KES 500,000/)).toBeVisible();

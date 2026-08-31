@@ -24,9 +24,11 @@ test("manager termination requires a reason and sends the structured request", a
   await authenticated(context, page, {
     title: "EstateManager",
     permissions: ["view_estate", "manage_estate", "view_service_charge"],
+    propertyIds: [11],
+    propertyNames: ["Silverwood Estate"],
   });
-  await page.route("**/estate/ownership", route => route.request().method() === "GET"
-    ? route.fulfill({ json: envelope([{ id: 9, propertyId: 11, unitId: 77, homeownerUserId: 200, ownershipStart: "2026-01-01", active: true }]) })
+  await page.route("**/estate/ownership**", route => route.request().method() === "GET"
+    ? route.fulfill({ json: envelope([{ id: 9, propertyId: 11, propertyName: "Silverwood Estate", unitId: 77, unitRef: "A-101", homeownerUserId: 200, homeownerName: "Amina Owner", homeownerEmail: "amina@example.com", ownershipStart: "2026-01-01", active: true }]) })
     : route.continue());
   await page.route("**/estate/service-charges**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/estate/operations/properties/11/**", route => route.fulfill({ json: envelope([]) }));
@@ -41,4 +43,26 @@ test("manager termination requires a reason and sends the structured request", a
 
   expect(request.postDataJSON()).toMatchObject({ reason: "Property sale completed" });
   expect(request.postDataJSON().endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+});
+
+test("manager homeowner assignment starts from an estate-scoped home", async ({ context, page }) => {
+  await authenticated(context, page, {
+    title: "EstateOperationsManager",
+    permissions: ["view_estate", "manage_estate", "view_service_charge"],
+    propertyIds: [11],
+    propertyNames: ["Silverwood Estate"],
+  });
+  await page.route("**/estate/ownership**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/estate/service-charges**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/property/unit/list**", route => route.fulfill({ json: envelope([{
+    unitId: 77, propertyId: 11, ref: "A-101", currency: "KES", leaseMode: "SERVICE_CHARGE",
+  }]) }));
+  await page.route("**/estate/operations/properties/11/**", route => route.fulfill({ json: envelope([]) }));
+
+  await page.goto("/dashboard/homeowners?propertyId=11");
+  await page.getByRole("combobox").nth(1).click();
+  await page.getByRole("option", { name: "A-101" }).click();
+  await page.getByRole("button", { name: "Open home & invite" }).click();
+
+  await expect(page).toHaveURL("/dashboard/unit/details/77?p=11&from=homeowners");
 });

@@ -1,5 +1,6 @@
 export interface PropertyOwnership {
   id: number; propertyId: number; unitId?: number; homeownerUserId: number;
+  propertyName: string; unitRef?: string; homeownerName: string; homeownerEmail: string;
   ownershipStart: string; ownershipEnd?: string; source?: string; terminationReason?: string; active: boolean;
 }
 export type ServiceChargeStatus = "DUE" | "OVERDUE" | "PAID";

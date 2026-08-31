@@ -2,7 +2,8 @@ import { API } from "@/lib/api";
 import { SaleStatus } from "@/types/business-workflows";
 
 export const estateService = {
-  listOwnership: () => API.get("/estate/ownership"),
+  listOwnership: (params: {page?:number;size?:number;propertyId?:number;active?:boolean} = {}) =>
+    API.get("/estate/ownership", { params: { page: 0, size: 50, ...params } }),
   createOwnership: (data:{propertyId:number;unitId?:number;homeownerUserId:number;ownershipStart:string;source?:string}) => API.post("/estate/ownership",data),
   endOwnership: (id:number,data:{endDate:string;reason:string}) => API.post(`/estate/ownership/${id}/end`,data),
   listServiceCharges: (page=0,size=50) => API.get("/estate/service-charges",{params:{page,size,sort:"dueDate,desc"}}),

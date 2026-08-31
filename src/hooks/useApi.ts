@@ -168,7 +168,6 @@ export function useApi() {
               const res = await fetchUserList(params, {
                 headers: { Authorization: `Bearer ${token}` }, // 👈 injected here
               });
-              console.log("Response from fetchUserList:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
