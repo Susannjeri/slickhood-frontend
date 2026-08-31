@@ -33,9 +33,18 @@ export interface KycDocument {
   qualityScore?: number;
   ocrConfidence?: number;
   extractedFields: Record<string, string>;
+  validationIssues?: KycValidationIssue[];
   rejectionReason?: string;
   uploadedAt: string;
   downloadUrl?: string;
+}
+
+export interface KycValidationIssue {
+  field: string;
+  code: string;
+  message: string;
+  guidance: string;
+  blocking: boolean;
 }
 
 export interface KycCase {
@@ -111,6 +120,11 @@ export async function reprocessKycDocuments() {
 export async function listKycReviewQueue() {
   const response = await API.get("/kyc/admin/queue");
   return (response.data.data ?? []) as KycAdminCase[];
+}
+
+export async function reprocessKycCase(caseId: number) {
+  const response = await API.post(`/kyc/admin/${caseId}/reprocess`);
+  return first<KycCase>(response)!;
 }
 
 export async function reviewKyc(

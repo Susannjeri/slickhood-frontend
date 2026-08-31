@@ -17,18 +17,39 @@ fi
 : "${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL must be set for a production build}"
 : "${NEXT_PUBLIC_CLIENT_ID:?NEXT_PUBLIC_CLIENT_ID must be set for Google Sign-In}"
 
+case "$NEXT_PUBLIC_API_URL" in
+  https://*) ;;
+  *)
+    echo "Refusing to build: NEXT_PUBLIC_API_URL must be an HTTPS production URL." >&2
+    exit 1
+    ;;
+esac
+
 ARCHIVE=deploy.tar.gz
 
-rm -rf deploy
+rm -rf .next deploy
 
 # Build in the same exported production environment used for packaging. This
 # prevents an ignored developer .env.local file from overriding public URLs.
 NODE_ENV=production npm run build
 
-if grep -Rqs "http://localhost:8080" \
-  .next/server/app/api/auth/refresh \
-  .next/server/app/browser-session/refresh; then
+if [ ! -f .next/standalone/server.js ] || [ ! -d .next/standalone/.next ]; then
+  echo "Refusing to package: Next.js standalone output is not rooted in this project." >&2
+  exit 1
+fi
+
+if grep -RqsE "http://(localhost|127\\.0\\.0\\.1):8080" \
+  .next/static/chunks .next/server; then
   echo "Refusing to package a production build containing localhost API URLs." >&2
+  exit 1
+fi
+
+# NEXT_PUBLIC values are compiled into browser chunks. Checking only server
+# routes allows a healthy-looking deployment whose users still post login
+# credentials to their own localhost. Require the intended API origin in the
+# browser bundle before packaging anything.
+if ! grep -RqsF "$NEXT_PUBLIC_API_URL" .next/static/chunks; then
+  echo "Refusing to package: browser bundle does not contain NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >&2
   exit 1
 fi
 

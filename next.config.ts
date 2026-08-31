@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // Production CI runs on Linux and retains the deployable standalone bundle;
   // local Windows builds use standard output without changing system policy.
   output: process.platform === 'win32' ? undefined : 'standalone',
+  // Keep the standalone server at .next/standalone/server.js even when the
+  // deployment host has an unrelated lockfile above this repository.
+  outputFileTracingRoot: process.cwd(),
   poweredByHeader: false,
   reactStrictMode: true,
   async headers() {

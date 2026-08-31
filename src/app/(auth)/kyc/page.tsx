@@ -38,8 +38,12 @@ const label = (value: string) =>
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 const errorMessage = (error: unknown, fallback: string) => {
-  const candidate = error as { response?: { data?: { description?: string } } };
+  const candidate = error as {
+    response?: { data?: { description?: string; data?: unknown[] } };
+  };
+  const detail = candidate.response?.data?.data?.[0];
   return (
+    (typeof detail === "string" && detail.trim() ? detail : undefined) ??
     candidate.response?.data?.description ??
     (error instanceof Error ? error.message : fallback)
   );
@@ -470,7 +474,8 @@ function RequirementCard({
       const uploaded = await uploadKycDocument(type, prepared.file);
       if (uploaded.status === "REJECTED")
         toast.error(
-          uploaded.rejectionReason ||
+          uploaded.validationIssues?.[0]?.message ||
+            uploaded.rejectionReason ||
             "The document could not be read confidently. Upload a clearer original.",
         );
       else toast.success(`${requirement.label} uploaded and checked.`);
@@ -506,10 +511,32 @@ function RequirementCard({
         )}
       </div>
       {rejected && !document && (
-        <p className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-          {rejected.rejectionReason ||
-            "The previous document could not be read confidently. Upload a clearer original."}
-        </p>
+        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          <p className="font-bold">This upload needs correction</p>
+          {rejected.validationIssues?.length ? (
+            <ul className="mt-3 space-y-3">
+              {rejected.validationIssues.map((issue) => (
+                <li
+                  key={`${issue.field}-${issue.code}-${issue.message}`}
+                  className="rounded-lg border border-red-200 bg-white/70 p-3"
+                >
+                  <p className="font-semibold">
+                    {issue.field === "document" ? "Document" : label(issue.field)}: {issue.message}
+                  </p>
+                  <p className="mt-1 text-xs text-red-700">{issue.guidance}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2">
+              {rejected.rejectionReason ||
+                "The previous document could not be read confidently. Upload a clearer original."}
+            </p>
+          )}
+          <p className="mt-3 text-xs font-semibold text-red-700">
+            Your other accepted documents remain saved. Replace only this item.
+          </p>
+        </div>
       )}
       {document ? (
         <div className="mt-4 space-y-3 rounded-xl bg-white p-3 text-sm">
