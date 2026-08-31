@@ -527,9 +527,17 @@ export default function KycReviewPage() {
                                 onClick={() =>
                                   setDocumentDecision(document.id, true)
                                 }
+                                disabled={isRecordedRejection}
+                                title={
+                                  isRecordedRejection
+                                    ? "This upload failed the production guard and must be replaced or reprocessed before it can be accepted."
+                                    : undefined
+                                }
                               >
                                 <CheckCircle2 className="mr-2 h-4 w-4" />
-                                Accept document
+                                {isRecordedRejection
+                                  ? "Replacement required"
+                                  : "Accept document"}
                               </Button>
                               <Button
                                 type="button"
