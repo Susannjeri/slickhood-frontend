@@ -27,19 +27,15 @@ test("sales owner starts an email-bound sale from scoped property and unit selec
  expect(body.buyerUserId).toBeUndefined();
 });
 
-test("only the buyer can accept a recorded offer",async({context,page})=>{
+test("buyer is routed to review and sign the sale letter of offer",async({context,page})=>{
  await authenticated(context,page,{title:"Buyer",permissions:["view_sale_pipeline","accept_sale_offer"]});
- let accepted=false;
  await page.route("**/sales**",async route=>{
   const path=new URL(route.request().url()).pathname;
   if(path==="/dashboard/sales"){await route.continue();return}
-  if(path.endsWith("/accept-offer")&&route.request().method()==="POST"){accepted=true;await route.fulfill({json:{success:true,code:"S00294",description:"Sale offer accepted.",data:[]}});return}
-  await route.fulfill({json:pageEnvelope([{id:91,propertyId:11,unitId:77,salesAgentUserId:100,buyerUserId:200,invitedBuyerEmail:"buyer@example.com",status:accepted?"RESERVED":"OFFERED",askingPrice:15000000,offerAmount:14500000,currency:"KES"}])});
+  await route.fulfill({json:pageEnvelope([{id:91,propertyId:11,unitId:77,salesAgentUserId:100,buyerUserId:200,invitedBuyerEmail:"buyer@example.com",status:"OFFERED",askingPrice:15000000,offerAmount:14500000,currency:"KES"}])});
  });
 
  await page.goto("/dashboard/sales");
  await expect(page.getByText("Offer: KES 14,500,000")).toBeVisible();
- const acceptRequest=page.waitForRequest(request=>request.method()==="POST"&&new URL(request.url()).pathname.endsWith("/accept-offer"));
- await page.getByRole("button",{name:"Accept offer"}).click();
- await expect((await acceptRequest).url()).toContain("/sales/91/accept-offer");
+ await expect(page.getByRole("link",{name:"Review and sign letter of offer"})).toHaveAttribute("href","/dashboard/documents?saleId=91&type=PROPERTY_SALE_LETTER_OF_OFFER&amount=14500000&currency=KES");
 });
