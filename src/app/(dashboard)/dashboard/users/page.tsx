@@ -25,7 +25,13 @@ import { Search, ChevronDown, ChevronUp, ChevronsUpDown, Loader2, Trash2, UserPl
 import { useApi } from '@/hooks/useApi';
 import { inviteInternalStaff, InternalStaffRole } from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
-import { normalizedRoleTitle } from '@/config/businessAreas';
+import { normalizedRoleTitle, roleDisplayName } from '@/config/businessAreas';
+
+interface ProfileType {
+  id: string;
+  name: string;
+  description?: string | null;
+}
 
 interface User {
   name: string | null;
@@ -37,6 +43,8 @@ interface User {
   city: string | null;
   source: string;
   active: boolean;
+  profileType: ProfileType;
+  userTypes: string[];
 }
 
 interface UserListResponse {
@@ -232,7 +240,7 @@ export default function UserTable() {
       )}
 
       {/* Table */}
-      <div className="border rounded-md">
+      <div className="overflow-x-auto border rounded-md">
         <Table>
           <TableHeader>
             <TableRow>
@@ -246,6 +254,7 @@ export default function UserTable() {
                   Name 
                 </button>
               </TableHead>
+              <TableHead>User Type</TableHead>
               <TableHead>
                 <button className="flex items-center">
                   Location 
@@ -311,6 +320,22 @@ export default function UserTable() {
                 <TableRow key={user.email}>
                   <TableCell className="font-medium">{user.email}</TableCell>
                   <TableCell>{user.name || '—'}</TableCell>
+                  <TableCell className="min-w-48">
+                    <div className="flex flex-wrap gap-1.5">
+                      {user.userTypes?.length ? user.userTypes.map((userType) => (
+                        <span key={userType} className="inline-flex rounded-full bg-orange-50 px-2 py-1 text-xs font-medium text-orange-800">
+                          {roleDisplayName(userType)}
+                        </span>
+                      )) : (
+                        <span className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+                          No role assigned
+                        </span>
+                      )}
+                    </div>
+                    {user.profileType?.name && (
+                      <span className="mt-1.5 block text-xs text-muted-foreground">{user.profileType.name}</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {user.country ? `${user.city || ''}, ${user.country}` : '—'}
                   </TableCell>
