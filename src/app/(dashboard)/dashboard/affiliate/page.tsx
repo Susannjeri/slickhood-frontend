@@ -36,6 +36,8 @@ import {apiErrorMessage} from "@/lib/api-error";
 import CreateAccountDialog from "@/components/accounts/CreateAccountDialog";
 import AccountDetailDrawer from "@/components/accounts/AccountDetailDrawer";
 import type { Account } from "@/types/account";
+import {envelopeItem,envelopePageList} from "@/lib/api-envelope";
+import {DistributionChart} from "@/components/dashboard/DashboardCharts";
 const money = (n: number, c = "KES") =>
   new Intl.NumberFormat("en-KE", {
     style: "currency",
@@ -58,9 +60,9 @@ export default function AffiliatePage() {
         affiliateDashboard(),
         listAccounts(token, { byLandlord: true, size: 100 }),
       ]);
-      const dashboard=d.data?.data as AffiliateDashboard|undefined;
+      const dashboard=envelopeItem<AffiliateDashboard|undefined>(d,undefined);
       setData(dashboard?{...dashboard,referrals:Array.isArray(dashboard.referrals)?dashboard.referrals:[],commissions:Array.isArray(dashboard.commissions)?dashboard.commissions:[],payouts:Array.isArray(dashboard.payouts)?dashboard.payouts:[]}:undefined);
-      setAccounts(Array.isArray(a.data?.data)?a.data.data:[]);
+      setAccounts(envelopePageList<Account>(a));
     } catch (e:unknown) {
       setFailed(true);
       toast.error(apiErrorMessage(e, "Affiliate workspace could not be loaded."));
@@ -185,6 +187,7 @@ export default function AffiliatePage() {
           value={money(data.pendingPayouts,data.profile.currency)}
         />
       </div>
+      <Card><CardHeader><CardTitle>Referral funnel</CardTitle><CardDescription>A clear view of registrations progressing into eligible paid customers.</CardDescription></CardHeader><CardContent><DistributionChart ariaLabel="Affiliate referral conversion funnel" data={[{label:"Registered referrals",value:data.totalReferrals},{label:"Converted customers",value:data.referrals.filter(item=>item.status==="CONVERTED").length,color:"#10B981"}]}/></CardContent></Card>
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <div className="space-y-6">
           <Card>

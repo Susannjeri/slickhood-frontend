@@ -14,6 +14,25 @@ export interface DashboardTotals {
   secondaryLabel?: string;
   pendingLabel?: string;
   completedLabel?: string;
+  totalOccupiedUnits?: number;
+  totalPendingLeases?: number;
+  totalUnPaidInvoices?: number;
+  totalPaidInvoices?: number;
+  totalManagedUnits?: number;
+  totalManagedProperties?: number;
+  totalPendingLeaseSigns?: number;
+  totalInsideProperty?: number;
+  totalDeliveryToday?: number;
+  totalContractorsToday?: number;
+  totalGuestsToday?: number;
+  bookingsWithinCurrentMonth?: number;
+  bookingsWithinPreviousMonth?: number;
+  averageRating?: number;
+  mostRecentRating?: number;
+  inActiveUserPercent?: number;
+  userLoggedInWithinCurrentMonth?: number;
+  totalActiveProperties?: number;
+  totalSubscriptionPaidWithinCurrentMonth?: number;
 }
 
 export interface DashboardTotalsResponse {

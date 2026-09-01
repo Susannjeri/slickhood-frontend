@@ -25,6 +25,7 @@ import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {Textarea} from "@/components/ui/textarea";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {DistributionChart} from "@/components/dashboard/DashboardCharts";
 
 const EMPTY_SUMMARY: InsuranceOperationsSummary = {
   openCases: 0,
@@ -226,6 +227,7 @@ export default function InsuranceOperationsPage() {
       {canReport && <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {metrics.map(([label, value, Icon]) => <Card key={label}><CardContent className="flex items-center justify-between p-4"><div><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl font-bold">{value}</p></div><Icon className="size-7 text-[#1769aa]"/></CardContent></Card>)}
       </div>}
+      {canReport&&<Card className="mt-6"><CardHeader><CardTitle>Operations workload</CardTitle></CardHeader><CardContent><DistributionChart ariaLabel="Insurance operations queue workload" data={[{label:"Applications open",value:summary.openCases},{label:"Applications unassigned",value:summary.unassignedCases},{label:"Payment verification queue",value:summary.paymentsAwaitingVerification},{label:"Claims open",value:summary.openClaims},{label:"Renewals approaching",value:summary.renewalsDue}]}/></CardContent></Card>}
 
       <Tabs defaultValue={defaultTab} className="mt-6">
         <TabsList>
