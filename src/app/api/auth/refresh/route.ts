@@ -1,6 +1,8 @@
 // app/api/auth/refresh/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
+import { writeAccessTokenCookies } from "@/lib/access-token-cookie";
+import { accessTokenMaxAge } from "@/lib/session-token";
 
 
 
@@ -53,16 +55,9 @@ export async function POST(req: NextRequest) {
     // ✅ FIXED: Correct secure flag (false in dev, true in prod)
     const isProduction = process.env.NODE_ENV === "production";
 
-    // Update access token
-    nextResponse.cookies.set({
-      name: "token",
-      value: accessToken,
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 15, // 15 minutes
-    });
+    const maxAge = accessTokenMaxAge(accessToken);
+    if (!maxAge) throw new Error("Invalid access token returned by backend");
+    writeAccessTokenCookies(nextResponse.cookies, accessToken, maxAge);
 
     // Update refresh token
     nextResponse.cookies.set({

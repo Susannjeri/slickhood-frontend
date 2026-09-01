@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { sidebarLinks, settingsLinks, SidebarLink } from "./config/sidebarConfig";
 import { decodeServerToken } from "./lib/actions";
+import { readAccessTokenCookie } from "./lib/access-token-cookie";
 
 export async function proxy(req: NextRequest) {
-  const token = req.cookies.get("token")?.value;
+  const token = readAccessTokenCookie(req.cookies);
   // if(!token){
   //   return NextResponse.redirect(new URL("/login", req.url));
   // }
