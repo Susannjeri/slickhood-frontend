@@ -7,7 +7,7 @@ This audit covers the shared role dashboard and the Affiliate, My Wealth, Commun
 ## Closed gaps
 
 - Role-specific backend payloads are mapped explicitly for landlords, tenants, property managers, guards, service providers, system owners, estate/homeowner/sales roles, internal teams, insurance teams, affiliates, and asset portfolio managers.
-- Placeholder internal-team and insurance totals were replaced with scoped operational counts.
+- Placeholder internal-team and insurance totals were replaced with scoped operational counts. On the current production baseline, insurance metrics describe the governed email correspondence pipeline (queued, sent, received for review, and failed); case/claim/renewal metrics remain part of the separately controlled Insurance Operations release.
 - Dashboard totals now require authentication, and the requested role must equal the active session role.
 - Backend response envelopes are normalized consistently for objects, collections, and paginated results. This fixes real responses that are wrapped differently from earlier browser mocks.
 - Optional report requests use `Promise.allSettled`; one unavailable insight no longer clears every graph, task, and activity item.
