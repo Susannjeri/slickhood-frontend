@@ -53,7 +53,11 @@ test("switching a primary business role selects its product and opens its own wo
   }, { roles: [landlord, estateManager], token });
   await page.route("**/browser-session/get-token", route => route.fulfill({ json: { data: { jwt: token } } }));
   await page.route("**/kyc/current", route => route.fulfill({ json: { success: true, data: [{ status: "APPROVED", accountStatus: "ACTIVE", phoneVerified: true, requirements: [], missingRequirements: [], documents: [] }] } }));
-  await page.route("**/estate/ownership**", route => route.fulfill({ json: { success: true, data: [] } }));
+  let estateRequestRole: string | undefined;
+  await page.route("**/estate/ownership**", route => {
+    estateRequestRole = route.request().headers()["x-slickhood-role"];
+    return route.fulfill({ json: { success: true, data: [] } });
+  });
   await page.route("**/estate/service-charges**", route => route.fulfill({ json: { success: true, data: [] } }));
 
   // Use a role-neutral dashboard page so unrelated dashboard data calls cannot
@@ -66,6 +70,7 @@ test("switching a primary business role selects its product and opens its own wo
   const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state);
   expect(persisted.activeRole.title).toBe("EstateManager");
   expect(persisted.selectedBusinessAreaId).toBe("estate-management");
+  expect(estateRequestRole).toBe("EstateManager");
 });
 
 for (const participant of ["Tenant", "Buyer", "Homeowner"]) {
