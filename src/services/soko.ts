@@ -14,7 +14,7 @@ export type RiderPayload={storeId:number;riderType:"INDIVIDUAL"|"DELIVERY_COMPAN
 export const searchSoko=(params:{query?:string;category?:string;latitude?:number;longitude?:number;radiusKm?:number})=>API.get("/soko/catalog",{params:{page:0,size:60,...params}});
 export const mySokoOrders=()=>API.get("/soko/order/my",{params:{page:0,size:100,sort:"createdOn,desc"}});
 export const merchantSokoOrders=()=>API.get("/soko/order/merchant",{params:{page:0,size:100,sort:"createdOn,desc"}});
-export const checkoutSoko=(payload:{storeId:number;items:{productId:number;quantity:number}[];deliveryMethod:string;deliveryAddress?:string;customerPhone:string;notes?:string;destinationUnitId?:number})=>API.post("/soko/order/checkout",payload);
+export const checkoutSoko=(payload:{storeId:number;items:{productId:number;quantity:number}[];deliveryMethod:string;deliveryAddress?:string;customerPhone:string;notes?:string;destinationUnitId?:number},idempotencyKey:string)=>API.post("/soko/order/checkout",payload,{headers:{"Idempotency-Key":idempotencyKey}});
 export const updateSokoOrder=(id:number,status:string,dispatch?:{riderId?:number;courierName?:string;courierPhone?:string;vehiclePlate?:string;expectedArrivalTime:string})=>API.put(`/soko/order/${id}/status`,dispatch??null,{params:{status}});
 export const getSokoDeliveryCode=(id:number)=>API.get(`/soko/order/${id}/delivery-code`);
 export const confirmSokoDelivery=(id:number,code:string)=>API.put(`/soko/order/${id}/delivery/confirm`,{code});
