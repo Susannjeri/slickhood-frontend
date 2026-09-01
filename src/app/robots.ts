@@ -1,2 +1,3 @@
 import type { MetadataRoute } from "next";
-export default function robots(): MetadataRoute.Robots { return { rules:{userAgent:"*",allow:["/","/properties/","/property/"],disallow:["/dashboard/","/api/","/browser-session/"]}, sitemap:"https://slickhood.com/sitemap.xml", host:"https://slickhood.com" }; }
+import { siteBase } from "@/lib/property-listings";
+export default function robots(): MetadataRoute.Robots { const base=siteBase(); return { rules:{userAgent:"*",allow:["/","/properties/","/property/"],disallow:["/dashboard/","/api/","/browser-session/"]}, sitemap:`${base}/sitemap.xml`, host:base }; }
