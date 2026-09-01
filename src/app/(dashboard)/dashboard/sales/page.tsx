@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import RequireRole from "@/components/auth/RequireRole";
 
 type PropertyOption={id:number;name:string;managementMode?:string};
 type UnitOption={unitId:number;propertyId:number;ref:string;currency:string;price:number};
@@ -43,7 +44,8 @@ export default function SalesPage(){
  async function loadMilestones(id:number){try{const response=await salesService.milestones(id);setMilestones(current=>({...current,[id]:response.data?.data??[]}))}catch(error:unknown){toast.error(apiErrorMessage(error,"Could not load milestones."))}}
  async function addMilestone(id:number){const type=milestoneType[id];if(!type){toast.error("Select a milestone.");return}const amount=milestoneAmount[id],reference=milestoneReference[id]?.trim(),evidence=evidenceId[id];if(type==="ESCROW_FUNDED"&&(!amount||!reference)){toast.error("Completed escrow requires an amount and payment reference.");return}if(type!=="ESCROW_FUNDED"&&!evidence){toast.error("Completed due-diligence and handover milestones require evidence.");return}setBusy(true);try{await salesService.addMilestone(id,{type,status:"COMPLETED",amount:amount?Number(amount):undefined,externalReference:reference||undefined,evidenceDocumentId:evidence?Number(evidence):undefined});toast.success("Milestone evidence recorded.");await loadMilestones(id)}catch(error:unknown){toast.error(apiErrorMessage(error,"Could not record milestone."))}finally{setBusy(false)}}
 
- return <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+ return <RequireRole roles={["SalesAgent", "SalesCoordinator", "ListingAgent", "Buyer", "Superadmin"]} permissions={["view_sale_pipeline"]}>
+ <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
   <div><p className="text-sm font-semibold uppercase tracking-[.18em] text-[#EF4217]">SlickHood Property Sales</p><h1 className="mt-1 text-3xl font-bold">Property Sale Management</h1><p className="text-muted-foreground">A controlled buyer journey from listing and offer through due diligence, transfer and handover.</p></div>
   {canManage&&<Card><CardHeader><CardTitle>Start a sale</CardTitle><CardDescription>Select a sale property and unit. The buyer may be new to SlickHood; an email-bound invitation will be sent automatically.</CardDescription></CardHeader><CardContent><form onSubmit={create} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
    <div className="space-y-2"><Label>Property</Label><Select value={propertyId} onValueChange={chooseProperty}><SelectTrigger><SelectValue placeholder="Select sale property"/></SelectTrigger><SelectContent>{properties.map(property=><SelectItem key={property.id} value={String(property.id)}>{property.name}</SelectItem>)}</SelectContent></Select></div>
@@ -65,4 +67,5 @@ export default function SalesPage(){
    {totalPages>1&&<div className="flex items-center justify-between border-t pt-4"><Button variant="outline" disabled={page===0||loading} onClick={()=>setPage(value=>value-1)}>Previous</Button><span className="text-sm text-muted-foreground">Page {page+1} of {totalPages}</span><Button variant="outline" disabled={page>=totalPages-1||loading} onClick={()=>setPage(value=>value+1)}>Next</Button></div>}
   </CardContent></Card>
  </div>
+ </RequireRole>
 }
