@@ -1,7 +1,11 @@
 import {API} from "@/lib/api";
 import {envelopeItem,envelopeList} from "@/lib/api-envelope";
 
-export type InsuranceCompany={id:number;code:string;name:string;logoUrl?:string;description?:string};
+export type InsuranceCompany={id:number;code:string;name:string;logoUrl?:string;description?:string;active:boolean};
+export type InsuranceCompanyAdmin=InsuranceCompany&{quotationEmail?:string;claimsEmail?:string;renewalsEmail?:string};
+export type InsuranceAgency={code:string;name:string;supportEmail?:string;supportPhone?:string;logoUrl?:string};
+export type InsurancePaymentConfiguration={id:number;companyCode:string;companyName:string;paymentAccountId:number;accountName:string;channel:string;label:string;instructions:string;referenceTemplate?:string;version:number;effectiveFrom:string;effectiveTo?:string;active:boolean;accountVerified:boolean;paymentDetails:PaymentDetail[]};
+export type InsuranceAccount={id:number;name:string;category:string;channel:string;active:boolean;verified:boolean};
 export type PaymentDetail={key:string;label:string;description:string;value:string;displayField:boolean};
 export type InsurancePaymentOption={id:number;companyCode:string;companyName:string;accountName:string;channel:string;label:string;instructions:string;referenceTemplate?:string;paymentDetails:PaymentDetail[]};
 export type InsuranceProduct={code:string;name:string;description:string;subjectTypes:string[]};
@@ -16,7 +20,15 @@ export type InsuranceStaff={id:number;fullName:string;email:string;roleName:stri
 export type PageResult<T>={content:T[];totalElements:number;totalPages:number;number:number;size:number};
 
 export const insuranceService={
- companies:()=>API.get("/insurance/companies"),
+ companies:async()=>envelopeList<InsuranceCompany>(await API.get("/insurance/companies")),
+ agency:async()=>envelopeItem<InsuranceAgency>(await API.get("/insurance/agency"),{code:"SILVERWOOD",name:"Silverwood Insurance Agency"}),
+ adminCompanies:async()=>envelopeList<InsuranceCompanyAdmin>(await API.get("/insurance/admin/companies")),
+ createCompany:async(payload:Record<string,unknown>)=>envelopeItem<InsuranceCompanyAdmin>(await API.post("/insurance/admin/companies",payload),{} as InsuranceCompanyAdmin),
+ updateCompany:async(code:string,payload:Record<string,unknown>)=>envelopeItem<InsuranceCompanyAdmin>(await API.put(`/insurance/admin/companies/${encodeURIComponent(code)}`,payload),{} as InsuranceCompanyAdmin),
+ insuranceAccounts:async()=>envelopeList<InsuranceAccount>(await API.get("/account/list",{params:{byLandlord:true,size:100}})),
+ adminPaymentConfigurations:async(code:string)=>envelopeList<InsurancePaymentConfiguration>(await API.get(`/insurance/admin/companies/${encodeURIComponent(code)}/payment-configurations`)),
+ createPaymentConfiguration:async(code:string,payload:Record<string,unknown>)=>envelopeItem<InsurancePaymentConfiguration>(await API.post(`/insurance/admin/companies/${encodeURIComponent(code)}/payment-configurations`,payload),{} as InsurancePaymentConfiguration),
+ deactivatePaymentConfiguration:(id:number)=>API.delete(`/insurance/admin/payment-configurations/${id}`),
  paymentOptions:(companyCode:string)=>API.get(`/insurance/companies/${encodeURIComponent(companyCode)}/payment-options`),
  products:async()=>envelopeList<InsuranceProduct>(await API.get("/insurance/products")),
  cases:async()=>envelopeList<InsuranceCase>(await API.get("/insurance/cases")),
