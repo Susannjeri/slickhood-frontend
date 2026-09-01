@@ -227,6 +227,59 @@ test("adding a business area rechecks KYC before exposing the new workspace", as
   await expect(sales.getByRole("button", { name: "Add business area" })).toBeVisible();
   await sales.getByRole("button", { name: "Add business area" }).click();
   await expect(page).toHaveURL(/\/kyc$/);
+  const roleState = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state);
+  expect(roleState.selectedBusinessAreaId).toBe("property-sales");
+  expect(roleState.activeRole.title).toBe("SalesAgent");
+});
+
+test("an interrupted Add Business Area journey resumes KYC instead of bypassing setup", async ({ context, page }) => {
+  const landlord = { title: "Landlord", permissions: [] };
+  const sales = { title: "SalesAgent", permissions: [] };
+  await authenticated(context, page, landlord);
+  await page.addInitScript(() => {
+    const persisted = JSON.parse(localStorage.getItem("auth-storage") || "{}");
+    persisted.state = { ...persisted.state, selectedBusinessAreaId: "property-sales" };
+    localStorage.setItem("auth-storage", JSON.stringify(persisted));
+  });
+  await page.route("**/role/list", route => route.fulfill({ json: envelope([
+    { roleId: 101, roleName: "Landlord", selfAssignable: true },
+    { roleId: 103, roleName: "SalesAgent", selfAssignable: true },
+  ]) }));
+  await page.route("**/browser-session/get-token", route => route.fulfill({
+    json: { data: { jwt: testToken([landlord, sales]) } },
+  }));
+  await page.route("**/kyc/current", route => route.fulfill({ json: envelope([{
+    id: 45, status: "IN_PROGRESS", accountStatus: "PENDING_KYC", consentVersion: "2026-08",
+    phoneVerified: true, requirements: [], missingRequirements: ["SALES_AUTHORITY"], documents: [],
+  }]) }));
+  await page.route("**/subscription/current**", route => route.fulfill({ json: envelope([]) }));
+  await page.goto("/business-areas");
+  await page.evaluate((roles) => {
+    const persisted = JSON.parse(localStorage.getItem("auth-storage") || "{}");
+    persisted.state = { ...persisted.state, roles };
+    localStorage.setItem("auth-storage", JSON.stringify(persisted));
+  }, [landlord, sales]);
+  await page.reload();
+
+  const salesCard = page.locator("article").filter({ hasText: "Property Sales" });
+  await salesCard.getByRole("button", { name: "Open & view plans" }).click();
+  await expect(page).toHaveURL(/\/continue-setup$/);
+  await expect(page.getByText(/Complete identity verification/)).toBeVisible();
+});
+
+test("participant roles are invitation-only and never appear as self-service business areas", async ({ page }) => {
+  await page.route("**/role/list", route => route.fulfill({ json: envelope([
+    { roleId: 101, roleName: "Landlord", selfAssignable: true },
+    { roleId: 201, roleName: "Tenant", selfAssignable: false },
+    { roleId: 202, roleName: "Buyer", selfAssignable: false },
+    { roleId: 203, roleName: "Homeowner", selfAssignable: false },
+  ]) }));
+
+  await page.goto("/role");
+  await expect(page.getByText("Tenant", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Buyer", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Homeowner", { exact: true })).toHaveCount(0);
+  await expect(page.locator("article").filter({ hasText: "Rental Management" }).getByRole("button", { name: "Choose this area" })).toBeEnabled();
 });
 
 test("KYC phone verification accepts Kenyan 01 ranges and offers a protected resend flow", async ({ context, page }) => {
