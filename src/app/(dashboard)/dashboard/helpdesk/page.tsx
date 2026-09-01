@@ -12,9 +12,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthStore } from "@/store/authStore";
-import { normalizedRoleTitle } from "@/config/businessAreas";
 import {
-  addHelpInternalNote, createHelpConversation, escalateHelpConversation, getHelpConversation, getHelpDeskSupportSummary,
+  addHelpInternalNote, claimHelpConversation, createHelpConversation, escalateHelpConversation, getHelpConversation, getHelpDeskSupportSummary,
   HelpDeskArticle, HelpDeskConversation, HelpDeskMessage, HelpDeskSupportSummary,
   listHelpArticles, listHelpConversations, replyToHelpConversation, resolveHelpConversation,
   saveHelpArticle, sendHelpMessage,
@@ -26,10 +25,9 @@ const errorMessage = (error: unknown, fallback: string) =>
   axios.isAxiosError<{ description?: string }>(error) ? error.response?.data?.description ?? fallback : fallback;
 
 export default function HelpDeskPage() {
-  const activeRole = useAuthStore((s) => s.activeRole?.title);
   const permissions = useAuthStore((s) => s.permissions);
-  const isAdmin = permissions.includes("view_helpdesk_queue") || ["superadmin", "support"].includes(normalizedRoleTitle(activeRole));
-  const canManageArticles = permissions.includes("manage_helpdesk_articles") || normalizedRoleTitle(activeRole) === "superadmin";
+  const isAdmin = permissions.includes("view_helpdesk_queue");
+  const canManageArticles = permissions.includes("manage_helpdesk_articles");
   const [mode, setMode] = useState<Mode>("mine");
   const [conversations, setConversations] = useState<HelpDeskConversation[]>([]);
   const [articles, setArticles] = useState<HelpDeskArticle[]>([]);
@@ -124,6 +122,16 @@ export default function HelpDeskPage() {
     if (updated) setConversations((old) => old.map((c) => c.id === updated.id ? updated : c));
   };
 
+  const claim = async () => {
+    if (!selected) return;
+    try {
+      const res = await claimHelpConversation(selected.id);
+      const updated = unwrap<HelpDeskConversation>(res)[0];
+      if (updated) setConversations((old) => old.map((c) => c.id === updated.id ? updated : c));
+      toast.success("Help case assigned to you.");
+    } catch (error: unknown) { toast.error(errorMessage(error, "This help case could not be claimed.")); }
+  };
+
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5 p-4 pb-10 md:p-6">
       <header className="flex flex-col gap-4 overflow-hidden rounded-2xl border-b-4 border-[#EF4217] bg-[#141130] p-5 text-white shadow-[0_14px_36px_rgba(20,17,48,0.16)] md:flex-row md:items-center md:justify-between">
@@ -172,7 +180,7 @@ export default function HelpDeskPage() {
             {selected ? <>
               <CardHeader className="flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div><CardTitle className="text-lg">{selected.subject}</CardTitle><p className="mt-1 text-xs text-slate-500">Private conversation · {selected.activeRole}</p></div>
-                <div className="flex gap-2">{mode === "mine" && !["ESCALATED","ASSIGNED","RESOLVED"].includes(selected.status) && <Button variant="outline" size="sm" onClick={escalate}><UserRound className="mr-2 h-4 w-4" />Human support</Button>}{mode === "queue" && selected.status !== "RESOLVED" && <Button variant="outline" size="sm" onClick={resolve}><CheckCircle2 className="mr-2 h-4 w-4" />Resolve</Button>}</div>
+                <div className="flex gap-2">{mode === "mine" && !["ESCALATED","ASSIGNED","RESOLVED"].includes(selected.status) && <Button variant="outline" size="sm" onClick={escalate}><UserRound className="mr-2 h-4 w-4" />Human support</Button>}{mode === "queue" && !selected.assignedToUserId && selected.status !== "RESOLVED" && <Button size="sm" className="bg-[#EF4217] hover:bg-[#d93a13]" onClick={claim}><Headphones className="mr-2 h-4 w-4" />Claim ticket</Button>}{mode === "queue" && selected.status !== "RESOLVED" && <Button variant="outline" size="sm" onClick={resolve}><CheckCircle2 className="mr-2 h-4 w-4" />Resolve</Button>}</div>
               </CardHeader>
               <ScrollArea className="flex-1 p-4"><div className="space-y-4 pr-3">{selected.messages.length === 0 && <Empty text="Describe the issue below. Slickhood Help will answer or transfer it safely." />}{selected.messages.map((m) => <MessageBubble key={m.id} message={m} />)}</div></ScrollArea>
               <div className="border-t bg-white p-4">{mode === "queue" && <label className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={internalNote} onChange={(e) => setInternalNote(e.target.checked)} />Internal note — hidden from the customer</label>}<div className="flex items-end gap-2"><Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder={selected.status === "RESOLVED" ? "This conversation is resolved" : mode === "queue" ? internalNote ? "Add a private support note…" : "Reply as a support agent…" : "Ask Slickhood Help…"} disabled={selected.status === "RESOLVED" || sending} className="min-h-20 resize-none" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitMessage(); } }} /><Button size="icon" className="h-11 w-11 bg-[#EF4217] hover:bg-[#d93a13]" onClick={submitMessage} disabled={sending || !message.trim() || selected.status === "RESOLVED"}>{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button></div><p className="mt-2 text-xs text-slate-500">AI guidance can be inaccurate. Verify financial, legal, KYC, and safety decisions with an authorised person.</p></div>

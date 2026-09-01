@@ -13,6 +13,7 @@ test("registration help opens a guest chat and can transfer to human support", a
     await route.fulfill({ json: envelope([{ conversation, accessToken: "guest-token-with-more-than-thirty-two-characters", expiresAt: "2026-09-02T17:00:00" }]) });
   });
   await page.route("**/helpdesk/public/conversations/SH-260901-ABC12345/messages", async (route) => {
+    expect(route.request().headers()["x-help-token"]).toBe("guest-token-with-more-than-thirty-two-characters");
     conversation.messages = [
       { id: 1, senderType: "USER", content: "How do I complete registration?", createdOn: "2026-09-01T17:00:01Z", internalNote: false },
       { id: 2, senderType: "AI", content: "Enter your details, verify your code, then choose the role you want to use.", createdOn: "2026-09-01T17:00:02Z", internalNote: false },
@@ -20,6 +21,7 @@ test("registration help opens a guest chat and can transfer to human support", a
     await route.fulfill({ json: envelope([conversation]) });
   });
   await page.route("**/helpdesk/public/conversations/SH-260901-ABC12345/escalate", async (route) => {
+    expect(route.request().headers()["x-help-token"]).toBe("guest-token-with-more-than-thirty-two-characters");
     conversation.status = "ESCALATED";
     conversation.messages.push({ id: 3, senderType: "SYSTEM", content: "This conversation has been transferred to a human support specialist.", createdOn: "2026-09-01T17:00:03Z", internalNote: false });
     await route.fulfill({ json: envelope([conversation]) });
