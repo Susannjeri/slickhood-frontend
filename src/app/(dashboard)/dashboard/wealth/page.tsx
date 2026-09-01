@@ -3,8 +3,9 @@
 import {FormEvent,useCallback,useEffect,useMemo,useState} from "react";
 import {toast} from "sonner";
 import {AlertTriangle,Archive,ArrowUpRight,Building2,CalendarClock,Download,FileLock2,Goal,Landmark,Plus,RefreshCw,Scale,ShieldCheck,Sparkles,Trash2,TrendingUp,WalletCards} from "lucide-react";
-import {wealthService,AssetPayload,WealthPropertyOption} from "@/services/wealth.service";
+import {wealthService,AssetPayload,WealthAssetType,WealthPropertyOption} from "@/services/wealth.service";
 import {VaultDocument,WealthAsset,WealthDashboard,WealthLedger} from "@/types/wealth";
+import {envelopeItem,envelopeList} from "@/lib/api-envelope";
 import {apiErrorMessage} from "@/lib/api-error";
 import {Card,CardContent,CardDescription,CardHeader,CardTitle} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
@@ -18,17 +19,19 @@ const currency=(value?:string|null)=>{const code=String(value??"").trim().toUppe
 const money=(n?:number|null,c?:string|null)=>{try{return new Intl.NumberFormat("en-KE",{style:"currency",currency:currency(c),maximumFractionDigits:0}).format(Number(n)||0)}catch{return `KES ${(Number(n)||0).toLocaleString("en-KE")}`}};
 const list=<T,>(value:unknown):T[]=>Array.isArray(value)?value.filter((item):item is T=>Boolean(item)&&typeof item==="object"):[];
 const emptyAsset:AssetPayload={assetType:"PROPERTY",name:"",currency:"KES",acquisitionCost:0,currentValue:0,valuationDate:today(),status:"ACTIVE",pricingMode:"MANUAL"};
-const assetTypes=["PROPERTY","LAND","LISTED_SECURITY","FUND","GOVERNMENT_SECURITY","SACCO","PENSION","CASH","BUSINESS","VEHICLE","DIGITAL_ASSET","OTHER"];
+const fallbackAssetTypes=["PROPERTY","LAND","LISTED_SECURITY","FUND","GOVERNMENT_SECURITY","SACCO","PENSION","CASH","BUSINESS","VEHICLE","DIGITAL_ASSET","OTHER"];
 
 export default function WealthPage(){
  const [dashboard,setDashboard]=useState<WealthDashboard|null>(null),[assets,setAssets]=useState<WealthAsset[]>([]),[busy,setBusy]=useState(false);
  const [propertyOptions,setPropertyOptions]=useState<WealthPropertyOption[]>([]);
+ const [configuredAssetTypes,setConfiguredAssetTypes]=useState<WealthAssetType[]>([]);
+ const assetTypes=configuredAssetTypes.length?configuredAssetTypes.map(type=>type.code):fallbackAssetTypes;
  const [selected,setSelected]=useState<number|undefined>(),[assetForm,setAssetForm]=useState<AssetPayload>(emptyAsset),[editing,setEditing]=useState<number>();
  const [years,setYears]=useState(5),[valueGrowth,setValueGrowth]=useState(5),[incomeGrowth,setIncomeGrowth]=useState(3),[expenseGrowth,setExpenseGrowth]=useState(3);
  const [ledger,setLedger]=useState<WealthLedger>({valuations:[],cashFlows:[],liabilities:[],obligations:[],documents:[]});
  const [docs,setDocs]=useState<VaultDocument[]>([]);
  const selectedAsset=useMemo(()=>assets.find(a=>a.id===selected),[assets,selected]);
- const load=useCallback(async()=>{try{const [d,a,p]=await Promise.all([wealthService.dashboard(years,valueGrowth,incomeGrowth,expenseGrowth),wealthService.assets(),wealthService.propertyOptions().catch(()=>({data:{data:[]}}))]);const raw=d.data?.data as WealthDashboard|undefined;setDashboard(raw&&typeof raw==="object"?{...raw,assets:list(raw.assets),obligations:list(raw.obligations),goals:list(raw.goals),goalProgress:list(raw.goalProgress),insights:list(raw.insights),projection:list(raw.projection)}:null);const next=list<WealthAsset>(a.data?.data);setAssets(next);setPropertyOptions(list<WealthPropertyOption>(p.data?.data));setSelected(current=>next.some(asset=>asset.id===current)?current:next[0]?.id)}catch(e:unknown){setDashboard(null);setAssets([]);setPropertyOptions([]);setSelected(undefined);toast.error(apiErrorMessage(e,"Could not load Wealth."))}},[years,valueGrowth,incomeGrowth,expenseGrowth]);
+ const load=useCallback(async()=>{try{const [d,a,p,t]=await Promise.all([wealthService.dashboard(years,valueGrowth,incomeGrowth,expenseGrowth),wealthService.assets(),wealthService.propertyOptions().catch(()=>({data:{data:[]}})),wealthService.assetTypes().catch(()=>({data:{data:[]}}))]);const raw=envelopeItem<WealthDashboard|null>(d,null);setDashboard(raw?{...raw,assets:list(raw.assets),obligations:list(raw.obligations),goals:list(raw.goals),goalProgress:list(raw.goalProgress),insights:list(raw.insights),projection:list(raw.projection)}:null);const next=envelopeList<WealthAsset>(a);setAssets(next);setPropertyOptions(envelopeList<WealthPropertyOption>(p));setConfiguredAssetTypes(envelopeList<WealthAssetType>(t));setSelected(current=>next.some(asset=>asset.id===current)?current:next[0]?.id)}catch(e:unknown){setDashboard(null);setAssets([]);setPropertyOptions([]);setConfiguredAssetTypes([]);setSelected(undefined);toast.error(apiErrorMessage(e,"Could not load Wealth."))}},[years,valueGrowth,incomeGrowth,expenseGrowth]);
  useEffect(()=>{load()},[load]);
  const loadLedger=useCallback(async(id:number)=>{try{const response=await wealthService.ledger(id);const raw=response.data?.data as Partial<WealthLedger>|undefined;setLedger({valuations:list(raw?.valuations),cashFlows:list(raw?.cashFlows),liabilities:list(raw?.liabilities),obligations:list(raw?.obligations),documents:list(raw?.documents)})}catch(e:unknown){setLedger({valuations:[],cashFlows:[],liabilities:[],obligations:[],documents:[]});toast.error(apiErrorMessage(e,"Could not load this asset ledger."))}},[]);
  useEffect(()=>{if(!selected){setLedger({valuations:[],cashFlows:[],liabilities:[],obligations:[],documents:[]});return}void loadLedger(selected)},[selected,loadLedger]);
