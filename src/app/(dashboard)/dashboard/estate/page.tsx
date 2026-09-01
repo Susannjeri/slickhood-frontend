@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { EstateOperationsPanel } from "@/components/estate/EstateOperationsPanel";
+import RequireRole from "@/components/auth/RequireRole";
 import { fetchUnitList } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-error";
 import { estateService } from "@/services/business-workflows.service";
@@ -132,7 +133,8 @@ export default function EstatePage() {
   const outstanding = charges.filter(charge => !charge.paid).reduce((sum, charge) => sum + charge.pendingAmount, 0);
   const estatePropertyIds = Array.from(new Set([...currentOwnerships.map(item => item.propertyId), ...(canManage ? scopedPropertyIds : [])]));
 
-  return <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+  return <RequireRole roles={["EstateManager", "EstateOperationsManager", "Homeowner", "Superadmin"]} permissions={["view_estate"]}>
+  <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="text-sm font-semibold uppercase tracking-[.18em] text-[#EF4217]">SlickHood Estates</p><h1 className="mt-1 text-3xl font-bold">{canManage ? "Estate Management" : "My Home"}</h1><p className="text-muted-foreground">{canManage ? "Manage homeowner onboarding, ownership history, service charges and estate operations." : "View your homes, service charges, balances and payment documents."}</p></div>
       {canManage && <div className="w-full sm:w-72"><Label id="estate-filter-label" htmlFor="estate-filter">Estate</Label><Select value={propertyFilter} onValueChange={value => { setPropertyFilter(value); setAssignmentUnitId(""); }}><SelectTrigger id="estate-filter" aria-labelledby="estate-filter-label"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All estates</SelectItem>{properties.map(property => <SelectItem key={property.id} value={String(property.id)}>{property.name}</SelectItem>)}</SelectContent></Select></div>}
@@ -150,5 +152,6 @@ export default function EstatePage() {
 
     <EstateOperationsPanel properties={estatePropertyIds.map(id => ({ id, name: properties.find(property => property.id === id)?.name ?? currentOwnerships.find(item => item.propertyId === id)?.propertyName ?? `Property #${id}` }))} canManage={canManage} />
     <Dialog open={Boolean(endingOwnership)} onOpenChange={open => { if (!open && !busy) { setEndingOwnership(null); setEndReason(""); } }}><DialogContent><form onSubmit={endOwnership} className="space-y-4"><DialogHeader><DialogTitle>End ownership</DialogTitle><DialogDescription>This immediately removes homeowner access while preserving ownership and financial history. The homeowner will be notified.</DialogDescription></DialogHeader><div><Label htmlFor="ownership-end-date">End date</Label><Input id="ownership-end-date" required type="date" min={endingOwnership?.ownershipStart} max={new Date().toISOString().slice(0, 10)} value={endDate} onChange={event => setEndDate(event.target.value)} /></div><div><Label htmlFor="ownership-end-reason">Reason</Label><Textarea id="ownership-end-reason" required maxLength={500} value={endReason} onChange={event => setEndReason(event.target.value)} placeholder="For example: property sale completed" /></div><DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setEndingOwnership(null)}>Cancel</Button><Button type="submit" variant="destructive" disabled={busy || !endReason.trim()}>End ownership</Button></DialogFooter></form></DialogContent></Dialog>
-  </div>;
+  </div>
+  </RequireRole>;
 }

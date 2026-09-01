@@ -3,7 +3,7 @@ import { authenticated, envelope } from "./support";
 
 test.beforeEach(async ({ context, page }) => {
   await authenticated(context, page, {
-    title: "Landlord",
+    title: "EstateManager",
     permissions: ["view_property", "create_unit", "view_unit_list", "view_account", "view_estate", "manage_estate"],
     propertyIds: [41],
     propertyNames: ["Green Court"],
