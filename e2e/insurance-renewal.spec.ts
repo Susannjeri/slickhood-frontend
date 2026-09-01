@@ -1,0 +1,42 @@
+import {expect,test} from "@playwright/test";
+import {authenticated,envelope} from "./support";
+
+test("insurance renewal runs from Silverwood offer through verified payment and renewed policy",async({context,page})=>{
+ test.setTimeout(60_000);
+ let renewalStatus="CONTACTED",offerStatus="",paymentStatus="",proofAvailable=false,renewed=false;
+ const policy=()=>({id:31,caseId:44,policyNumber:renewed?"APA-POL-31-R":"APA-POL-31",companyName:"APA Insurance",productCode:"MOTOR",status:"ACTIVE",startDate:renewed?"2027-09-01":"2026-09-01",endDate:renewed?"2028-08-31":"2027-08-31",renewalStatus});
+ const offer=()=>offerStatus?{id:41,policyId:31,quoteNumber:"APA-REN-41",currency:"KES",basePremium:24000,taxesLevies:2000,totalPremium:26000,coverageSummary:"Renewed comprehensive cover",validUntil:"2027-08-20",coverStartDate:"2027-09-01",coverEndDate:"2028-08-31",status:offerStatus}:undefined;
+ const payment=()=>paymentStatus?{id:51,policyId:31,renewalOfferId:41,paymentConfigurationId:7,amount:26000,currency:"KES",paymentReference:"REN-MPESA-51",paidAt:"2027-08-10T10:00:00",status:paymentStatus,proofAvailable,proofContentType:proofAvailable?"image/png":undefined}:undefined;
+ const journey=()=>({policyId:31,companyCode:"APA",offer:offer(),payment:payment()});
+ await authenticated(context,page,{title:"InsuranceManager",permissions:["review_insurance_applications","manage_insurance_quotes","verify_insurance_payments","issue_insurance_policies","manage_insurance_claims","manage_insurance_renewals"]});
+ await page.route("**/insurance/agency",route=>route.fulfill({json:envelope({code:"SILVERWOOD",name:"Silverwood Insurance Agency",logoUrl:"/insurance/brands/silverwood.webp"})}));
+ await page.route("**/insurance/products",route=>route.fulfill({json:envelope([])}));
+ await page.route("**/insurance/companies",route=>route.fulfill({json:envelope([{id:1,code:"APA",name:"APA Insurance",active:true}])}));
+ await page.route("**/insurance/cases",route=>route.fulfill({json:envelope([])}));
+ await page.route("**/insurance/policies",route=>route.fulfill({json:envelope([policy()])}));
+ await page.route("**/insurance/renewals",route=>route.fulfill({json:envelope([journey()])}));
+ await page.route("**/insurance/claims",route=>route.fulfill({json:envelope([])}));
+ await page.route("**/insurance/documents",route=>route.fulfill({json:envelope([])}));
+ await page.route("**/insurance/companies/APA/payment-options",route=>route.fulfill({json:envelope([{id:7,companyCode:"APA",companyName:"APA Insurance",accountName:"APA Premium Collection",channel:"MPESA",label:"Pay APA premium",instructions:"Use your renewal reference.",referenceTemplate:"POLICY-RENEWAL",paymentDetails:[{key:"paybill",label:"Paybill",description:"",value:"123456",displayField:true}]}])}));
+ await page.route("**/insurance/policies/31/renewal/accept",route=>{renewalStatus="ACCEPTED";offerStatus="ACCEPTED";return route.fulfill({json:envelope(journey())})});
+ await page.route("**/insurance/policies/31/renewal/payments",route=>{paymentStatus="PENDING_VERIFICATION";offerStatus="PAYMENT_PENDING";return route.fulfill({json:envelope(payment())})});
+ await page.route("**/insurance/renewal-payments/51/proof",route=>{if(route.request().method()==="GET")return route.fulfill({json:envelope("https://files.example/renewal-proof?expires=60")});proofAvailable=true;return route.fulfill({json:envelope(payment())})});
+ await page.route("**/insurance/admin/operations/summary",route=>route.fulfill({json:envelope({openCases:0,unassignedCases:0,paymentsAwaitingVerification:1,openClaims:0,renewalsDue:1})}));
+ await page.route("**/insurance/admin/cases**",route=>route.fulfill({json:envelope({content:[],totalElements:0,totalPages:0,number:0,size:100})}));
+ await page.route("**/insurance/admin/claims**",route=>route.fulfill({json:envelope({content:[],totalElements:0,totalPages:0,number:0,size:100})}));
+ await page.route("**/insurance/admin/renewals**",route=>route.fulfill({json:envelope({content:[policy()],totalElements:1,totalPages:1,number:0,size:100})}));
+ await page.route("**/insurance/admin/renewal-journeys",route=>route.fulfill({json:envelope([journey()])}));
+ await page.route("**/insurance/admin/staff",route=>route.fulfill({json:envelope([])}));
+ await page.route("**/insurance/admin/policies/31/renewal-offer",route=>{renewalStatus="RENEWAL_QUOTED";offerStatus="PUBLISHED";return route.fulfill({json:envelope(offer())})});
+ await page.route("**/insurance/admin/renewal-payments/51/decision",route=>{paymentStatus="VERIFIED";offerStatus="PAID";renewalStatus="PAID";return route.fulfill({json:envelope(payment())})});
+ await page.route("**/insurance/admin/renewal-payments/51/remit",route=>{paymentStatus="REMITTED";offerStatus="REMITTED";return route.fulfill({json:envelope(payment())})});
+ await page.route("**/insurance/admin/policies/31/renewal-complete",route=>{renewed=true;renewalStatus="RENEWED";offerStatus="COMPLETED";return route.fulfill({json:envelope(journey())})});
+
+ await page.goto("/dashboard/insurance/operations");await page.getByRole("tab",{name:"Renewals"}).click();await page.getByRole("button",{name:"Create renewal offer"}).click();
+ await page.getByLabel("Renewal quote number").fill("APA-REN-41");await page.getByLabel("Base premium").fill("24000");await page.getByLabel("Taxes and levies").fill("2000");await page.getByLabel("Total renewal premium").fill("26000");await page.getByLabel("Coverage summary").fill("Renewed comprehensive cover");await page.getByRole("button",{name:"Confirm"}).click();
+ await page.goto("/dashboard/insurance?tab=policies&policyId=31");await page.getByRole("button",{name:"Review renewal offer"}).click();await expect(page.getByText("Renewed comprehensive cover")).toBeVisible();await page.getByRole("button",{name:"Accept renewal offer"}).click();
+ await page.getByRole("button",{name:"Pay now"}).click();await expect(page.getByText("SlickHood does not receive or hold these funds.")).toBeVisible();await page.getByLabel("Renewal payment reference").fill("REN-MPESA-51");await page.getByRole("button",{name:"Record renewal payment"}).click();
+ await page.getByText("Upload renewal payment evidence").locator("..").locator('input[type="file"]').setInputFiles({name:"proof.png",mimeType:"image/png",buffer:Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])});await expect.poll(()=>proofAvailable).toBe(true);
+ await page.goto("/dashboard/insurance/operations");await page.getByRole("tab",{name:"Renewals"}).click();await page.getByRole("button",{name:"Review renewal evidence"}).click();await expect(page.getByRole("link",{name:"Open secure renewal evidence"})).toHaveAttribute("href",/renewal-proof/);await page.getByRole("dialog").getByRole("button",{name:"Close",exact:true}).first().click();
+ await page.getByRole("button",{name:"Verify renewal payment"}).click();await page.getByRole("button",{name:"Confirm"}).click();await page.getByRole("button",{name:"Record renewal remittance"}).click();await page.getByLabel("Insurer remittance reference").fill("APA-REN-REM-51");await page.getByRole("button",{name:"Confirm"}).click();await page.getByRole("button",{name:"Issue renewed policy"}).click();await page.getByLabel("Renewed policy number").fill("APA-POL-31-R");await page.getByRole("button",{name:"Confirm"}).click();await expect.poll(()=>renewed).toBe(true);
+});
