@@ -42,6 +42,38 @@ test("My Wealth remains usable with incomplete legacy portfolio records", async 
   await expect(page.getByText("Application error:")).toHaveCount(0);
 });
 
+test("vault metadata does not expose a download link until the owner opens it", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Landlord", permissions: ["view_wealth"] });
+  let secureLinkRequests = 0;
+  await page.route("**/wealth/dashboard**", route => route.fulfill({ json: envelope({
+    summary: { currency: "KES" }, assets: [], obligations: [], goals: [], goalProgress: [], insights: [], projection: [],
+  }) }));
+  await page.route("**/wealth/assets", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/wealth/property-options", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/wealth/asset-types", route => route.fulfill({ json: envelope([
+    { id: 1, code: "PROPERTY", label: "Property", displayOrder: 10, marketPricingAllowed: false, active: true },
+  ]) }));
+  await page.route("**/wealth/vault/9", route => {
+    secureLinkRequests += 1;
+    return route.fulfill({ json: envelope({
+      document: { id: 9, category: "WILL", displayName: "will.pdf", contentType: "application/pdf", fileSize: 128, checksumSha256: "abc" },
+      downloadUrl: "about:blank#protected-document",
+    }) });
+  });
+  await page.route("**/wealth/vault", route => route.fulfill({ json: envelope([{
+    document: { id: 9, category: "WILL", displayName: "will.pdf", contentType: "application/pdf", fileSize: 128, checksumSha256: "abc" },
+    downloadUrl: null,
+  }]) }));
+
+  await page.goto("/dashboard/wealth");
+  await page.getByRole("tab", { name: "Document vault" }).click();
+  const documentButton = page.getByRole("button", { name: /^will\.pdf WILL/i });
+  await expect(documentButton).toBeVisible();
+  expect(secureLinkRequests).toBe(0);
+  await documentButton.click();
+  await expect.poll(() => secureLinkRequests).toBe(1);
+});
+
 test("My Wealth supports cash corrections, debt updates and ledger history", async ({ context, page }) => {
   await authenticated(context, page, { title: "AssetPortfolioManager", permissions: ["view_wealth","manage_wealth_assets","manage_wealth_finance","manage_wealth_compliance","manage_wealth_vault","manage_wealth_goals"] });
   const dashboard={summary:{currency:"KES",netWorth:7000000,totalAssetValue:10000000,totalDebt:3000000,annualIncome:1200000,annualExpenses:300000,netOperatingIncome:900000,annualDebtService:240000,cashFlow:660000,equity:7000000,portfolioYieldPercent:9,occupancyPercent:100,arrears:0,overdueDeadlines:0},assets:[{assetId:7,name:"Rental A",assetType:"PROPERTY",currency:"KES",value:10000000,debt:3000000,equity:7000000,income:1200000,expenses:300000,netOperatingIncome:900000,annualDebtService:240000,cashFlow:660000,rentalYieldPercent:9,appreciation:2000000,loanToValuePercent:30,concentrationPercent:100,totalUnits:4,occupiedUnits:4,occupancyPercent:100,arrears:0}],obligations:[],goals:[],goalProgress:[],insights:[],projection:[]};
@@ -93,7 +125,7 @@ test("My Wealth maintains deadlines, vault records and goals", async ({ context,
   await page.getByRole("tab",{name:"Lifecycle"}).click();
   await page.getByRole("button",{name:"Complete"}).click();
   await expect.poll(()=>completed).toBeTruthy();
-  await page.getByRole("tab",{name:"Asset vault"}).click();
+  await page.getByRole("tab",{name:"Document vault"}).click();
   page.once("dialog",dialog=>dialog.accept());
   await page.getByRole("button",{name:"Archive document"}).click();
   await expect.poll(()=>documentArchived).toBeTruthy();

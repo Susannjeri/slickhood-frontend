@@ -30,7 +30,6 @@ import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {Textarea} from "@/components/ui/textarea";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {DistributionChart} from "@/components/dashboard/DashboardCharts";
 import {InsuranceBrandLogo} from "@/components/insurance/InsuranceBrandLogo";
 
 const EMPTY_SUMMARY: InsuranceOperationsSummary = {
