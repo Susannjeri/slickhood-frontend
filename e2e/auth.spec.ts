@@ -155,6 +155,19 @@ test("a large multi-role token survives the secure cookie handoff", async ({ pag
   expect(tokenChunks.length).toBeGreaterThan(1);
   expect(tokenChunks.every(cookie => cookie.value.length <= 3_500 && cookie.httpOnly)).toBe(true);
 
+  // The production cookie is Secure. Re-add the captured values without Secure so
+  // Playwright's HTTP-only local web server can exercise reconstruction and Proxy.
+  await context.clearCookies();
+  await context.addCookies(cookies.map(cookie => ({
+    name: cookie.name,
+    value: cookie.value,
+    domain: cookie.domain,
+    path: cookie.path,
+    httpOnly: cookie.httpOnly,
+    secure: false,
+    sameSite: cookie.sameSite,
+  })));
+
   const retrieved = await page.request.get("/browser-session/get-token");
   expect(retrieved.status()).toBe(200);
   await expect(retrieved.json()).resolves.toMatchObject({ data: { jwt } });
