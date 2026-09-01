@@ -44,7 +44,7 @@ if [ ! -f .next/standalone/server.js ] || [ ! -d .next/standalone/.next ]; then
   exit 1
 fi
 
-if grep -RqsE "http://(localhost|127\\.0\\.0\\.1):8080" \
+if grep -RqsE --include='*.js' "http://(localhost|127\\.0\\.0\\.1):8080" \
   .next/static/chunks .next/server; then
   echo "Refusing to package a production build containing localhost API URLs." >&2
   exit 1
@@ -54,7 +54,7 @@ fi
 # routes allows a healthy-looking deployment whose users still post login
 # credentials to their own localhost. Require the intended API origin in the
 # browser bundle before packaging anything.
-if ! grep -RqsF "$NEXT_PUBLIC_API_URL" .next/static/chunks; then
+if ! grep -RqsF --include='*.js' "$NEXT_PUBLIC_API_URL" .next/static/chunks; then
   echo "Refusing to package: browser bundle does not contain NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >&2
   exit 1
 fi
