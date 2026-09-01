@@ -45,6 +45,8 @@ jobs:
           EOF
 
       - name: Build and package deployment binaries
+        env:
+          NEXT_PUBLIC_COMMIT_HASH: ${{ github.sha }}
         run:  |
           chmod +x ./build.sh
           ./build.sh
