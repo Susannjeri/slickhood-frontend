@@ -1,5 +1,6 @@
 import { cpSync, existsSync, mkdirSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { resolve } from "node:path";
 
 const standalone = ".next/standalone/server.js";
 const useStandalone = existsSync(standalone);
@@ -8,11 +9,11 @@ if (useStandalone) {
   cpSync(".next/static", ".next/standalone/.next/static", { recursive: true, force: true });
   if (existsSync("public")) cpSync("public", ".next/standalone/public", { recursive: true, force: true });
 }
-const command = useStandalone ? process.execPath : (process.platform === "win32" ? "npm.cmd" : "npm");
-const args = useStandalone ? [standalone] : ["run", "start", "--", "--hostname", "127.0.0.1", "--port", "3100"];
+const command = process.execPath;
+const args = useStandalone ? [standalone] : [resolve("node_modules/next/dist/bin/next"), "start", "--hostname", "127.0.0.1", "--port", "3100"];
 const child = spawn(command, args, {
   stdio: "inherit",
-  shell: process.platform === "win32" && !useStandalone,
+  shell: false,
   env: { ...process.env, HOSTNAME: "127.0.0.1", PORT: "3100" },
 });
 

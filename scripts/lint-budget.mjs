@@ -12,7 +12,7 @@ const eslintCli = resolve(dirname(require.resolve("eslint/package.json")), "bin"
 const result = spawnSync(process.execPath, [eslintCli, ".", "--format", "json"], {
   encoding: "utf8",
   maxBuffer: 32 * 1024 * 1024,
-  shell: false,
+  shell: process.platform === "win32",
 });
 if (result.error) throw result.error;
 

@@ -15,18 +15,35 @@ export interface HelpDeskMessage {
   createdOn: string;
   model?: string;
   sourceArticleIds?: string;
+  internalNote: boolean;
 }
 
 export interface HelpDeskConversation {
   id: number;
+  ticketNumber: string;
   subject: string;
-  status: "OPEN" | "ESCALATED" | "ASSIGNED" | "RESOLVED";
+  category: string;
+  pageContext?: string;
+  status: "OPEN" | "ESCALATED" | "ASSIGNED" | "WAITING_FOR_SUPPORT" | "WAITING_FOR_CUSTOMER" | "RESOLVED";
   priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
   activeRole: string;
   assignedToUserId?: number;
   lastMessageAt: string;
+  waitingSince?: string;
+  slaDueAt?: string;
+  slaBreachedAt?: string;
+  firstResponseAt?: string;
+  customerUnreadCount: number;
+  agentUnreadCount: number;
   messages: HelpDeskMessage[];
 }
+
+export interface HelpDeskGuestSession {
+  conversation: HelpDeskConversation;
+  accessToken: string;
+  expiresAt: string;
+}
+export interface HelpDeskSupportSummary { waitingForSupport: number; unassigned: number; slaBreached: number; waitingForCustomer: number }
 
 export interface HelpDeskArticle {
   id: number;
@@ -40,19 +57,37 @@ export interface HelpDeskArticle {
 }
 
 export const listHelpConversations = (admin = false) =>
-  API.get(admin ? "/helpdesk/admin/conversations?size=100" : "/helpdesk/conversations?size=100");
-export const createHelpConversation = (subject: string) => API.post("/helpdesk/conversations", { subject });
-export const sendHelpMessage = (conversationId: number, message: string) =>
-  API.post(`/helpdesk/conversations/${conversationId}/messages`, { message });
+  API.get(admin ? "/helpdesk/admin/conversations?size=50" : "/helpdesk/conversations?size=50");
+export const getHelpConversation = (conversationId: number, admin = false) =>
+  API.get(admin ? `/helpdesk/admin/conversations/${conversationId}` : `/helpdesk/conversations/${conversationId}`);
+export const getHelpDeskSupportSummary = () => API.get("/helpdesk/admin/summary");
+export const createHelpConversation = (subject: string, category = "GENERAL", pageContext?: string) =>
+  API.post("/helpdesk/conversations", { subject, category, pageContext });
+export const sendHelpMessage = (conversationId: number, message: string, idempotencyKey = crypto.randomUUID()) =>
+  API.post(`/helpdesk/conversations/${conversationId}/messages`, { message, idempotencyKey });
 export const escalateHelpConversation = (conversationId: number, reason = "") =>
   API.post(`/helpdesk/conversations/${conversationId}/escalate`, { reason, priority: "NORMAL" });
+export const reopenHelpConversation = (conversationId: number) => API.post(`/helpdesk/conversations/${conversationId}/reopen`);
 export const listHelpArticles = (admin = false) => API.get(admin ? "/helpdesk/admin/articles" : "/helpdesk/articles");
-export const replyToHelpConversation = (conversationId: number, message: string) =>
-  API.post(`/helpdesk/admin/conversations/${conversationId}/reply`, { message });
+export const replyToHelpConversation = (conversationId: number, message: string, idempotencyKey = crypto.randomUUID()) =>
+  API.post(`/helpdesk/admin/conversations/${conversationId}/reply`, { message, idempotencyKey });
+export const addHelpInternalNote = (conversationId: number, message: string) =>
+  API.post(`/helpdesk/admin/conversations/${conversationId}/notes`, { message });
+export const claimHelpConversation = (conversationId: number) => API.post(`/helpdesk/admin/conversations/${conversationId}/claim`);
 export const resolveHelpConversation = (conversationId: number) =>
   API.post(`/helpdesk/admin/conversations/${conversationId}/resolve`);
 export const saveHelpArticle = (article: Omit<HelpDeskArticle, "id">, id?: number) =>
   id ? API.put(`/helpdesk/admin/articles/${id}`, article) : API.post("/helpdesk/admin/articles", article);
+export const createGuestHelpConversation = (subject: string, category: string, pageContext?: string) =>
+  API.post("/helpdesk/public/conversations", { subject, category, pageContext });
+export const getGuestHelpConversation = (ticketNumber: string, accessToken: string) =>
+  API.get(`/helpdesk/public/conversations/${encodeURIComponent(ticketNumber)}`, { headers: { "X-Help-Token": accessToken } });
+export const sendGuestHelpMessage = (ticketNumber: string, accessToken: string, message: string, idempotencyKey = crypto.randomUUID()) =>
+  API.post(`/helpdesk/public/conversations/${encodeURIComponent(ticketNumber)}/messages`, { message, idempotencyKey }, { headers: { "X-Help-Token": accessToken } });
+export const escalateGuestHelpConversation = (ticketNumber: string, accessToken: string) =>
+  API.post(`/helpdesk/public/conversations/${encodeURIComponent(ticketNumber)}/escalate`, null, { headers: { "X-Help-Token": accessToken } });
+export const listGuestHelpArticles = () => API.get("/helpdesk/public/articles");
+export const claimGuestHelpConversation = (accessToken: string) => API.post("/helpdesk/guest/claim", null, { headers: { "X-Help-Token": accessToken } });
 
 export type TeamMembershipStatus = "PENDING" | "ACCEPTED" | "KYC_PENDING" | "ACTIVE" | "EXPIRED" | "REVOKED" | "SUSPENDED";
 export type TeamScopeType = "ENTIRE_WORKSPACE" | "SELECTED_RESOURCES";
@@ -1454,7 +1489,7 @@ export const activePaymentChannels = (token: string) => {
 
 export type paymentChannel = "MPESA" | "MPESA_BANK" | "PESA_LINK" | "PAYSTACK";
 
-export type accountCategory = "LANDLORD" | "SLICKHOOD" | "MERCHANT";
+export type accountCategory = "LANDLORD" | "SLICKHOOD" | "MERCHANT" | "AFFILIATE" | "INSURANCE" | "COMMUNITY_FUND";
 
 export const createLandlordAccount = (channel: paymentChannel, name: string, token: string) => {
 return API.post(`/account/create`, { channel, name, category: "LANDLORD" }, {

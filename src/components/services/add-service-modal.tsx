@@ -299,7 +299,9 @@ export default function AddServiceModal({
 
       const service = response.data.data[0];
       setCreatedService(service);
-      setStep("documents");
+      const documentCount = selectedCategory?.requiredDocumentTypes?.length ?? 0;
+      const refereeCount = selectedCategory?.requiredNumberOfReferees ?? 0;
+      setStep(documentCount > 0 ? "documents" : refereeCount > 0 ? "referees" : "review");
     } catch (error) {
       console.error("Failed to create service:", error);
       if (axios.isAxiosError(error)) {
@@ -654,10 +656,10 @@ export default function AddServiceModal({
       <>
         <div className="mb-5">
           <h3 className="text-sm font-semibold text-[#020B2D]">
-            Upload required documents
+            Add the relevant credential
           </h3>
           <p className="mt-1 text-xs leading-5 text-gray-500">
-            Provide the documents required for{" "}
+            To protect customers, provide only the credential required for{" "}
             <span className="font-medium text-[#020B2D]">
               {selectedCategory?.name}
             </span>
@@ -670,7 +672,7 @@ export default function AddServiceModal({
             Document requirements
           </p>
           <p className="mt-1 text-[11px] leading-5 text-gray-500">
-            You will need to upload {requiredDocuments.length}{" "}
+            Your identity is already covered by account verification. You only need {requiredDocuments.length}{" "}
             {requiredDocuments.length === 1 ? "document" : "documents"}{" "}
             before you can continue.
           </p>
@@ -925,7 +927,12 @@ export default function AddServiceModal({
     }
 
     if (step === "documents") {
-      setStep("referees");
+      const required = selectedCategory?.requiredDocumentTypes ?? [];
+      if (required.some((type) => uploadedDocs[type]?.status !== "done")) {
+        setApiError("Upload the required credential before continuing.");
+        return;
+      }
+      setStep((selectedCategory?.requiredNumberOfReferees ?? 0) > 0 ? "referees" : "review");
       return;
     }
 

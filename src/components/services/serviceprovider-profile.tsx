@@ -147,13 +147,11 @@ export default function ServiceProviderProfile({
 
                 const response = await getServiceCategories(token);
 
-                console.log("CATEGORY RESPONSE:", response.data);
 
                 setCategories(response.data.data ?? []);
             } catch (err: any) {
                 console.error("Failed to fetch service categories:", err);
 
-                console.log("CATEGORY ERROR:", err?.response?.data);
 
                 setCategoriesError(
                     err?.response?.data?.description ||

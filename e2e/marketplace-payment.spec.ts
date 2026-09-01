@@ -24,6 +24,9 @@ test("customer sees payment only after provider acceptance and invoice creation"
   await page.getByRole("button", { name: "My bookings" }).click();
   await expect(page.getByText("INV-SVC-70", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Pay now" })).toBeVisible();
+  await page.getByRole("button", { name: "Pay now" }).click();
+  await expect(page.getByRole("dialog", { name: "Continue to payment" })).toBeVisible();
+  await expect(page.getByLabel("Payment phone (optional)")).toBeVisible();
   await expect(page.getByRole("button", { name: "Start work" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Complete with evidence" })).toHaveCount(0);
 });

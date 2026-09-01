@@ -1,4 +1,4 @@
-export type AccountCategory = "LANDLORD" | "SLICKHOOD" | "MERCHANT" | "COMMUNITY_FUND";
+export type AccountCategory = "LANDLORD" | "SLICKHOOD" | "MERCHANT" | "AFFILIATE" | "INSURANCE" | "COMMUNITY_FUND";
 
 export interface PaymentChannelType {
   id: string;

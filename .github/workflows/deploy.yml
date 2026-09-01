@@ -31,9 +31,6 @@ jobs:
       - name: Static analysis
         run: npm run lint:ci
 
-      - name: Install browser runtime
-        run: npx playwright install --with-deps chromium
-
       - name: Copy env production configs
         run: |
           cat > .env.production <<'EOF'
@@ -44,6 +41,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Build the exact production frontend
+        env:
+          NEXT_PUBLIC_COMMIT_HASH: ${{ github.sha }}
         run: npm run build
 
       - name: Browser regression suite

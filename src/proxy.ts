@@ -66,7 +66,7 @@ export async function proxy(req: NextRequest) {
           const routeConfig = allLinks
             .filter((link) => link.href && (pathname === link.href || pathname.startsWith(`${link.href}/`)))
             .sort((a, b) => (b.href?.length || 0) - (a.href?.length || 0))[0];
-          if (routeConfig?.permissions) {
+          if (routeConfig?.permissions?.length) {
             const hasPermission = routeConfig.permissions.some((perm) => {
               return permissions.includes(perm)
             }
