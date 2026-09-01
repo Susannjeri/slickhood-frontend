@@ -126,15 +126,15 @@ export default function HelpDeskPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5 p-4 pb-10 md:p-6">
-      <header className="flex flex-col gap-4 rounded-2xl bg-[#141130] p-5 text-white shadow-sm md:flex-row md:items-center md:justify-between">
+      <header className="flex flex-col gap-4 overflow-hidden rounded-2xl border-b-4 border-[#EF4217] bg-[#141130] p-5 text-white shadow-[0_14px_36px_rgba(20,17,48,0.16)] md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
           <div className="rounded-2xl bg-[#EF4217] p-3"><CircleHelp className="h-7 w-7" /></div>
-          <div><h1 className="text-2xl font-bold">Slickhood Help Desk</h1><p className="text-sm text-white/70">Fast guidance, grounded answers, and a clear path to human support.</p></div>
+          <div><h1 className="text-2xl font-bold"><span className="text-white">Slick</span><span className="text-[#EF4217]">Hood</span> Help Desk</h1><p className="text-sm text-white/70">Fast guidance, grounded answers, and a clear path to human support.</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant={mode === "mine" ? "default" : "secondary"} onClick={() => setMode("mine")}>My help</Button>
-          {isAdmin && <Button variant={mode === "queue" ? "default" : "secondary"} onClick={() => setMode("queue")}><Headphones className="mr-2 h-4 w-4" />Support queue</Button>}
-          <Button variant={mode === "knowledge" ? "default" : "secondary"} onClick={() => setMode("knowledge")}><BookOpen className="mr-2 h-4 w-4" />Knowledge</Button>
+          <Button className={mode === "mine" ? "bg-[#EF4217] text-white hover:bg-[#d93a13]" : "bg-white/10 text-white hover:bg-white/20"} onClick={() => setMode("mine")}>My help</Button>
+          {isAdmin && <Button className={mode === "queue" ? "bg-[#EF4217] text-white hover:bg-[#d93a13]" : "bg-white/10 text-white hover:bg-white/20"} onClick={() => setMode("queue")}><Headphones className="mr-2 h-4 w-4" />Support queue</Button>}
+          <Button className={mode === "knowledge" ? "bg-[#EF4217] text-white hover:bg-[#d93a13]" : "bg-white/10 text-white hover:bg-white/20"} onClick={() => setMode("knowledge")}><BookOpen className="mr-2 h-4 w-4" />Knowledge</Button>
         </div>
       </header>
 
@@ -150,7 +150,7 @@ export default function HelpDeskPage() {
         {mode === "queue" && supportSummary && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[
           ["Waiting for support", supportSummary.waitingForSupport], ["Unassigned", supportSummary.unassigned],
           ["SLA breached", supportSummary.slaBreached], ["Waiting for customer", supportSummary.waitingForCustomer],
-        ].map(([label,value]) => <Card key={String(label)}><CardContent className="p-4"><p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p><p className={`mt-1 text-2xl font-bold ${label === "SLA breached" && Number(value) > 0 ? "text-red-600" : "text-[#141130]"}`}>{value}</p></CardContent></Card>)}</div>}
+        ].map(([label,value]) => <Card key={String(label)} className="border-l-4 border-l-[#EF4217]"><CardContent className="p-4"><p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p><p className={`mt-1 text-2xl font-bold ${label === "SLA breached" && Number(value) > 0 ? "text-red-600" : "text-[#141130]"}`}>{value}</p></CardContent></Card>)}</div>}
         <div className="grid min-h-[480px] min-w-0 gap-4 xl:min-h-[650px] xl:grid-cols-[300px_minmax(0,1fr)_320px]">
           <Card className="overflow-hidden">
             <CardHeader className="space-y-3 border-b p-4">
@@ -159,7 +159,7 @@ export default function HelpDeskPage() {
             </CardHeader>
             <ScrollArea className="h-[570px]">
               {loading ? <Loader /> : conversations.length === 0 ? <Empty text={mode === "queue" ? "No support tickets are waiting." : "Start your first help conversation."} /> : conversations.map((c) => (
-                <button key={c.id} onClick={() => setSelectedId(c.id)} className={`w-full border-b p-4 text-left transition hover:bg-slate-50 ${selectedId === c.id ? "bg-orange-50" : ""}`}>
+                <button key={c.id} onClick={() => setSelectedId(c.id)} className={`w-full border-b p-4 text-left transition hover:bg-[#EF4217]/5 ${selectedId === c.id ? "border-l-4 border-l-[#EF4217] bg-[#EF4217]/[0.07]" : ""}`}>
                   <div className="mb-2 flex items-start justify-between gap-2"><span className="line-clamp-2 text-sm font-semibold text-[#141130]">{c.subject}</span><Status status={c.status} /></div>
                   <p className="text-xs text-slate-500">{c.ticketNumber} · {c.category.toLowerCase()} · {c.priority.toLowerCase()}</p>
                   {mode === "queue" && c.slaDueAt && <p className={`mt-1 text-xs ${c.slaBreachedAt ? "font-semibold text-red-600" : "text-slate-500"}`}>{c.slaBreachedAt ? "Response target breached" : `Respond by ${new Date(c.slaDueAt).toLocaleString()}`}</p>}
