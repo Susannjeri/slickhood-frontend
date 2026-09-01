@@ -2,7 +2,7 @@
 
 import {FormEvent, useCallback, useEffect, useMemo, useState} from "react";
 import Link from "next/link";
-import {ArrowLeft, CheckCircle2, Clock, FileCheck2, Landmark, Plus, RefreshCw, Settings2, ShieldCheck, Users} from "lucide-react";
+import {ArrowLeft, CheckCircle2, Clock, ExternalLink, Eye, FileCheck2, Landmark, Plus, RefreshCw, Settings2, ShieldCheck, Users} from "lucide-react";
 import {
   InsuranceCase,
   InsuranceClaim,
@@ -114,6 +114,7 @@ export default function InsuranceOperationsPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [action, setAction] = useState<Action | null>(null);
+  const [evidence,setEvidence]=useState<{payment:InsurancePayment;url:string;loading:boolean;error:string}|null>(null);
   const [adviserId, setAdviserId] = useState("");
   const [caseStatus, setCaseStatus] = useState("INFORMATION_REQUIRED");
   const [note, setNote] = useState("");
@@ -202,6 +203,8 @@ export default function InsuranceOperationsPage() {
     }
   }
 
+  async function openEvidence(payment:InsurancePayment){setEvidence({payment,url:"",loading:true,error:""});try{const url=await insuranceService.paymentProof(payment.id);setEvidence({payment,url,loading:false,error:""})}catch(error:unknown){setEvidence({payment,url:"",loading:false,error:apiErrorMessage(error,"Payment evidence could not be opened.")})}}
+
   async function submitAction(event: FormEvent) {
     event.preventDefault();
     if (!action) return;
@@ -263,7 +266,7 @@ export default function InsuranceOperationsPage() {
           {canCatalog && <TabsTrigger value="partners">Partners</TabsTrigger>}
           {canPaymentConfig && <TabsTrigger value="payments">Payment routes</TabsTrigger>}
         </TabsList>
-        {canUseApplicationQueue && <TabsContent value="applications" className="space-y-4"><ApplicationQueue items={cases} permissions={{canReview, canQuote, canApprove, canVerify, canIssue}} onAction={setAction}/></TabsContent>}
+        {canUseApplicationQueue && <TabsContent value="applications" className="space-y-4"><ApplicationQueue items={cases} permissions={{canReview, canQuote, canApprove, canVerify, canIssue}} onAction={setAction} onEvidence={payment=>void openEvidence(payment)}/></TabsContent>}
         {canManageClaims && <TabsContent value="claims" className="space-y-3"><ClaimQueue items={claims} onAction={item => {setClaimStatus(CLAIM_TRANSITIONS[item.status]?.[0] ?? "");setAction({kind: "claim-status", item});}}/></TabsContent>}
         {canManageRenewals && <TabsContent value="renewals" className="space-y-3"><RenewalQueue items={renewals} onAction={item => {setRenewalStatus(RENEWAL_TRANSITIONS[item.renewalStatus]?.[0] ?? "");setAction({kind: "renewal-status", item});}}/></TabsContent>}
         {canCatalog&&<TabsContent value="partners"><PartnerCatalog items={adminCompanies} onAdd={()=>openPartner()} onEdit={openPartner}/></TabsContent>}
@@ -271,6 +274,7 @@ export default function InsuranceOperationsPage() {
       </Tabs>
     </div>
     <ActionDialog action={action} busy={busy} staff={staff} companies={companies} adviserId={adviserId} setAdviserId={setAdviserId} caseStatus={caseStatus} setCaseStatus={setCaseStatus} note={note} setNote={setNote} reference={reference} setReference={setReference} quote={quote} setQuote={setQuote} policy={policy} setPolicy={setPolicy} claimStatus={claimStatus} setClaimStatus={setClaimStatus} insurerReference={insurerReference} setInsurerReference={setInsurerReference} renewalStatus={renewalStatus} setRenewalStatus={setRenewalStatus} onClose={closeAction} onSubmit={submitAction}/>
+    <Dialog open={Boolean(evidence)} onOpenChange={open=>!open&&setEvidence(null)}><DialogContent><DialogHeader><DialogTitle>Payment evidence</DialogTitle><DialogDescription>Evidence is opened through a short-lived secure link. Confirm the amount, destination, reference and payment time before making a decision.</DialogDescription></DialogHeader>{evidence?.loading?<p className="rounded-lg border p-4 text-sm text-muted-foreground">Preparing secure evidence…</p>:evidence?.error?<p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{evidence.error}</p>:evidence?.url?<div className="space-y-3 rounded-lg border bg-slate-50 p-4 text-sm"><p><strong>Reference:</strong> {evidence.payment.paymentReference}</p><p><strong>File type:</strong> {evidence.payment.proofContentType??"Payment evidence"}</p><Button asChild><a href={evidence.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-2 size-4"/>Open secure evidence</a></Button><p className="text-xs text-muted-foreground">The link expires automatically and the internal storage location is never disclosed.</p></div>:null}<DialogFooter><Button variant="outline" onClick={()=>setEvidence(null)}>Close</Button></DialogFooter></DialogContent></Dialog>
     <PartnerDialog open={partnerOpen} editing={Boolean(editingPartner)} value={partner} setValue={setPartner} busy={busy} onClose={()=>setPartnerOpen(false)} onSubmit={savePartner}/>
   </div>;
 }
@@ -281,7 +285,7 @@ function PaymentRoutes({companies,accounts,configurations,form,setForm,busy,onSu
 
 function PartnerDialog({open,editing,value,setValue,busy,onClose,onSubmit}:{open:boolean;editing:boolean;value:typeof blankPartner;setValue:(value:typeof blankPartner)=>void;busy:boolean;onClose:()=>void;onSubmit:(event:FormEvent)=>void}){return <Dialog open={open} onOpenChange={next=>!next&&onClose()}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><form onSubmit={onSubmit}><DialogHeader><DialogTitle>{editing?"Edit insurance partner":"Add insurance partner"}</DialogTitle><DialogDescription>Only approved brand assets and operational destinations should be published.</DialogDescription></DialogHeader><div className="mt-5 grid gap-4 sm:grid-cols-2">{!editing&&<Field label="Partner code"><Input required pattern="[A-Z][A-Z0-9_]{1,49}" maxLength={50} value={value.code} onChange={event=>setValue({...value,code:event.target.value.toUpperCase().replace(/[^A-Z0-9_]/g,"")})}/></Field>}<Field label="Display name"><Input required maxLength={160} value={value.name} onChange={event=>setValue({...value,name:event.target.value})}/></Field><div className="sm:col-span-2"><Field label="Logo URL"><Input maxLength={800} placeholder="/insurance/brands/partner.webp or https://…" value={value.logoUrl} onChange={event=>setValue({...value,logoUrl:event.target.value})}/></Field></div><div className="sm:col-span-2"><Field label="Description"><Textarea maxLength={1000} value={value.description} onChange={event=>setValue({...value,description:event.target.value})}/></Field></div><Field label="Quotation email"><Input type="email" value={value.quotationEmail} onChange={event=>setValue({...value,quotationEmail:event.target.value})}/></Field><Field label="Claims email"><Input type="email" value={value.claimsEmail} onChange={event=>setValue({...value,claimsEmail:event.target.value})}/></Field><Field label="Renewals email"><Input type="email" value={value.renewalsEmail} onChange={event=>setValue({...value,renewalsEmail:event.target.value})}/></Field>{editing&&<label className="flex items-center gap-2 self-end text-sm"><input type="checkbox" checked={value.active} onChange={event=>setValue({...value,active:event.target.checked})}/>Active partner</label>}</div><DialogFooter className="mt-6"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy}><Settings2 className="mr-2 size-4"/>{busy?"Saving…":"Save partner"}</Button></DialogFooter></form></DialogContent></Dialog>}
 
-function ApplicationQueue({items, permissions, onAction}: {items: InsuranceCase[]; permissions: {canReview: boolean; canQuote: boolean; canApprove: boolean; canVerify: boolean; canIssue: boolean}; onAction: (action: Action) => void}) {
+function ApplicationQueue({items, permissions, onAction,onEvidence}: {items: InsuranceCase[]; permissions: {canReview: boolean; canQuote: boolean; canApprove: boolean; canVerify: boolean; canIssue: boolean}; onAction: (action: Action) => void;onEvidence:(payment:InsurancePayment)=>void}) {
   if (!items.length) return <Empty text="No applications in the queue."/>;
   return items.map(item => <Card key={item.id}>
     <CardHeader><div className="flex flex-wrap items-center justify-between gap-2"><div><CardTitle>{item.reference} · {title(item.productCode)}</CardTitle><p className="mt-1 text-sm text-muted-foreground">{item.fullName} · {item.phone} · {item.email}</p></div><Badge>{title(item.status)}</Badge></div></CardHeader>
@@ -293,7 +297,7 @@ function ApplicationQueue({items, permissions, onAction}: {items: InsuranceCase[
         {permissions.canReview && ["SUBMITTED", "ADVISER_ASSIGNED"].includes(item.status) && <Button size="sm" variant="outline" onClick={() => onAction({kind: "case-status", item})}>Request information</Button>}
         {permissions.canQuote && ["SUBMITTED", "ADVISER_ASSIGNED", "INFORMATION_REQUIRED", "QUOTED"].includes(item.status) && <Button size="sm" variant="outline" onClick={() => onAction({kind: "quote", item})}>Add quote</Button>}
         {permissions.canApprove && item.quotes.filter(value => value.status === "DRAFT").map(value => <Button key={value.id} size="sm" onClick={() => onAction({kind: "approve-quote", item, quoteId: value.id, insurer: value.companyName})}>Approve {value.companyName}</Button>)}
-        {permissions.canVerify && item.payments.filter(value => value.status === "PENDING_VERIFICATION").map(value => <span key={value.id} className="flex gap-2"><Button size="sm" disabled={!value.proofAvailable} onClick={() => onAction({kind: "payment-decision", item: value, decision: "VERIFIED"})}>Verify payment</Button><Button size="sm" variant="destructive" onClick={() => onAction({kind: "payment-decision", item: value, decision: "REJECTED"})}>Reject payment</Button></span>)}
+        {permissions.canVerify && item.payments.filter(value => value.status === "PENDING_VERIFICATION").map(value => <span key={value.id} className="flex flex-wrap gap-2">{value.proofAvailable&&<Button size="sm" variant="outline" onClick={()=>onEvidence(value)}><Eye className="mr-2 size-4"/>Review evidence</Button>}<Button size="sm" disabled={!value.proofAvailable} onClick={() => onAction({kind: "payment-decision", item: value, decision: "VERIFIED"})}>Verify payment</Button><Button size="sm" variant="destructive" onClick={() => onAction({kind: "payment-decision", item: value, decision: "REJECTED"})}>Reject payment</Button></span>)}
         {permissions.canVerify && item.payments.filter(value => value.status === "VERIFIED").map(value => <Button key={value.id} size="sm" onClick={() => onAction({kind: "remit", item: value})}>Record remittance</Button>)}
         {permissions.canIssue && item.status === "PREMIUM_REMITTED" && <Button size="sm" onClick={() => onAction({kind: "issue-policy", item})}>Issue policy</Button>}
       </div>
