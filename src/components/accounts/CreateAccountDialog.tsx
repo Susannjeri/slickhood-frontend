@@ -82,15 +82,6 @@ export default function CreateAccountDialog({
   const [creating, setCreating] = useState(false);
   const [createdAccountId, setCreatedAccountId] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (open) {
-      resetState();
-      loadChannels();
-    }
-    // load only when the dialog opens; the API handlers are stable store adapters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
   const resetState = () => {
     setStep(1);
     setSelectedChannel(null);
@@ -116,6 +107,17 @@ export default function CreateAccountDialog({
     }
   };
 
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => {
+      resetState();
+      void loadChannels();
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // Load only when the dialog opens; the API handlers are stable store adapters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   const handleSelectChannel = (channel: PaymentChannelType) => {
     setSelectedChannel(channel);
     setStep(2);
@@ -131,7 +133,7 @@ export default function CreateAccountDialog({
     try {
       setCreating(true);
       const category = forceCategory ?? (isSuperadmin ? "SLICKHOOD" : "LANDLORD");
-      const res = category === "COMMUNITY_FUND"
+      const res = category === "COMMUNITY_FUND" || category === "AFFILIATE" || category === "INSURANCE"
         ? (await API.post("/account/create",{channel:selectedChannel.id,name:name.trim(),category})).data
         : await (category === "SLICKHOOD" ? handleCreateSlickHoodAccount : category === "MERCHANT" ? handleCreateMerchantAccount : handleCreateLandlordAccount)(selectedChannel.id as paymentChannel, name.trim(), category as accountCategory);
 
@@ -177,6 +179,8 @@ export default function CreateAccountDialog({
           <DialogDescription>
             {isSuperadmin
               ? "Create a platform-level SlickHood payment account"
+              : forceCategory === "AFFILIATE"
+              ? "Create a verified destination for your affiliate payouts"
               : "Create a payment account to receive your collections"}
           </DialogDescription>
         </DialogHeader>

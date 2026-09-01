@@ -6,10 +6,12 @@ import {
   Copy,
   ExternalLink,
   Link2,
+  Plus,
   RefreshCw,
   Share2,
   Users,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -29,6 +31,11 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogTitle} from "@/components/ui/dialog";
+import {apiErrorMessage} from "@/lib/api-error";
+import CreateAccountDialog from "@/components/accounts/CreateAccountDialog";
+import AccountDetailDrawer from "@/components/accounts/AccountDetailDrawer";
+import type { Account } from "@/types/account";
 const money = (n: number, c = "KES") =>
   new Intl.NumberFormat("en-KE", {
     style: "currency",
@@ -37,73 +44,73 @@ const money = (n: number, c = "KES") =>
   }).format(n || 0);
 const date = (v?: string) =>
   v ? new Date(v).toLocaleDateString("en-KE", { dateStyle: "medium" }) : "—";
-const apiError = (e: any, f: string) => e?.response?.data?.description ?? f;
-const window = globalThis.window ?? ({ location: { origin: "" } } as Window);
 export default function AffiliatePage() {
   const token = useAuthStore((s) => s.token),
     [data, setData] = useState<AffiliateDashboard>(),
-    [accounts, setAccounts] = useState<any[]>([]),
-    [busy, setBusy] = useState(false);
+    [accounts, setAccounts] = useState<Account[]>([]),
+    [busy, setBusy] = useState(false),[failed,setFailed]=useState(false),[payoutOpen,setPayoutOpen]=useState(false),[createAccountOpen,setCreateAccountOpen]=useState(false),[accountDetailId,setAccountDetailId]=useState<number|null>(null),[origin] = useState(() => typeof window === "undefined" ? "" : window.location.origin);
   const load = useCallback(async () => {
     if (!token) return;
     setBusy(true);
+    setFailed(false);
     try {
       const [d, a] = await Promise.all([
         affiliateDashboard(),
         listAccounts(token, { byLandlord: true, size: 100 }),
       ]);
-      setData(d.data?.data?.[0]);
-      setAccounts(a.data?.data ?? []);
-    } catch (e) {
-      toast.error(apiError(e, "Affiliate workspace could not be loaded."));
+      const dashboard=d.data?.data as AffiliateDashboard|undefined;
+      setData(dashboard?{...dashboard,referrals:Array.isArray(dashboard.referrals)?dashboard.referrals:[],commissions:Array.isArray(dashboard.commissions)?dashboard.commissions:[],payouts:Array.isArray(dashboard.payouts)?dashboard.payouts:[]}:undefined);
+      setAccounts(Array.isArray(a.data?.data)?a.data.data:[]);
+    } catch (e:unknown) {
+      setFailed(true);
+      toast.error(apiErrorMessage(e, "Affiliate workspace could not be loaded."));
     } finally {
       setBusy(false);
     }
   }, [token]);
   useEffect(() => {
-    load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
   const link = useMemo(
     () =>
-      data ? `${window.location.origin}/r/${data.profile.referralCode}` : "",
-    [data],
+      data ? `${origin}/r/${data.profile.referralCode}` : "",
+    [data,origin],
   );
   const copy = async (value = link) => {
-    await navigator.clipboard.writeText(value);
-    toast.success("Referral link copied.");
+    try{await navigator.clipboard.writeText(value);toast.success("Referral link copied.");}catch{toast.error("Copy was blocked by your browser. Select and copy the link manually.");}
   };
   const share = async () => {
-    if (navigator.share)
-      await navigator.share({
-        title: "Join SlickHood",
-        text: "Join SlickHood through my referral link.",
-        url: link,
-      });
-    else await copy();
+    try{if (navigator.share)
+        await navigator.share({title: "Join SlickHood",text: "Join SlickHood through my referral link.",url: link});
+      else await copy();
+    }catch(e){if((e as DOMException)?.name!=="AbortError")toast.error("This link could not be shared. You can still copy it.");}
   };
   const setAccount = async (id: number) => {
     try {
       await setAffiliatePayoutAccount(id);
       toast.success("Payout account saved.");
       await load();
-    } catch (e) {
-      toast.error(apiError(e, "Payout account could not be saved."));
+    } catch (e:unknown) {
+      toast.error(apiErrorMessage(e, "Payout account could not be saved."));
     }
   };
   const payout = async () => {
     try {
-      await requestAffiliatePayout();
+      setBusy(true);await requestAffiliatePayout();
       toast.success("Payout request submitted.");
+      setPayoutOpen(false);
       await load();
-    } catch (e) {
+    } catch (e:unknown) {
       toast.error(
-        apiError(
+        apiErrorMessage(
           e,
           `Available earnings must reach ${money(data?.profile.minimumPayout ?? 0)} and a verified payout account is required.`,
         ),
       );
-    }
+    }finally{setBusy(false);}
   };
+  if(failed&&!data)return <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-slate-500"><p>Affiliate workspace could not be loaded.</p><Button onClick={load} variant="outline"><RefreshCw className="mr-2 h-4 w-4"/>Try again</Button></div>;
   if (!data)
     return (
       <div className="flex min-h-[50vh] items-center justify-center text-slate-500">
@@ -146,7 +153,7 @@ export default function AffiliatePage() {
           </Button>
         </div>
       </section>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <Metric
           icon={Users}
           label="Referrals"
@@ -154,23 +161,28 @@ export default function AffiliatePage() {
         />
         <Metric
           icon={CheckCircle2}
-          label="Conversions"
-          value={String(data.conversions)}
+          label="Conversion rate"
+          value={`${data.conversionRatePercent??0}%`}
         />
         <Metric
           icon={Wallet}
           label="Available"
-          value={money(data.availableBalance)}
+          value={money(data.availableBalance,data.profile.currency)}
+        />
+        <Metric
+          icon={BadgeDollarSign}
+          label="Pending clearance"
+          value={money(data.pendingEarnings,data.profile.currency)}
         />
         <Metric
           icon={BadgeDollarSign}
           label="Lifetime earnings"
-          value={money(data.lifetimeEarnings)}
+          value={money(data.lifetimeEarnings,data.profile.currency)}
         />
         <Metric
           icon={RefreshCw}
           label="Pending payouts"
-          value={money(data.pendingPayouts)}
+          value={money(data.pendingPayouts,data.profile.currency)}
         />
       </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
@@ -198,7 +210,7 @@ export default function AffiliatePage() {
                   {data.referrals.map((r) => (
                     <tr key={r.id} className="border-b last:border-0">
                       <td className="py-4 font-medium">
-                        User #{r.referredUserId}
+                        Referral #{r.id}
                       </td>
                       <td>
                         <Status value={r.status} />
@@ -236,7 +248,7 @@ export default function AffiliatePage() {
                       {c.commissionRate}%
                     </p>
                     <p className="text-xs text-slate-400">
-                      Earned {date(c.earnedAt)}
+                      Earned {date(c.earnedAt)}{c.status==="PENDING"&&c.availableAt?` · clears ${date(c.availableAt)}`:""}
                     </p>
                   </div>
                   <div className="text-right">
@@ -267,7 +279,7 @@ export default function AffiliatePage() {
             <CardContent className="space-y-3">
               <select
                 value={data.profile.payoutAccountId ?? 0}
-                onChange={(e) => setAccount(Number(e.target.value))}
+                onChange={(e) => {const id=Number(e.target.value);if(id>0)void setAccount(id)}}
                 className="w-full rounded-xl border p-3 text-sm"
               >
                 <option value={0}>Select verified payout account</option>
@@ -280,7 +292,16 @@ export default function AffiliatePage() {
                   ))}
               </select>
               <Button
-                onClick={payout}
+                type="button"
+                variant="outline"
+                onClick={() => setCreateAccountOpen(true)}
+                className="w-full"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add payout account
+              </Button>
+              <Button
+                onClick={()=>setPayoutOpen(true)}
                 disabled={
                   busy ||
                   data.availableBalance < data.profile.minimumPayout ||
@@ -336,6 +357,23 @@ export default function AffiliatePage() {
           </Card>
         </aside>
       </div>
+      {data.historyLimited&&<p className="text-center text-xs text-slate-500">Showing the 100 most recent records in each ledger. Full financial history remains available through reports.</p>}
+      <CreateAccountDialog
+        open={createAccountOpen}
+        onClose={() => setCreateAccountOpen(false)}
+        onCreated={(accountId) => {
+          setCreateAccountOpen(false);
+          setAccountDetailId(accountId);
+          void load();
+        }}
+        forceCategory="AFFILIATE"
+      />
+      <AccountDetailDrawer
+        accountId={accountDetailId}
+        onClose={() => setAccountDetailId(null)}
+        onChanged={load}
+      />
+      <Dialog open={payoutOpen} onOpenChange={setPayoutOpen}><DialogContent><DialogHeader><DialogTitle>Request affiliate payout?</DialogTitle><DialogDescription>{money(data.availableBalance,data.profile.currency)} will be reserved for the verified account selected above. It cannot be included in another request while processing.</DialogDescription></DialogHeader><DialogFooter><Button type="button" variant="outline" onClick={()=>setPayoutOpen(false)}>Cancel</Button><Button type="button" disabled={busy} onClick={()=>void payout()} className="bg-[#FF4B1F] hover:bg-[#E8451D]">Confirm payout request</Button></DialogFooter></DialogContent></Dialog>
     </div>
   );
 }
@@ -344,7 +382,7 @@ function Metric({
   label,
   value,
 }: {
-  icon: any;
+  icon: LucideIcon;
   label: string;
   value: string;
 }) {
@@ -365,7 +403,7 @@ function Status({ value }: { value: string }) {
       className={
         value === "CONVERTED" || value === "EARNED" || value === "PAID"
           ? "bg-emerald-50 text-emerald-700"
-          : value.includes("REQUEST")
+          : value.includes("REQUEST") || value === "PENDING"
             ? "bg-amber-50 text-amber-700"
             : ""
       }
