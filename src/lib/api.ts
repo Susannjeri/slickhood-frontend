@@ -1454,7 +1454,7 @@ export const activePaymentChannels = (token: string) => {
 
 export type paymentChannel = "MPESA" | "MPESA_BANK" | "PESA_LINK" | "PAYSTACK";
 
-export type accountCategory = "LANDLORD" | "SLICKHOOD" | "MERCHANT";
+export type accountCategory = "LANDLORD" | "SLICKHOOD" | "MERCHANT" | "AFFILIATE" | "INSURANCE" | "COMMUNITY_FUND";
 
 export const createLandlordAccount = (channel: paymentChannel, name: string, token: string) => {
 return API.post(`/account/create`, { channel, name, category: "LANDLORD" }, {
