@@ -11,11 +11,25 @@ if [ -f .env.production ]; then
   # .env.local. The checked deployment configuration is authoritative here.
   NEXT_PUBLIC_API_URL="$(read_production_value NEXT_PUBLIC_API_URL)"
   NEXT_PUBLIC_CLIENT_ID="$(read_production_value NEXT_PUBLIC_CLIENT_ID)"
-  export NEXT_PUBLIC_API_URL NEXT_PUBLIC_CLIENT_ID
+  # The workflow supplies the immutable release SHA. Do not let an ignored env
+  # file replace it with stale developer metadata.
+  export NEXT_PUBLIC_API_URL NEXT_PUBLIC_CLIENT_ID NEXT_PUBLIC_COMMIT_HASH
 fi
 
 : "${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL must be set for a production build}"
 : "${NEXT_PUBLIC_CLIENT_ID:?NEXT_PUBLIC_CLIENT_ID must be set for Google Sign-In}"
+: "${NEXT_PUBLIC_COMMIT_HASH:?NEXT_PUBLIC_COMMIT_HASH must be set to the release SHA}"
+
+case "$NEXT_PUBLIC_COMMIT_HASH" in
+  *[!0-9a-fA-F]*|'')
+    echo "Refusing to build: NEXT_PUBLIC_COMMIT_HASH must be a hexadecimal commit SHA." >&2
+    exit 1
+    ;;
+esac
+if [ "${#NEXT_PUBLIC_COMMIT_HASH}" -ne 40 ]; then
+  echo "Refusing to build: NEXT_PUBLIC_COMMIT_HASH must be the full 40-character commit SHA." >&2
+  exit 1
+fi
 
 case "$NEXT_PUBLIC_API_URL" in
   https://*) ;;
