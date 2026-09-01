@@ -2,11 +2,14 @@
 
 import {FormEvent, useCallback, useEffect, useMemo, useState} from "react";
 import Link from "next/link";
-import {ArrowLeft, CheckCircle2, Clock, FileCheck2, RefreshCw, ShieldCheck, Users} from "lucide-react";
+import {ArrowLeft, CheckCircle2, Clock, FileCheck2, Landmark, Plus, RefreshCw, Settings2, ShieldCheck, Users} from "lucide-react";
 import {
   InsuranceCase,
   InsuranceClaim,
   InsuranceCompany,
+  InsuranceCompanyAdmin,
+  InsuranceAccount,
+  InsurancePaymentConfiguration,
   InsuranceOperationsSummary,
   InsurancePayment,
   InsurancePolicy,
@@ -25,6 +28,8 @@ import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {Textarea} from "@/components/ui/textarea";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {DistributionChart} from "@/components/dashboard/DashboardCharts";
+import {InsuranceBrandLogo} from "@/components/insurance/InsuranceBrandLogo";
 
 const EMPTY_SUMMARY: InsuranceOperationsSummary = {
   openCases: 0,
@@ -65,6 +70,8 @@ const blankQuote = {
   exclusions: "",
   validUntil: "",
 };
+const blankPartner = {code:"",name:"",logoUrl:"",description:"",quotationEmail:"",claimsEmail:"",renewalsEmail:"",active:true};
+const blankPaymentConfiguration = {companyCode:"",paymentAccountId:"",label:"",instructions:"",referenceTemplate:"",effectiveFrom:new Date().toISOString().slice(0,10)};
 
 type Action =
   | {kind: "assign"; item: InsuranceCase}
@@ -90,14 +97,19 @@ export default function InsuranceOperationsPage() {
   const canManageClaims = permissions.includes("manage_insurance_claims");
   const canManageRenewals = permissions.includes("manage_insurance_renewals");
   const canReport = permissions.includes("view_insurance_reports");
+  const canCatalog = permissions.includes("manage_insurance_catalog");
+  const canPaymentConfig = permissions.includes("manage_insurance_payment_config");
   const canUseApplicationQueue = canReview || canQuote || canApprove || canVerify || canIssue;
-  const allowed = canUseApplicationQueue || canManageClaims || canManageRenewals || canReport;
+  const allowed = canUseApplicationQueue || canManageClaims || canManageRenewals || canReport || canCatalog || canPaymentConfig;
 
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [cases, setCases] = useState<InsuranceCase[]>([]);
   const [claims, setClaims] = useState<InsuranceClaim[]>([]);
   const [renewals, setRenewals] = useState<InsurancePolicy[]>([]);
   const [companies, setCompanies] = useState<InsuranceCompany[]>([]);
+  const [adminCompanies,setAdminCompanies]=useState<InsuranceCompanyAdmin[]>([]);
+  const [accounts,setAccounts]=useState<InsuranceAccount[]>([]);
+  const [paymentConfigurations,setPaymentConfigurations]=useState<InsurancePaymentConfiguration[]>([]);
   const [staff, setStaff] = useState<InsuranceStaff[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -111,8 +123,12 @@ export default function InsuranceOperationsPage() {
   const [claimStatus, setClaimStatus] = useState("");
   const [insurerReference, setInsurerReference] = useState("");
   const [renewalStatus, setRenewalStatus] = useState("");
+  const [partnerOpen,setPartnerOpen]=useState(false);
+  const [editingPartner,setEditingPartner]=useState<string|null>(null);
+  const [partner,setPartner]=useState(blankPartner);
+  const [paymentConfiguration,setPaymentConfiguration]=useState(blankPaymentConfiguration);
 
-  const defaultTab = canUseApplicationQueue ? "applications" : canManageClaims ? "claims" : "renewals";
+  const defaultTab = canUseApplicationQueue ? "applications" : canManageClaims ? "claims" : canManageRenewals ? "renewals" : canCatalog ? "partners" : "payments";
   const metrics = useMemo(() => [
     ["Open applications", summary.openCases, FileCheck2],
     ["Unassigned", summary.unassignedCases, Users],
@@ -129,23 +145,30 @@ export default function InsuranceOperationsPage() {
       canUseApplicationQueue ? insuranceService.operationsCases() : Promise.resolve({content: []}),
       canManageClaims ? insuranceService.operationsClaims() : Promise.resolve({content: []}),
       canManageRenewals ? insuranceService.operationsRenewals() : Promise.resolve({content: []}),
-      insuranceService.companies(),
+      canCatalog ? insuranceService.adminCompanies() : insuranceService.companies(),
       canReview ? insuranceService.operationsStaff() : Promise.resolve([]),
+      canPaymentConfig ? insuranceService.insuranceAccounts() : Promise.resolve([]),
     ]);
 
-    const [summaryResult, casesResult, claimsResult, renewalsResult, companiesResult, staffResult] = requests;
+    const [summaryResult, casesResult, claimsResult, renewalsResult, companiesResult, staffResult,accountsResult] = requests;
     if (summaryResult.status === "fulfilled") setSummary(summaryResult.value);
     if (casesResult.status === "fulfilled") setCases(pageContent<InsuranceCase>(casesResult.value));
     if (claimsResult.status === "fulfilled") setClaims(pageContent<InsuranceClaim>(claimsResult.value));
     if (renewalsResult.status === "fulfilled") setRenewals(pageContent<InsurancePolicy>(renewalsResult.value));
     if (companiesResult.status === "fulfilled") {
-      const values = companiesResult.value.data?.data;
-      setCompanies(Array.isArray(values) ? values : []);
+      const values = Array.isArray(companiesResult.value) ? companiesResult.value : [];
+      setCompanies(values);
+      if(canCatalog)setAdminCompanies(values as InsuranceCompanyAdmin[]);
+      if(values[0])setPaymentConfiguration(current=>current.companyCode?current:{...current,companyCode:values[0].code});
     }
     if (staffResult.status === "fulfilled") setStaff(Array.isArray(staffResult.value) ? staffResult.value : []);
+    if(accountsResult.status==="fulfilled")setAccounts((Array.isArray(accountsResult.value)?accountsResult.value:[]).filter(account=>account.category==="INSURANCE"&&account.active&&account.verified));
     if (requests.some(result => result.status === "rejected")) toast.error("Some insurance queues could not be refreshed. Available data is still shown.");
     setLoading(false);
-  }, [allowed, canManageClaims, canManageRenewals, canReport, canReview, canUseApplicationQueue]);
+  }, [allowed, canCatalog, canManageClaims, canManageRenewals, canPaymentConfig, canReport, canReview, canUseApplicationQueue]);
+
+  const loadPaymentConfigurations=useCallback(async(code:string)=>{if(!canPaymentConfig||!code)return;try{setPaymentConfigurations(await insuranceService.adminPaymentConfigurations(code))}catch(error:unknown){toast.error(apiErrorMessage(error,"Payment routes could not be loaded."))}},[canPaymentConfig]);
+  useEffect(()=>{const timer=window.setTimeout(()=>void loadPaymentConfigurations(paymentConfiguration.companyCode),0);return()=>window.clearTimeout(timer)},[loadPaymentConfigurations,paymentConfiguration.companyCode]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -210,6 +233,11 @@ export default function InsuranceOperationsPage() {
     }
   }
 
+  function openPartner(value?:InsuranceCompanyAdmin){setEditingPartner(value?.code??null);setPartner(value?{code:value.code,name:value.name,logoUrl:value.logoUrl??"",description:value.description??"",quotationEmail:value.quotationEmail??"",claimsEmail:value.claimsEmail??"",renewalsEmail:value.renewalsEmail??"",active:value.active}:blankPartner);setPartnerOpen(true)}
+  async function savePartner(event:FormEvent){event.preventDefault();await execute(()=>editingPartner?insuranceService.updateCompany(editingPartner,partner):insuranceService.createCompany(partner),editingPartner?"Insurance partner updated.":"Insurance partner added.");setPartnerOpen(false)}
+  async function addPaymentConfiguration(event:FormEvent){event.preventDefault();const payload={paymentAccountId:Number(paymentConfiguration.paymentAccountId),label:paymentConfiguration.label,instructions:paymentConfiguration.instructions,referenceTemplate:paymentConfiguration.referenceTemplate||null,effectiveFrom:paymentConfiguration.effectiveFrom};setBusy(true);try{await insuranceService.createPaymentConfiguration(paymentConfiguration.companyCode,payload);toast.success("Payment route activated.");setPaymentConfiguration(current=>({...blankPaymentConfiguration,companyCode:current.companyCode}));await loadPaymentConfigurations(paymentConfiguration.companyCode)}catch(error:unknown){toast.error(apiErrorMessage(error,"Payment route could not be saved."))}finally{setBusy(false)}}
+  async function deactivatePaymentConfiguration(id:number){setBusy(true);try{await insuranceService.deactivatePaymentConfiguration(id);toast.success("Payment route deactivated.");await loadPaymentConfigurations(paymentConfiguration.companyCode)}catch(error:unknown){toast.error(apiErrorMessage(error,"Payment route could not be deactivated."))}finally{setBusy(false)}}
+
   if (!allowed) return <AccessDenied/>;
 
   return <div className="min-h-screen bg-slate-50 p-4 sm:p-7">
@@ -217,7 +245,7 @@ export default function InsuranceOperationsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <Button variant="link" asChild className="h-auto p-0"><Link href="/dashboard/insurance"><ArrowLeft className="mr-1 size-4"/>Customer hub</Link></Button>
-          <h1 className="mt-2 text-3xl font-bold text-[#10243e]">Silverwood Insurance Operations</h1>
+          <div className="mt-2 flex items-center gap-4"><InsuranceBrandLogo src="/insurance/brands/silverwood.webp" name="Silverwood Insurance Agency" className="h-16 w-40 shrink-0"/><h1 className="text-3xl font-bold text-[#10243e]">Silverwood Insurance Operations</h1></div>
           <p className="text-muted-foreground">Controlled adviser and manager workflow with complete audit history.</p>
         </div>
         <Button variant="outline" onClick={() => void load()} disabled={loading}><RefreshCw className={`mr-2 size-4 ${loading ? "animate-spin" : ""}`}/>Refresh</Button>
@@ -232,15 +260,26 @@ export default function InsuranceOperationsPage() {
           {canUseApplicationQueue && <TabsTrigger value="applications">Applications</TabsTrigger>}
           {canManageClaims && <TabsTrigger value="claims">Claims</TabsTrigger>}
           {canManageRenewals && <TabsTrigger value="renewals">Renewals</TabsTrigger>}
+          {canCatalog && <TabsTrigger value="partners">Partners</TabsTrigger>}
+          {canPaymentConfig && <TabsTrigger value="payments">Payment routes</TabsTrigger>}
         </TabsList>
         {canUseApplicationQueue && <TabsContent value="applications" className="space-y-4"><ApplicationQueue items={cases} permissions={{canReview, canQuote, canApprove, canVerify, canIssue}} onAction={setAction}/></TabsContent>}
         {canManageClaims && <TabsContent value="claims" className="space-y-3"><ClaimQueue items={claims} onAction={item => {setClaimStatus(CLAIM_TRANSITIONS[item.status]?.[0] ?? "");setAction({kind: "claim-status", item});}}/></TabsContent>}
         {canManageRenewals && <TabsContent value="renewals" className="space-y-3"><RenewalQueue items={renewals} onAction={item => {setRenewalStatus(RENEWAL_TRANSITIONS[item.renewalStatus]?.[0] ?? "");setAction({kind: "renewal-status", item});}}/></TabsContent>}
+        {canCatalog&&<TabsContent value="partners"><PartnerCatalog items={adminCompanies} onAdd={()=>openPartner()} onEdit={openPartner}/></TabsContent>}
+        {canPaymentConfig&&<TabsContent value="payments"><PaymentRoutes companies={companies.filter(company=>company.active)} accounts={accounts} configurations={paymentConfigurations} form={paymentConfiguration} setForm={setPaymentConfiguration} busy={busy} onSubmit={addPaymentConfiguration} onDeactivate={deactivatePaymentConfiguration}/></TabsContent>}
       </Tabs>
     </div>
     <ActionDialog action={action} busy={busy} staff={staff} companies={companies} adviserId={adviserId} setAdviserId={setAdviserId} caseStatus={caseStatus} setCaseStatus={setCaseStatus} note={note} setNote={setNote} reference={reference} setReference={setReference} quote={quote} setQuote={setQuote} policy={policy} setPolicy={setPolicy} claimStatus={claimStatus} setClaimStatus={setClaimStatus} insurerReference={insurerReference} setInsurerReference={setInsurerReference} renewalStatus={renewalStatus} setRenewalStatus={setRenewalStatus} onClose={closeAction} onSubmit={submitAction}/>
+    <PartnerDialog open={partnerOpen} editing={Boolean(editingPartner)} value={partner} setValue={setPartner} busy={busy} onClose={()=>setPartnerOpen(false)} onSubmit={savePartner}/>
   </div>;
 }
+
+function PartnerCatalog({items,onAdd,onEdit}:{items:InsuranceCompanyAdmin[];onAdd:()=>void;onEdit:(item:InsuranceCompanyAdmin)=>void}){return <Card><CardHeader className="flex-row items-center justify-between"><div><CardTitle>Insurance partner catalogue</CardTitle><p className="mt-1 text-sm text-muted-foreground">Maintain approved brands and operational email destinations.</p></div><Button onClick={onAdd}><Plus className="mr-2 size-4"/>Add partner</Button></CardHeader><CardContent><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map(item=><button type="button" key={item.code} onClick={()=>onEdit(item)} className="rounded-xl border p-4 text-left transition hover:border-[#1769aa] hover:shadow-sm"><InsuranceBrandLogo src={item.logoUrl} name={item.name}/><div className="mt-3 flex items-center justify-between gap-2"><strong>{item.name}</strong><Badge variant={item.active?"default":"secondary"}>{item.active?"Active":"Inactive"}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{item.quotationEmail||"Quotation email not configured"}</p></button>)}</div></CardContent></Card>}
+
+function PaymentRoutes({companies,accounts,configurations,form,setForm,busy,onSubmit,onDeactivate}:{companies:InsuranceCompany[];accounts:InsuranceAccount[];configurations:InsurancePaymentConfiguration[];form:typeof blankPaymentConfiguration;setForm:(value:typeof blankPaymentConfiguration)=>void;busy:boolean;onSubmit:(event:FormEvent)=>void;onDeactivate:(id:number)=>void}){const [pending,setPending]=useState<InsurancePaymentConfiguration|null>(null);return <><div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]"><Card><CardHeader><CardTitle>Configured payment routes</CardTitle></CardHeader><CardContent><Field label="Insurance partner"><Select value={form.companyCode} onValueChange={companyCode=>setForm({...form,companyCode})}><SelectTrigger><SelectValue placeholder="Select partner"/></SelectTrigger><SelectContent>{companies.map(company=><SelectItem key={company.code} value={company.code}>{company.name}</SelectItem>)}</SelectContent></Select></Field><div className="mt-4 space-y-3">{!configurations.length&&<Empty text="No payment routes configured for this partner."/>}{configurations.map(item=><div key={item.id} className="rounded-xl border p-4"><div className="flex items-start justify-between gap-3"><div><strong>{item.label}</strong><p className="text-sm text-muted-foreground">{item.accountName} · {title(item.channel)} · version {item.version}</p></div><Badge variant={item.active?"default":"secondary"}>{item.active?"Active":"Inactive"}</Badge></div><p className="mt-2 text-sm">{item.instructions}</p>{item.active&&<Button size="sm" variant="outline" className="mt-3" disabled={busy} onClick={()=>setPending(item)}>Deactivate</Button>}</div>)}</div></CardContent></Card><Card><CardHeader><CardTitle>Add a verified payment route</CardTitle></CardHeader><CardContent><form onSubmit={onSubmit} className="space-y-4"><Field label="Verified Insurance account"><Select required value={form.paymentAccountId} onValueChange={paymentAccountId=>setForm({...form,paymentAccountId})}><SelectTrigger><SelectValue placeholder="Select payment account"/></SelectTrigger><SelectContent>{accounts.map(account=><SelectItem key={account.id} value={String(account.id)}>{account.name} · {title(account.channel)}</SelectItem>)}</SelectContent></Select>{!accounts.length&&<p className="text-xs text-amber-700">Create an Insurance account and have the SlickHood system owner verify it before activation.</p>}</Field><Field label="Customer label"><Input required maxLength={120} value={form.label} onChange={event=>setForm({...form,label:event.target.value})}/></Field><Field label="Payment instructions"><Textarea required maxLength={1500} value={form.instructions} onChange={event=>setForm({...form,instructions:event.target.value})}/></Field><Field label="Reference format (optional)"><Input maxLength={240} value={form.referenceTemplate} onChange={event=>setForm({...form,referenceTemplate:event.target.value})}/></Field><Field label="Effective from"><Input required type="date" min={new Date().toISOString().slice(0,10)} value={form.effectiveFrom} onChange={event=>setForm({...form,effectiveFrom:event.target.value})}/></Field><div className="flex flex-wrap gap-2"><Button disabled={busy||!accounts.length||!form.companyCode}>Activate route</Button><Button asChild type="button" variant="outline"><Link href="/dashboard/insurance/accounts"><Landmark className="mr-2 size-4"/>Manage accounts</Link></Button></div></form></CardContent></Card></div><Dialog open={Boolean(pending)} onOpenChange={open=>!open&&setPending(null)}><DialogContent><DialogHeader><DialogTitle>Deactivate this payment route?</DialogTitle><DialogDescription>Customers will no longer see {pending?.label}. Historical payment records and configuration versions remain intact.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={()=>setPending(null)}>Cancel</Button><Button variant="destructive" disabled={busy} onClick={()=>{if(pending)onDeactivate(pending.id);setPending(null)}}>Deactivate route</Button></DialogFooter></DialogContent></Dialog></>}
+
+function PartnerDialog({open,editing,value,setValue,busy,onClose,onSubmit}:{open:boolean;editing:boolean;value:typeof blankPartner;setValue:(value:typeof blankPartner)=>void;busy:boolean;onClose:()=>void;onSubmit:(event:FormEvent)=>void}){return <Dialog open={open} onOpenChange={next=>!next&&onClose()}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><form onSubmit={onSubmit}><DialogHeader><DialogTitle>{editing?"Edit insurance partner":"Add insurance partner"}</DialogTitle><DialogDescription>Only approved brand assets and operational destinations should be published.</DialogDescription></DialogHeader><div className="mt-5 grid gap-4 sm:grid-cols-2">{!editing&&<Field label="Partner code"><Input required pattern="[A-Z][A-Z0-9_]{1,49}" maxLength={50} value={value.code} onChange={event=>setValue({...value,code:event.target.value.toUpperCase().replace(/[^A-Z0-9_]/g,"")})}/></Field>}<Field label="Display name"><Input required maxLength={160} value={value.name} onChange={event=>setValue({...value,name:event.target.value})}/></Field><div className="sm:col-span-2"><Field label="Logo URL"><Input maxLength={800} placeholder="/insurance/brands/partner.webp or https://…" value={value.logoUrl} onChange={event=>setValue({...value,logoUrl:event.target.value})}/></Field></div><div className="sm:col-span-2"><Field label="Description"><Textarea maxLength={1000} value={value.description} onChange={event=>setValue({...value,description:event.target.value})}/></Field></div><Field label="Quotation email"><Input type="email" value={value.quotationEmail} onChange={event=>setValue({...value,quotationEmail:event.target.value})}/></Field><Field label="Claims email"><Input type="email" value={value.claimsEmail} onChange={event=>setValue({...value,claimsEmail:event.target.value})}/></Field><Field label="Renewals email"><Input type="email" value={value.renewalsEmail} onChange={event=>setValue({...value,renewalsEmail:event.target.value})}/></Field>{editing&&<label className="flex items-center gap-2 self-end text-sm"><input type="checkbox" checked={value.active} onChange={event=>setValue({...value,active:event.target.checked})}/>Active partner</label>}</div><DialogFooter className="mt-6"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button disabled={busy}><Settings2 className="mr-2 size-4"/>{busy?"Saving…":"Save partner"}</Button></DialogFooter></form></DialogContent></Dialog>}
 
 function ApplicationQueue({items, permissions, onAction}: {items: InsuranceCase[]; permissions: {canReview: boolean; canQuote: boolean; canApprove: boolean; canVerify: boolean; canIssue: boolean}; onAction: (action: Action) => void}) {
   if (!items.length) return <Empty text="No applications in the queue."/>;
