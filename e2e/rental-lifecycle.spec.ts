@@ -9,14 +9,14 @@ test("lease operations routes drafts through governed documents and records a te
   await page.route("**/lease/**", async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (path === "/lease/list") {
+    if (path.endsWith("/lease/list")) {
       await route.fulfill({ json: envelope([
         { id: 41, name: "Apartment A offer", leaseMode: "RENT", tenantName: "Jane Tenant", signed: false, lifecycleStatus: "DRAFT", expiryDate: "2027-08-31" },
         { id: 42, name: "Apartment B lease", leaseMode: "RENT", tenantName: "John Tenant", signed: true, lifecycleStatus: "ACTIVE", expiryDate: "2027-08-31" },
       ]) });
       return;
     }
-    if (path === "/lease/42/termination" && request.method() === "POST") {
+    if (path.endsWith("/lease/42/termination") && request.method() === "POST") {
       notice = request.postDataJSON(); await route.fulfill({ json: envelope([]) }); return;
     }
     await route.continue();
@@ -38,11 +38,11 @@ test("landlord creates a residential lease agreement without a sales offer lette
   await page.route("**/lease/documents**", async route => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (path === "/lease/documents/templates") { await route.fulfill({ json: envelope([]) }); return; }
-    if (path === "/lease/documents" && request.method() === "POST") {
+    if (path.endsWith("/lease/documents/templates")) { await route.fulfill({ json: envelope([]) }); return; }
+    if (path.endsWith("/lease/documents") && request.method() === "POST") {
       generated = request.postDataJSON(); await route.fulfill({ json: envelope([]) }); return;
     }
-    if (path === "/lease/documents") { await route.fulfill({ json: envelope([]) }); return; }
+    if (path.endsWith("/lease/documents")) { await route.fulfill({ json: envelope([]) }); return; }
     await route.continue();
   });
 
