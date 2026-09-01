@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readAccessTokenCookie } from "@/lib/access-token-cookie";
 
 export async function GET(req: NextRequest) {
-  const token = req.cookies.get("token")?.value;
+  const token = readAccessTokenCookie(req.cookies);
   if (!token) {
     return NextResponse.json(
       { success: false, description: "No token found", code: "i0000", data: null },

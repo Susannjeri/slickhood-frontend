@@ -134,6 +134,52 @@ test("the browser session endpoint rejects malformed tokens", async ({ request }
   await expect(response.json()).resolves.toMatchObject({ success: false });
 });
 
+test("a large multi-role token survives the secure cookie handoff", async ({ page, context }) => {
+  const permissions = Array.from({ length: 35 }, (_, index) => `permission_${index}_${"x".repeat(20)}`);
+  const jwt = testToken([
+    { title: "Landlord", permissions },
+    { title: "EstateManager", permissions },
+    { title: "SalesAgent", permissions },
+  ]);
+  expect(jwt.length).toBeGreaterThan(4_096);
+
+  const response = await page.request.post("/browser-session/set-cookie", {
+    data: { token: jwt, refreshToken: "refresh-token-longer-than-sixteen-characters" },
+  });
+  expect(response.status()).toBe(200);
+
+  const cookies = await context.cookies();
+  expect(cookies.find(cookie => cookie.name === "token")).toBeUndefined();
+  expect(cookies.find(cookie => cookie.name === "tokenChunks")?.httpOnly).toBe(true);
+  const tokenChunks = cookies.filter(cookie => /^token\.\d+$/.test(cookie.name));
+  expect(tokenChunks.length).toBeGreaterThan(1);
+  expect(tokenChunks.every(cookie => cookie.value.length <= 3_500 && cookie.httpOnly)).toBe(true);
+
+  // The production cookie is Secure. Re-add the captured values without Secure so
+  // Playwright's HTTP-only local web server can exercise reconstruction and Proxy.
+  await context.clearCookies();
+  await context.addCookies(cookies.map(cookie => ({
+    name: cookie.name,
+    value: cookie.value,
+    domain: cookie.domain,
+    path: cookie.path,
+    httpOnly: cookie.httpOnly,
+    secure: false,
+    sameSite: cookie.sameSite,
+  })));
+
+  const retrieved = await page.request.get("/browser-session/get-token");
+  expect(retrieved.status()).toBe(200);
+  await expect(retrieved.json()).resolves.toMatchObject({ data: { jwt } });
+
+  const protectedPage = await page.request.get("/continue-setup", { maxRedirects: 0 });
+  expect(protectedPage.status()).toBe(200);
+
+  await page.request.post("/browser-session/clear-cookie");
+  const cleared = await context.cookies();
+  expect(cleared.some(cookie => cookie.name === "token" || cookie.name === "tokenChunks" || /^token\.\d+$/.test(cookie.name))).toBe(false);
+});
+
 test("password reset verifies ownership and enforces the registration password policy", async ({ page }) => {
   await page.route("**/otp/options**", route => route.fulfill({ json: envelope([{ email: true, phone: false, google: false, preferred: "EMAIL" }]) }));
   await page.route("**/otp/send**", route => route.fulfill({ json: envelope(["sent"]) }));

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { accessTokenMaxAge } from "@/lib/session-token";
+import { writeAccessTokenCookies } from "@/lib/access-token-cookie";
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -10,8 +11,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, description: "Invalid session" }, { status: 400 });
   }
   const res = NextResponse.json({ success: true });
+  writeAccessTokenCookies(res.cookies, token, maxAge);
   const secure = process.env.NODE_ENV === "production";
-  res.cookies.set("token", token, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge });
   res.cookies.set("refreshToken", refreshToken, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 7 });
   return res;
 }

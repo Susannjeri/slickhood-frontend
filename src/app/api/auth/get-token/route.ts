@@ -1,9 +1,10 @@
 // app/api/auth/get-token/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { readAccessTokenCookie } from "@/lib/access-token-cookie";
 
 export async function GET(req: NextRequest) {
   // Get token from httpOnly cookie
-  const token = req.cookies.get("token")?.value;
+  const token = readAccessTokenCookie(req.cookies);
 
   if (!token) {
     return NextResponse.json(
