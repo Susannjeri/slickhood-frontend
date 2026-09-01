@@ -84,6 +84,7 @@ export interface ReportDefinition {
   description: string;
   category: string;
   supportsDateRange: boolean;
+  dateMode: "HISTORICAL" | "FORWARD" | "SNAPSHOT";
   availableToRoles: string[];
 }
 
@@ -96,6 +97,7 @@ export interface OperationalReport {
   columns: string[];
   rows: Array<Record<string, string | number | boolean | null>>;
   truncated: boolean;
+  rowLimit: number;
 }
 
 export const listReportCatalog = () => API.get("/reports/catalog");
