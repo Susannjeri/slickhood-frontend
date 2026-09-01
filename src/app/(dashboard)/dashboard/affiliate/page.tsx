@@ -29,6 +29,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { envelopeItem, envelopePageList } from "@/lib/api-envelope";
+import type { Account } from "@/types/account";
 const money = (n: number, c = "KES") =>
   new Intl.NumberFormat("en-KE", {
     style: "currency",
@@ -42,7 +44,7 @@ const window = globalThis.window ?? ({ location: { origin: "" } } as Window);
 export default function AffiliatePage() {
   const token = useAuthStore((s) => s.token),
     [data, setData] = useState<AffiliateDashboard>(),
-    [accounts, setAccounts] = useState<any[]>([]),
+    [accounts, setAccounts] = useState<Account[]>([]),
     [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     if (!token) return;
@@ -52,8 +54,18 @@ export default function AffiliatePage() {
         affiliateDashboard(),
         listAccounts(token, { byLandlord: true, size: 100 }),
       ]);
-      setData(d.data?.data?.[0]);
-      setAccounts(a.data?.data ?? []);
+      const dashboard = envelopeItem<AffiliateDashboard | undefined>(d, undefined);
+      setData(
+        dashboard
+          ? {
+              ...dashboard,
+              referrals: Array.isArray(dashboard.referrals) ? dashboard.referrals : [],
+              commissions: Array.isArray(dashboard.commissions) ? dashboard.commissions : [],
+              payouts: Array.isArray(dashboard.payouts) ? dashboard.payouts : [],
+            }
+          : undefined,
+      );
+      setAccounts(envelopePageList<Account>(a));
     } catch (e) {
       toast.error(apiError(e, "Affiliate workspace could not be loaded."));
     } finally {

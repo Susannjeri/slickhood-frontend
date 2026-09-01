@@ -3,6 +3,10 @@ import { useApi } from "@/hooks/useApi";
 import { useAuthStore } from "@/store/authStore";
 import { DashboardTotals, DashboardTotalsResponse } from "@/types/dashboard";
 import { apiErrorMessage } from "@/lib/api-error";
+import { affiliateDashboard, type AffiliateDashboard } from "@/services/affiliate";
+import { wealthService } from "@/services/wealth.service";
+import type { WealthDashboard } from "@/types/wealth";
+import { envelopeItem } from "@/lib/api-envelope";
 
 // Mirrors the shape of usePropertyMetadata.ts — a small stateful hook built
 // on top of useApi()'s plain handleGetDashboardTotals wrapper, since useApi
@@ -26,6 +30,18 @@ export function useDashboardTotals(refetchKey = 0) {
       setError(null);
       try {
         const apiRole = role.replace(/([a-z])([A-Z])/g, "$1_$2").replace(/[\s-]+/g, "_").toUpperCase();
+        if (apiRole === "AFFILIATE") {
+          const value = envelopeItem<AffiliateDashboard | null>(await affiliateDashboard(), null);
+          if (!cancelled && value) setTotals({role: apiRole, primaryCount: value.totalReferrals, secondaryCount: value.conversions, pendingActions: value.availableBalance, completedCount: value.lifetimeEarnings, primaryLabel: "Referrals", secondaryLabel: "Conversions", pendingLabel: `Available earnings (${value.profile.currency})`, completedLabel: `Lifetime earnings (${value.profile.currency})`});
+          else if (!cancelled) setError("Affiliate dashboard data is unavailable.");
+          return;
+        }
+        if (apiRole === "ASSET_PORTFOLIO_MANAGER") {
+          const value = envelopeItem<WealthDashboard | null>(await wealthService.dashboard(), null);
+          if (!cancelled && value) setTotals({role: apiRole, primaryCount: value.summary.assetCount, secondaryCount: value.summary.netWorth, pendingActions: value.summary.overdueDeadlines, completedCount: value.goalProgress.filter(goal => goal.progressPercent >= 100).length, primaryLabel: "Assets", secondaryLabel: `Net worth (${value.summary.currency})`, pendingLabel: "Overdue deadlines", completedLabel: "Goals achieved"});
+          else if (!cancelled) setError("Wealth dashboard data is unavailable.");
+          return;
+        }
         const res = await handleGetDashboardTotals(apiRole) as DashboardTotalsResponse;
         if (cancelled) return;
 
