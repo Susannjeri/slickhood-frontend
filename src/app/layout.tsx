@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import "./globals.css";
 import SessionHydrator from "@/components/auth/SessionHydrator";
+import HelpChatBox from "@/components/helpdesk/HelpChatBox";
 
 const roboto = Roboto({
   subsets: ["latin"],
@@ -26,6 +27,7 @@ export default function RootLayout({
         <main className="w-full h-full">
           {children}
         </main>
+        <HelpChatBox />
 </body>
     </html>
   );
