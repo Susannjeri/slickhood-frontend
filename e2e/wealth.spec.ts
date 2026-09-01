@@ -32,6 +32,7 @@ test("My Wealth remains usable with incomplete legacy portfolio records", async 
     status: "ACTIVE",
   }]) }));
   await page.route("**/wealth/property-options", route => route.fulfill({ json: envelope([null]) }));
+  await page.route("**/wealth/asset-types", route => route.fulfill({ json: envelope([{id:1,code:"PROPERTY",label:"Property",displayOrder:10,marketPricingAllowed:false,active:true}]) }));
   await page.route("**/wealth/vault", route => route.fulfill({ json: envelope([null]) }));
 
   await page.goto("/dashboard/wealth");
@@ -49,6 +50,7 @@ test("vault lists metadata and requests an owner-scoped link only when opened", 
   }) }));
   await page.route("**/wealth/assets", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/wealth/property-options", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/wealth/asset-types", route => route.fulfill({ json: envelope([{id:1,code:"PROPERTY",label:"Property",displayOrder:10,marketPricingAllowed:false,active:true}]) }));
   await page.route("**/wealth/vault/9", route => {
     secureLinkRequests += 1;
     return route.fulfill({ json: envelope({ document: { id: 9, category: "WILL", displayName: "will.pdf", contentType: "application/pdf", fileSize: 128, checksumSha256: "abc" }, downloadUrl: "about:blank#protected-document" }) });

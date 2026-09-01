@@ -3,7 +3,7 @@
 import {FormEvent,useCallback,useEffect,useMemo,useState} from "react";
 import {toast} from "sonner";
 import {AlertTriangle,Archive,ArrowUpRight,Building2,CalendarClock,FileLock2,Goal,Landmark,Plus,RefreshCw,Scale,ShieldCheck,Sparkles,TrendingUp,WalletCards} from "lucide-react";
-import {wealthService,AssetPayload,WealthPropertyOption} from "@/services/wealth.service";
+import {wealthService,AssetPayload,WealthPropertyOption,WealthAssetType} from "@/services/wealth.service";
 import {WealthAsset,WealthDashboard,VaultDocument} from "@/types/wealth";
 import {apiErrorMessage} from "@/lib/api-error";
 import {Card,CardContent,CardDescription,CardHeader,CardTitle} from "@/components/ui/card";
@@ -25,11 +25,13 @@ const assetTypes=["PROPERTY","LAND","LISTED_SECURITY","FUND","GOVERNMENT_SECURIT
 export default function WealthPage(){
  const [dashboard,setDashboard]=useState<WealthDashboard|null>(null),[assets,setAssets]=useState<WealthAsset[]>([]),[busy,setBusy]=useState(false);
  const [propertyOptions,setPropertyOptions]=useState<WealthPropertyOption[]>([]);
+ const [configuredAssetTypes,setConfiguredAssetTypes]=useState<WealthAssetType[]>([]);
+ const assetTypes=configuredAssetTypes.length?configuredAssetTypes.map(type=>type.code):["PROPERTY","OTHER"];
  const [selected,setSelected]=useState<number|undefined>(),[assetForm,setAssetForm]=useState<AssetPayload>(emptyAsset),[editing,setEditing]=useState<number>();
  const [years,setYears]=useState(5),[valueGrowth,setValueGrowth]=useState(5),[incomeGrowth,setIncomeGrowth]=useState(3),[expenseGrowth,setExpenseGrowth]=useState(3);
  const [docs,setDocs]=useState<VaultDocument[]>([]);
  const selectedAsset=useMemo(()=>assets.find(a=>a.id===selected),[assets,selected]);
- const load=useCallback(async()=>{try{const [d,a,p]=await Promise.all([wealthService.dashboard(years,valueGrowth,incomeGrowth,expenseGrowth),wealthService.assets(),wealthService.propertyOptions().catch(()=>({data:{data:[]}}))]);const raw=envelopeItem<WealthDashboard|null>(d,null);setDashboard(raw?{...raw,assets:list(raw.assets),obligations:list(raw.obligations),goals:list(raw.goals),goalProgress:list(raw.goalProgress),insights:list(raw.insights),projection:list(raw.projection)}:null);const next=envelopeList<WealthAsset>(a);setAssets(next);setPropertyOptions(envelopeList<WealthPropertyOption>(p));setSelected(current=>next.some(asset=>asset.id===current)?current:next[0]?.id)}catch(e:unknown){setDashboard(null);setAssets([]);setPropertyOptions([]);setSelected(undefined);toast.error(apiErrorMessage(e,"Could not load Wealth."))}},[years,valueGrowth,incomeGrowth,expenseGrowth]);
+ const load=useCallback(async()=>{try{const [d,a,p,t]=await Promise.all([wealthService.dashboard(years,valueGrowth,incomeGrowth,expenseGrowth),wealthService.assets(),wealthService.propertyOptions().catch(()=>({data:{data:[]}})),wealthService.assetTypes()]);const raw=envelopeItem<WealthDashboard|null>(d,null);setDashboard(raw?{...raw,assets:list(raw.assets),obligations:list(raw.obligations),goals:list(raw.goals),goalProgress:list(raw.goalProgress),insights:list(raw.insights),projection:list(raw.projection)}:null);const next=envelopeList<WealthAsset>(a);setAssets(next);setPropertyOptions(envelopeList<WealthPropertyOption>(p));setConfiguredAssetTypes(envelopeList<WealthAssetType>(t));setSelected(current=>next.some(asset=>asset.id===current)?current:next[0]?.id)}catch(e:unknown){setDashboard(null);setAssets([]);setPropertyOptions([]);setConfiguredAssetTypes([]);setSelected(undefined);toast.error(apiErrorMessage(e,"Could not load Wealth."))}},[years,valueGrowth,incomeGrowth,expenseGrowth]);
  useEffect(()=>{load()},[load]);
  useEffect(()=>{wealthService.vault().then(r=>setDocs(list<VaultDocument>(r.data?.data))).catch(()=>setDocs([]))},[]);
  async function run(action:()=>Promise<unknown>,success:string){setBusy(true);try{await action();toast.success(success);await load()}catch(e:unknown){toast.error(apiErrorMessage(e,"Wealth update failed."))}finally{setBusy(false)}}

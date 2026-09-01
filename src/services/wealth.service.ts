@@ -2,9 +2,15 @@ import {API} from "@/lib/api";
 
 export type AssetPayload={propertyId?:number;assetType:string;name:string;reference?:string;location?:string;currency:string;acquisitionCost:number;acquisitionDate?:string;currentValue:number;valuationDate:string;status:string;exchangeCode?:string;instrumentSymbol?:string;quantity?:number;averageUnitCost?:number;pricingMode?:"MANUAL"|"MARKET"};
 export type WealthPropertyOption={id:number;name:string;description?:string};
+export type WealthAssetType={id:number;code:string;label:string;description?:string;displayOrder:number;marketPricingAllowed:boolean;active:boolean};
 export const wealthService={
  dashboard:(years=5,valueGrowth=5,incomeGrowth=3,expenseGrowth=3)=>API.get("/wealth/dashboard",{params:{years,valueGrowth,incomeGrowth,expenseGrowth}}),
  assets:()=>API.get("/wealth/assets"),
+ assetTypes:()=>API.get("/wealth/asset-types"),
+ adminSummary:()=>API.get("/wealth/admin/summary"),
+ adminAssetTypes:()=>API.get("/wealth/admin/asset-types"),
+ createAssetType:(data:Partial<WealthAssetType>)=>API.post("/wealth/admin/asset-types",data),
+ updateAssetType:(id:number,data:Partial<WealthAssetType>)=>API.put(`/wealth/admin/asset-types/${id}`,data),
  propertyOptions:()=>API.get("/wealth/property-options"),
  createAsset:(data:AssetPayload)=>API.post("/wealth/assets",data),
  updateAsset:(id:number,data:AssetPayload)=>API.put(`/wealth/assets/${id}`,data),
