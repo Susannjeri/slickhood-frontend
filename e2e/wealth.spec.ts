@@ -32,11 +32,36 @@ test("My Wealth remains usable with incomplete legacy portfolio records", async 
     status: "ACTIVE",
   }]) }));
   await page.route("**/wealth/property-options", route => route.fulfill({ json: envelope([null]) }));
-  await page.route("**/wealth/assets/7/vault", route => route.fulfill({ json: envelope([null]) }));
+  await page.route("**/wealth/vault", route => route.fulfill({ json: envelope([null]) }));
 
   await page.goto("/dashboard/wealth");
 
   await expect(page.getByRole("heading", { name: "Your financial command centre." })).toBeVisible();
   await expect(page.getByText("Legacy rental").first()).toBeVisible();
   await expect(page.getByText("Application error:")).toHaveCount(0);
+});
+
+test("vault lists metadata and requests an owner-scoped link only when opened", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Landlord", permissions: ["view_wealth"] });
+  let secureLinkRequests = 0;
+  await page.route("**/wealth/dashboard**", route => route.fulfill({ json: envelope({
+    summary: { currency: "KES" }, assets: [], obligations: [], goals: [], goalProgress: [], insights: [], projection: [],
+  }) }));
+  await page.route("**/wealth/assets", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/wealth/property-options", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/wealth/vault/9", route => {
+    secureLinkRequests += 1;
+    return route.fulfill({ json: envelope({ document: { id: 9, category: "WILL", displayName: "will.pdf", contentType: "application/pdf", fileSize: 128, checksumSha256: "abc" }, downloadUrl: "about:blank#protected-document" }) });
+  });
+  await page.route("**/wealth/vault", route => route.fulfill({ json: envelope([
+    { document: { id: 9, category: "WILL", displayName: "will.pdf", contentType: "application/pdf", fileSize: 128, checksumSha256: "abc" }, downloadUrl: null },
+  ]) }));
+
+  await page.goto("/dashboard/wealth");
+  await page.getByRole("tab", { name: "Document vault" }).click();
+  const documentButton = page.getByRole("button", { name: /^will\.pdf WILL/i });
+  await expect(documentButton).toBeVisible();
+  expect(secureLinkRequests).toBe(0);
+  await documentButton.click();
+  await expect.poll(() => secureLinkRequests).toBe(1);
 });

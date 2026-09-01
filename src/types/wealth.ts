@@ -8,4 +8,4 @@ export type WealthInsight={severity:"INFO"|"MEDIUM"|"HIGH";code:string;title:str
 export type WealthProjection={year:number;assetValue:number;debt:number;netWorth:number;income:number;expenses:number;cashFlow:number};
 export type WealthAdvisor={completenessScore:number;headline:string;nextBestActions:string[];marketPricedAssets:number;staleValuations:number;hasWill:boolean;hasTrust:boolean};
 export type WealthDashboard={summary:WealthSummary;assets:WealthPerformance[];obligations:WealthObligation[];goals:WealthGoal[];goalProgress:WealthGoalProgress[];insights:WealthInsight[];projection:WealthProjection[];advisor?:WealthAdvisor};
-export type VaultDocument={document:{id:number;assetId?:number;category:string;displayName:string;contentType:string;fileSize:number;checksumSha256:string;documentDate?:string;expiryDate?:string;notes?:string};downloadUrl:string};
+export type VaultDocument={document:{id:number;assetId?:number;category:string;displayName:string;contentType:string;fileSize:number;checksumSha256:string;documentDate?:string;expiryDate?:string;notes?:string};downloadUrl?:string|null};

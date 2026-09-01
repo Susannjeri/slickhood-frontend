@@ -19,6 +19,7 @@ export const wealthService={
  uploadDocument:(id:number,data:FormData)=>API.post(`/wealth/assets/${id}/vault`,data),
  documents:(id:number)=>API.get(`/wealth/assets/${id}/vault`),
  vault:()=>API.get("/wealth/vault"),
+ document:(id:number)=>API.get(`/wealth/vault/${id}`),
  uploadVaultDocument:(data:FormData)=>API.post("/wealth/vault",data),
  archiveDocument:(id:number)=>API.delete(`/wealth/vault/${id}`),
 };
