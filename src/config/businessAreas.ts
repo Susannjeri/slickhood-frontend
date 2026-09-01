@@ -111,3 +111,19 @@ const roleDisplayNames: Record<string, string> = {
 
 export const roleDisplayName = (value?: string | null) =>
   roleDisplayNames[normalizedRoleTitle(value)] ?? value ?? "";
+
+export const businessAreaForRoleTitle = (value?: string | null) => {
+  const normalized = normalizedRoleTitle(value);
+  return businessAreas.find(area => area.roleTitles.includes(normalized));
+};
+
+export const workspaceHrefForRole = (value?: string | null) => {
+  const normalized = normalizedRoleTitle(value);
+  const businessArea = businessAreaForRoleTitle(value);
+  if (businessArea) return businessArea.workspaceHref;
+
+  if (["buyer", "salescoordinator", "listingagent"].includes(normalized)) return "/dashboard/sales";
+  if (["homeowner", "estateoperationsmanager"].includes(normalized)) return "/dashboard/estate";
+  if (normalized === "tenant") return "/dashboard/lease/operations";
+  return "/dashboard";
+};

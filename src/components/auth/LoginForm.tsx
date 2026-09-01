@@ -128,7 +128,10 @@ export default function LoginForm() {
     setEmail(values.email.trim().toLowerCase());
     setSuccess("Welcome back — checking where you left off...");
     setLoading(false);
-    router.replace("/continue-setup");
+    // The secure session cookie is created immediately before this hand-off.
+    // Force a fresh document request so Next cannot reuse an unauthenticated
+    // prefetched response for the protected continuation route.
+    window.location.replace("/continue-setup");
   }
 
   const inputClass = "h-11 rounded-lg text-base focus-visible:ring-[#EF4217]";

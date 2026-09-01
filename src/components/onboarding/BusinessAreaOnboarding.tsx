@@ -87,11 +87,17 @@ export default function BusinessAreaOnboarding({ registrationMode = false }: { r
       router.push("/register");
       return;
     }
+    // Persist the intended product before any API call. If KYC or a transient
+    // refresh interrupts this journey, Continue Setup can resume the exact
+    // business area instead of falling back to the user's previous role.
+    setSelectedBusinessAreaId(area.id);
     if (isSuperadmin) return void router.push(area.workspaceHref);
     const matchingRole = roles.find(role => area.roleTitles.includes(normalizedRoleTitle(role.title)));
     if (matchingRole) {
       setActiveRole(matchingRole);
-      router.push(`/business-areas/plans?area=${area.id}`);
+      // An existing role can represent a safely resumed, partially-completed
+      // Add Business Area attempt. Re-evaluate KYC and subscription state.
+      router.push("/continue-setup");
       return;
     }
     if (!token) return void router.replace("/login");
@@ -101,12 +107,13 @@ export default function BusinessAreaOnboarding({ registrationMode = false }: { r
       const response = await selfAssignRole(roleId, token);
       const kycRequired = Boolean(response.data.data?.[0]?.kycRequired);
       await handleTokenRefresh();
+      const refreshedRole = useAuthStore.getState().roles.find(role => area.roleTitles.includes(normalizedRoleTitle(role.title)));
+      if (!refreshedRole) throw new Error("The new business area was assigned but the secure session could not be refreshed.");
+      useAuthStore.getState().setActiveRole(refreshedRole);
       if (kycRequired) {
         toast.info("This business area needs additional verification. Let’s complete it securely.");
         router.push("/kyc");
       } else {
-        const refreshedRole = useAuthStore.getState().roles.find(role => area.roleTitles.includes(normalizedRoleTitle(role.title)));
-        if (refreshedRole) useAuthStore.getState().setActiveRole(refreshedRole);
         toast.success(`${area.title} was added to your account.`);
         router.push(`/business-areas/plans?area=${area.id}`);
       }

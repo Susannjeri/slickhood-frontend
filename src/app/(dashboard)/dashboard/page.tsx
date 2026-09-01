@@ -224,12 +224,13 @@ export default function DashboardPage() {
                 <Home className="w-4 h-4 mr-2" />
                 Add New Unit
               </Link></Button>}
-              {permissions.includes("view_lease_template") && <Button asChild variant="outline" className="w-full justify-start dark:border-white/10 dark:text-white dark:hover:bg-white/10"><Link href="/dashboard/lease/templates">
+              {permissions.includes("create_lease_template") && <Button asChild variant="outline" className="w-full justify-start dark:border-white/10 dark:text-white dark:hover:bg-white/10"><Link href="/dashboard/lease/templates">
                 <FileText className="w-4 h-4 mr-2" />
                 Create Lease
               </Link></Button>}
-              {permissions.includes("view_estate") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/estate"><Building2 className="mr-2 h-4 w-4"/>Estate Management</Link></Button>}
-              {permissions.includes("view_sale_pipeline") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/sales"><TrendingUp className="mr-2 h-4 w-4"/>Property Sale Management</Link></Button>}
+              {activeRoleKey === "tenant" && permissions.includes("view_active_lease") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/lease/operations"><FileText className="mr-2 h-4 w-4"/>My Lease</Link></Button>}
+              {permissions.includes("view_estate") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/estate"><Building2 className="mr-2 h-4 w-4"/>{activeRoleKey === "homeowner" ? "My Home" : "Estate Management"}</Link></Button>}
+              {permissions.includes("view_sale_pipeline") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/sales"><TrendingUp className="mr-2 h-4 w-4"/>{activeRoleKey === "buyer" ? "My Property Purchase" : "Property Sale Management"}</Link></Button>}
               {permissions.includes("view_wealth") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/wealth"><TrendingUp className="mr-2 h-4 w-4"/>Open My Wealth</Link></Button>}
               {permissions.includes("view_lease_document") && <Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/documents"><FileText className="mr-2 h-4 w-4"/>Documents & notices</Link></Button>}
             </CardContent>

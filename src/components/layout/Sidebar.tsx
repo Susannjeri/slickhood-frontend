@@ -52,7 +52,7 @@ import { ChevronUp, User, Briefcase, ChevronDown, Power, Check, UserCog, UserPlu
 import { FaUserTie, FaBuilding, FaTools, FaHandshake } from "react-icons/fa";
 import JobsDrawer from "@/components/JobsDrawer";
 import { cn } from "@/lib/utils";
-import { roleDisplayName } from "@/config/businessAreas";
+import { businessAreaForRoleTitle, roleDisplayName, workspaceHrefForRole } from "@/config/businessAreas";
 
 const commitHash = process.env.NEXT_PUBLIC_COMMIT_HASH || "unknown";
 const githubUrl = `https://github.com/naphtron/PMS/${commitHash}`;
@@ -97,6 +97,7 @@ export default function AppSidebar() {
   const roles = useAuthStore((s) => s.roles);
   const activeRole = useAuthStore((s) => s.activeRole);
   const setActiveRole = useAuthStore((s) => s.setActiveRole);
+  const setSelectedBusinessAreaId = useAuthStore((s) => s.setSelectedBusinessAreaId);
   const switching = useAuthStore((s) => s.switching);
   const setSwitching = useAuthStore((s) => s.setSwitching);
 
@@ -115,7 +116,8 @@ export default function AppSidebar() {
     setSwitching(true);
     setTimeout(() => {
       setActiveRole(role);
-      router.push("/dashboard");
+      setSelectedBusinessAreaId(businessAreaForRoleTitle(role.title)?.id ?? null);
+      router.push(workspaceHrefForRole(role.title));
       setTimeout(() => setSwitching(false), 500);
     }, 50);
   };
@@ -476,7 +478,7 @@ export default function AppSidebar() {
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-[#EF4217] text-[#EF4217] hover:bg-[#EF4217] hover:text-white"
             >
               <UserPlus className="w-3.5 h-3.5" />
-              Add Role
+              Add Business Area
             </button>
           </div>
         </DialogContent>
