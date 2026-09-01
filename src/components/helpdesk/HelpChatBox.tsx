@@ -122,17 +122,17 @@ export default function HelpChatBox() {
   if (hidden) return null;
   return <>
     {!open && <button type="button" aria-label="Open Slickhood Help" onClick={() => setOpen(true)}
-      className="fixed bottom-5 right-5 z-[70] flex items-center gap-2 rounded-full bg-[#EF4217] px-4 py-3 font-semibold text-white shadow-xl transition hover:bg-[#d93a13] focus:outline-none focus:ring-4 focus:ring-orange-200">
+      className="fixed bottom-5 right-5 z-[70] flex items-center gap-2 rounded-full border border-white/20 bg-[#EF4217] px-4 py-3 font-semibold text-white shadow-[0_14px_36px_rgba(20,17,48,0.28)] transition hover:bg-[#d93a13] focus:outline-none focus:ring-4 focus:ring-[#EF4217]/25">
       <MessageCircle className="h-5 w-5" /><span className="hidden sm:inline">Help</span>
     </button>}
     {open && <section aria-label="Slickhood Help chat" className="fixed inset-x-3 bottom-3 z-[70] flex max-h-[min(720px,calc(100vh-24px))] flex-col overflow-hidden rounded-2xl border bg-white shadow-2xl sm:left-auto sm:right-5 sm:w-[390px]">
-      <header className="flex items-center justify-between bg-[#141130] px-4 py-3 text-white">
-        <div className="flex items-center gap-3"><span className="rounded-xl bg-[#EF4217] p-2"><Bot className="h-5 w-5" /></span><div><h2 className="font-semibold">Slickhood Help</h2><p className="text-xs text-white/70">Guidance with human support when needed</p></div></div>
+      <header className="flex items-center justify-between border-b-4 border-[#EF4217] bg-[#141130] px-4 py-3 text-white">
+        <div className="flex items-center gap-3"><span className="rounded-xl bg-[#EF4217] p-2 shadow-sm"><Bot className="h-5 w-5" /></span><div><h2 className="font-semibold"><span className="text-white">Slick</span><span className="text-[#EF4217]">Hood</span> Help</h2><p className="text-xs text-white/70">Guidance with human support when needed</p></div></div>
         <div className="flex"><Button size="icon" variant="ghost" className="text-white hover:bg-white/10 hover:text-white" onClick={() => setOpen(false)} aria-label="Minimise help"><ChevronDown className="h-5 w-5" /></Button><Button size="icon" variant="ghost" className="text-white hover:bg-white/10 hover:text-white" onClick={() => { setOpen(false); setConversation(undefined); }} aria-label="Close help"><X className="h-5 w-5" /></Button></div>
       </header>
       <div className="border-b bg-orange-50 px-4 py-2 text-xs text-orange-900"><ShieldAlert className="mr-1 inline h-3.5 w-3.5" />Never share passwords, OTPs, PINs or full card details.</div>
-      <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4">
-        {!conversation && <div className="space-y-4"><div className="rounded-2xl border bg-white p-4"><p className="font-medium text-[#141130]">How can I help with {context.label}?</p><p className="mt-1 text-sm text-slate-600">Choose a common question or type your own. You can ask for a person at any time.</p></div><div className="grid gap-2">{context.prompts.map((prompt) => <button key={prompt} onClick={() => send(prompt)} className="rounded-xl border bg-white px-3 py-2 text-left text-sm text-slate-700 transition hover:border-orange-300 hover:bg-orange-50">{prompt}</button>)}</div></div>}
+      <div className="min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-[#EF4217]/[0.06] to-slate-50 p-4">
+        {!conversation && <div className="space-y-4"><div className="rounded-2xl border border-[#141130]/10 bg-white p-4 shadow-sm"><p className="font-medium text-[#141130]">How can I help with {context.label}?</p><p className="mt-1 text-sm text-slate-600">Choose a common question or type your own. You can ask for a person at any time.</p></div><div className="grid gap-2">{context.prompts.map((prompt) => <button key={prompt} onClick={() => send(prompt)} className="rounded-xl border border-[#141130]/10 bg-white px-3 py-2 text-left text-sm text-[#141130] transition hover:border-[#EF4217] hover:bg-[#EF4217]/5 hover:text-[#EF4217]">{prompt}</button>)}</div></div>}
         <div className="space-y-3">{conversation?.messages.map((item) => <ChatMessage key={item.id} message={item} />)}{sending && <div className="flex items-center gap-2 text-xs text-slate-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />Slickhood Help is responding…</div>}<div ref={endRef} /></div>
       </div>
       {error && <p role="alert" className="border-t bg-red-50 px-4 py-2 text-xs text-red-700">{error}</p>}
