@@ -135,7 +135,7 @@ test("the browser session endpoint rejects malformed tokens", async ({ request }
 });
 
 test("a large multi-role token survives the secure cookie handoff", async ({ page, context }) => {
-  const permissions = Array.from({ length: 180 }, (_, index) => `permission_${index}_${"x".repeat(20)}`);
+  const permissions = Array.from({ length: 35 }, (_, index) => `permission_${index}_${"x".repeat(20)}`);
   const jwt = testToken([
     { title: "Landlord", permissions },
     { title: "EstateManager", permissions },

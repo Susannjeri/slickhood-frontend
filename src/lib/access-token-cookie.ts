@@ -2,7 +2,7 @@ const ACCESS_TOKEN_COOKIE = "token";
 const ACCESS_TOKEN_CHUNK_COUNT_COOKIE = "tokenChunks";
 const ACCESS_TOKEN_CHUNK_PREFIX = "token.";
 const ACCESS_TOKEN_CHUNK_SIZE = 3_500;
-const MAX_ACCESS_TOKEN_CHUNKS = 8;
+const MAX_ACCESS_TOKEN_CHUNKS = 4;
 
 type CookieReader = {
   get(name: string): { value: string } | undefined;
