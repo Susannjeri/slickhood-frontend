@@ -11,8 +11,10 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "SlickHood",
-  description: "A property management system",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://slickhood.com"),
+  title: { default: "Slickhood | Find and manage property", template: "%s | Slickhood" },
+  description: "Discover verified property to rent and buy, or manage your property with Slickhood.",
+  openGraph: { siteName: "Slickhood", type: "website" },
 };
 
 export default function RootLayout({

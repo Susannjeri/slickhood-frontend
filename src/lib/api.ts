@@ -539,8 +539,8 @@ export const getUnit = (propertyId:number, unitId:number, token:string) => {
   })
 }
 
-export const toggleAdvert = (unitId: number, token: string) => {
-  return API.patch(`/property/unit/${unitId}/advertise-toggle`, {
+export const toggleAdvert = (unitId: number, published: boolean, token: string) => {
+  return API.put(`/property/listings/unit/${unitId}`, { published }, {
     headers: {
       "Content-Type": 'application/json',
       Authorization: `Bearer ${token}`

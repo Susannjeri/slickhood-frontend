@@ -446,11 +446,12 @@ export default function ViewUnitPage() {
     if (!unit) return;
     setIsTogglingAdvert(true);
     try {
-      await handleToggleAdvert(Number(unitId));
+      await handleToggleAdvert(Number(unitId), checked);
       setUnit({ ...unit, advertise: checked });
       toast.success(checked ? "Unit is now advertised" : "Unit advertisement disabled");
     } catch (err: any) {
-      toast.error("Failed to update advertising status");
+      const message = err?.response?.data?.message || err?.response?.data?.description;
+      toast.error(message || "Failed to update publication status. Confirm the unit has a price, currency, type and cover image.");
     } finally {
       setIsTogglingAdvert(false);
     }
@@ -1562,7 +1563,7 @@ export default function ViewUnitPage() {
                     <div>
                       <p className="font-medium text-sm" style={{ color: "#141130" }}>Advertise Unit</p>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {unit.advertise ? "Currently listed for tenants" : "Not visible to potential tenants"}
+                        {unit.advertise ? "Published on the Slickhood property website" : "Not visible on the public property website"}
                       </p>
                     </div>
                     <CanProperty propertyId={Number(propertyId)} permissions={["advertise_unit"]}>
@@ -1572,7 +1573,7 @@ export default function ViewUnitPage() {
                   {unit.advertise ? (
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
                       <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                      <p className="text-sm text-green-800 font-medium">Unit is live and visible to potential tenants</p>
+                      <p className="text-sm text-green-800 font-medium">Unit is live on the Slickhood property website</p>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 p-3 rounded-lg bg-orange-50 border border-orange-200">

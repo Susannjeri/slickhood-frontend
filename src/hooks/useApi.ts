@@ -443,14 +443,14 @@ export function useApi() {
             }
           };
 
-        const handleToggleAdvert = async(unitId: number) => {
+        const handleToggleAdvert = async(unitId: number, published: boolean) => {
           try {
               // ✅ Get token from global auth store
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
 
               // ✅ Call the API function with correct parameters
-              const res = await toggleAdvert(unitId, token);
+              const res = await toggleAdvert(unitId, published, token);
 
               console.log("Response from ToggleAdvertState:", res);
               return res.data;

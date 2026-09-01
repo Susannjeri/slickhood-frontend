@@ -145,6 +145,15 @@ export const sidebarLinks: SidebarLink[] = [
     permissions: [],
     roles: ["Superadmin"],
   },
+  {
+    icon: Building,
+    label: "Property Listing Moderation",
+    href: "/dashboard/property-listings",
+    description: "Review, suspend and reactivate property listings displayed on slickhood.com.",
+    protected: true,
+    permissions: ["manage_property_listings"],
+    roles: ["Superadmin"],
+  },
 
 
   // { 
@@ -202,6 +211,12 @@ export const sidebarLinks: SidebarLink[] = [
         label: "Create Unit",
         href: "/dashboard/unit/create",
         permissions: ["create_unit"],
+        protected: true,
+      },
+      {
+        label: "Listing Enquiries",
+        href: "/dashboard/property-listing-inquiries",
+        permissions: ["advertise_unit"],
         protected: true,
       }
     ],
@@ -442,7 +457,7 @@ const sectionDefinitions = [
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "Soko", "My Services", "Merchant Accounts", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre", "Subscriptions", "Upgrade Plan"] },
-  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
+  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
 ] as const
 
 const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))
