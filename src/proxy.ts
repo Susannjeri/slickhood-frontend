@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { sidebarLinks, settingsLinks, SidebarLink } from "./config/sidebarConfig";
 import { decodeServerToken } from "./lib/actions";
-import { readAccessTokenCookie } from "./lib/access-token-cookie";
+import { clearAccessTokenCookies, readAccessTokenCookie } from "./lib/access-token-cookie";
 
 export async function proxy(req: NextRequest) {
   const token = readAccessTokenCookie(req.cookies);
@@ -57,7 +57,7 @@ export async function proxy(req: NextRequest) {
           const response = requiresAuthentication
             ? NextResponse.redirect(new URL("/login", req.url))
             : NextResponse.next();
-          response.cookies.delete("token");
+          clearAccessTokenCookies(response.cookies);
           return response;
         }
         const permissions = payload?.roles?.flatMap(role => role.permissions) || [];
@@ -83,7 +83,7 @@ export async function proxy(req: NextRequest) {
       const response = requiresAuthentication
         ? NextResponse.redirect(new URL("/login", req.url))
         : NextResponse.next();
-      response.cookies.delete("token");
+      clearAccessTokenCookies(response.cookies);
       return response;
       }
     }

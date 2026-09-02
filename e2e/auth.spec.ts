@@ -114,6 +114,22 @@ test("an expired access cookie cannot trap the user in a login-dashboard redirec
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 });
 
+test("an invalid chunked access cookie is fully cleared at the request boundary", async ({ page, context }) => {
+  await context.addCookies([
+    { name: "tokenChunks", value: "2", url: "http://127.0.0.1:3000" },
+    { name: "token.0", value: "not-a-jwt", url: "http://127.0.0.1:3000" },
+    { name: "token.1", value: "stale", url: "http://127.0.0.1:3000" },
+  ]);
+
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/\/login$/);
+
+  const cookies = await context.cookies();
+  expect(cookies.some(cookie =>
+    cookie.name === "token" || cookie.name === "tokenChunks" || /^token\.\d+$/.test(cookie.name),
+  )).toBe(false);
+});
+
 test("a valid-looking stale cookie cannot make the sign-in page unreachable", async ({ page, context }) => {
   const stale = testToken([{ title: "Landlord", permissions: [] }]);
   await context.addCookies([{ name: "token", value: stale, domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
