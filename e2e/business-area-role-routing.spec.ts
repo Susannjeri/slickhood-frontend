@@ -35,7 +35,7 @@ test("estate manager can open the estate-management operator workspace", async (
 
   await page.goto("/dashboard/estate");
 
-  await expect(page.getByRole("heading", { name: "Estate Management" })).toBeVisible();
+  await expect(page.locator("main").getByRole("heading", { name: "Estate Management", exact: true })).toBeVisible();
 });
 
 test("switching a primary business role selects its product and opens its own workspace", async ({ context, page }) => {
