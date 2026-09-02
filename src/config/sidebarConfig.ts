@@ -1,5 +1,5 @@
 // src/config/sidebarConfig.ts
-import { HomeIcon, User, Settings, Rocket, DollarSign, Crown, Building, FileSignature, ClipboardClock, Bell, ReceiptText, Users, Wallet, Landmark, Wrench, LayoutGrid, ChartNoAxesCombined, ShieldCheck, ShieldPlus, ShoppingBasket, BadgeDollarSign, CircleHelp, FileKey2, PiggyBank } from "lucide-react"
+import { HomeIcon, User, Settings, Rocket, DollarSign, Crown, Building, FileSignature, ClipboardClock, Bell, ReceiptText, Users, Wallet, Landmark, Wrench, LayoutGrid, ChartNoAxesCombined, ShieldCheck, ShieldPlus, ShoppingBasket, BadgeDollarSign, CircleHelp, FileKey2, PiggyBank, Calculator } from "lucide-react"
 import { LucideIcon } from "lucide-react"
 // import { fa } from "zod/v4/locales"
 
@@ -60,6 +60,15 @@ export const sidebarLinks: SidebarLink[] = [
     description: "Operational, financial, property, security and marketplace reporting.",
     protected: false,
     permissions: [],
+  },
+  {
+    icon: Calculator,
+    label: "Tax Assist",
+    href: "/dashboard/tax-assist",
+    protected: false,
+    permissions: [],
+    roles: ["Landlord", "PropertyManager", "EstateManager", "SalesAgent", "PropertyAccountant", "WorkspaceAdmin", "Superadmin"],
+    description: "Estimate residential rental tax and property-sale CGT before choosing whether to connect to KRA.",
   },
   {
     icon: Wallet,
@@ -126,6 +135,15 @@ export const sidebarLinks: SidebarLink[] = [
     description: "Manage administrative settings, controls, and system operations.",
     protected: true,
     permissions: ["admin_access"],
+  },
+  {
+    icon: Calculator,
+    label: "Tax Administration",
+    href: "/dashboard/tax-assist/admin",
+    protected: false,
+    permissions: [],
+    roles: ["Superadmin"],
+    description: "Govern effective-dated tax rules and review optional KRA connection requests.",
   },
   {
     icon: ShieldCheck,
@@ -453,11 +471,11 @@ export const sidebarLinks: SidebarLink[] = [
 const sectionDefinitions = [
   { label: "Overview", links: ["Home", "Business Areas", "My Wealth"] },
   { label: "Property & Leasing", links: ["Properties", "Leases", "Documents & Notices", "Estate Management", "My Home", "Property Sale Management", "My Property Purchase", "Community Funds"] },
-  { label: "Money", links: ["Accounts", "Payments", "Invoices", "Reports", "Insurance Hub"] },
+  { label: "Money", links: ["Accounts", "Payments", "Invoices", "Tax Assist", "Reports", "Insurance Hub"] },
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "Soko", "My Services", "Merchant Accounts", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre", "Subscriptions", "Upgrade Plan"] },
-  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
+  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Tax Administration", "Audit Logs", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
 ] as const
 
 const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))
