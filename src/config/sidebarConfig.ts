@@ -395,6 +395,24 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
   },
   {
+    icon: ShoppingBasket,
+    label: "Soko Management",
+    href: "/dashboard/soko-management",
+    description: "Approve shops, moderate listings and oversee marketplace operations.",
+    permissions: [],
+    roles: ["Superadmin"],
+    protected: true,
+  },
+  {
+    icon: Landmark,
+    label: "Wealth Management",
+    href: "/dashboard/wealth-management",
+    description: "Maintain the wealth catalogue and monitor privacy-safe platform health.",
+    permissions: [],
+    roles: ["Superadmin"],
+    protected: true,
+  },
+  {
     icon: Wrench,
     label: "My Services",
     href: "/dashboard/services",
@@ -424,7 +442,7 @@ const sectionDefinitions = [
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "Soko", "My Services", "Merchant Accounts", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre", "Subscriptions", "Upgrade Plan"] },
-  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Affiliate Management"] },
+  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Landlord Accounts", "SlickHood Accounts", "Admin Panel", "Audit Logs", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
 ] as const
 
 const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))

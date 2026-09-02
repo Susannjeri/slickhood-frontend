@@ -53,6 +53,8 @@ jobs:
         run: npx playwright test e2e/auth.spec.ts e2e/auth-layout.spec.ts e2e/registration-subscription.spec.ts
 
       - name: Build and package deployment binaries
+        env:
+          NEXT_PUBLIC_COMMIT_HASH: ${{ github.sha }}
         run:  |
           chmod +x ./build.sh
           SKIP_BUILD=true ./build.sh

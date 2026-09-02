@@ -507,6 +507,7 @@ import { decodeIdToken } from "@/lib/actions";
 import { decodeServerToken } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { Channel } from "@/types";
+import { clearReferralAttribution, readReferralAttribution } from "@/lib/referral-attribution";
 
 // ─── helper ────────────────────────────────────────────────────────────────────
 // Extracts roles from a decoded token payload and calls setActiveRole,
@@ -768,14 +769,13 @@ export function useAuth() {
       if (roleId) payload.roleId = roleId;
       if (inviteToken) payload.token = inviteToken;
       if (typeof window !== "undefined") {
-        const referralCode = localStorage.getItem("slickhood_referral_code");
-        const referralCampaign = localStorage.getItem("slickhood_referral_campaign");
+        const { referralCode, referralCampaign } = readReferralAttribution();
         if (referralCode) payload.referralCode = referralCode;
         if (referralCampaign) payload.referralCampaign = referralCampaign;
       }
 
       const response = await registerUser(payload);
-      if (typeof window !== "undefined") { localStorage.removeItem("slickhood_referral_code"); localStorage.removeItem("slickhood_referral_campaign"); }
+      if (typeof window !== "undefined") clearReferralAttribution();
 
       const description = response.data.description;
       setEmail(normalizedEmail);
@@ -883,8 +883,7 @@ export function useAuth() {
       if (profileType === "COMPANY") payload.organizationName = organizationName?.trim();
       if (inviteToken) payload.token = inviteToken;
       if (typeof window !== "undefined") {
-        const referralCode = localStorage.getItem("slickhood_referral_code");
-        const referralCampaign = localStorage.getItem("slickhood_referral_campaign");
+        const { referralCode, referralCampaign } = readReferralAttribution();
         if (referralCode) payload.referralCode = referralCode;
         if (referralCampaign) payload.referralCampaign = referralCampaign;
       }
@@ -893,7 +892,7 @@ export function useAuth() {
       const email = decoded_id?.email || "no-email";
 
       const response = await googleRegister(payload);
-      if (typeof window !== "undefined") { localStorage.removeItem("slickhood_referral_code"); localStorage.removeItem("slickhood_referral_campaign"); }
+      if (typeof window !== "undefined") clearReferralAttribution();
 
       const { totpEnabled, mfaSetup, jwt, refreshToken } = response.data.data[0];
 

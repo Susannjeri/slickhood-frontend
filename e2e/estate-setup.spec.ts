@@ -12,7 +12,7 @@ test.beforeEach(async ({ context, page }) => {
     { id: "APARTMENT", name: "Apartment", description: "Multi-unit residential property" },
   ]) }));
   await page.route("**/property/unit/type**", route => route.fulfill({ json: envelope([]) }));
-  await page.route("**/property/list?**", route => route.fulfill({ json: envelope([{
+  await page.route("**/property/list**", route => route.fulfill({ json: envelope([{
     id: 41,
     name: "Green Court",
     type: "APARTMENT",
@@ -22,7 +22,7 @@ test.beforeEach(async ({ context, page }) => {
     currency: "KES",
     image: "",
   }]) }));
-  await page.route("**/property/unit/list?**", route => route.fulfill({ json: {
+  await page.route("**/property/unit/list**", route => route.fulfill({ json: {
     ...envelope([]), totalPages: 0, totalElements: 0,
   } }));
   await page.route("**/invite/types", route => route.fulfill({ json: envelope([]) }));
