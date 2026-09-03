@@ -213,7 +213,9 @@ test("customer sees the exact rejection reason, retains accepted evidence and re
     permissions: [],
   });
   await page.unroute("**/kyc/current");
-  let current = {
+  let current: Record<string, unknown> & {
+    documents: Array<Record<string, unknown>>;
+  } = {
     id: 44,
     status: "REJECTED",
     accountStatus: "KYC_REJECTED",
