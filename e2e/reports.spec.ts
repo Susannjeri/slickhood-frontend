@@ -53,7 +53,11 @@ test("reports stay bounded, require deliberate filters, and support forward leas
   await page.route("**/reports/INVOICE_COLLECTIONS/export**", route => route.fulfill({
     body: "Reference,Status\r\nINV-100,OVERDUE\r\n",
     contentType: "text/csv",
-    headers: { "X-Report-Truncated": "true", "X-Report-Row-Limit": "5000" },
+    headers: {
+      "X-Report-Truncated": "true",
+      "X-Report-Row-Limit": "5000",
+      "Access-Control-Expose-Headers": "X-Report-Truncated, X-Report-Row-Limit",
+    },
   }));
 
   await page.goto("/dashboard/reports");
