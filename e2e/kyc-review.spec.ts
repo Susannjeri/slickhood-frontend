@@ -204,6 +204,11 @@ test("customer sees the exact rejection reason, retains accepted evidence and re
   await expect(
     page.getByText("The identification number is obscured by glare."),
   ).toBeVisible();
+  const identity = page.locator("article").filter({ hasText: "Identity document" });
+  await expect(identity.getByText("Key details read from your document")).toBeVisible();
+  await expect(identity.getByText("12345678")).toBeVisible();
+  await expect(identity.getByText("OCR confidence 97%")).toBeVisible();
+  await expect(identity.getByText("SlickHood Test Owner")).toBeVisible();
   await expect(
     page.getByText("Replace or upload: Identity document."),
   ).toBeVisible();
@@ -211,7 +216,6 @@ test("customer sees the exact rejection reason, retains accepted evidence and re
     page.getByRole("button", { name: "Replace this document" }),
   ).toHaveCount(1);
 
-  const identity = page.locator("article").filter({ hasText: "Identity document" });
   await identity.locator('input[type="file"]').setInputFiles({
     name: "replacement-id.pdf",
     mimeType: "application/pdf",
