@@ -248,7 +248,7 @@ test("customer sees the exact rejection reason, retains accepted evidence and re
           originalFileName: "replacement-id.pdf",
           status: "OCR_COMPLETE",
           validationIssues: [],
-          rejectionReason: undefined,
+          rejectionReason: "",
           uploadedAt: "2026-08-30T11:00:00Z",
         },
         { ...documents[1], status: "VERIFIED" },
