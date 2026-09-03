@@ -100,7 +100,7 @@ test("admin corrects an OCR transcription without replacing the original evidenc
   await page.getByRole("button", { name: "Review request" }).click();
   const identity = page.locator("article").filter({ hasText: "National Id Front" });
   await expect(identity.getByText("OCR Document Number")).toBeVisible();
-  await expect(identity.getByText("12345678", { exact: true })).toBeVisible();
+  await expect(identity.getByText("12345678", { exact: true }).first()).toBeVisible();
   await identity.getByLabel("Verified Document Number for National Id Front").fill("12345679");
   await expect(
     page.getByRole("button", { name: "Approve KYC and activate" }),
@@ -247,6 +247,7 @@ test("customer sees the exact rejection reason, retains accepted evidence and re
           id: 91,
           originalFileName: "replacement-id.pdf",
           status: "OCR_COMPLETE",
+          validationIssues: [],
           rejectionReason: undefined,
           uploadedAt: "2026-08-30T11:00:00Z",
         },
