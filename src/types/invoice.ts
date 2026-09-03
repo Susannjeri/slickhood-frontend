@@ -19,6 +19,8 @@ export interface InvoiceListItem {
   issuerName?: string;
   issuerType?: string;
   issuerLogoUrl?: string | null;
+  payableByCurrentUser?: boolean;
+  recordableByCurrentUser?: boolean;
 }
 
 export interface InvoiceListResponse {
@@ -60,6 +62,8 @@ export interface Invoice {
   issuerName: string;
   issuerType: string;
   issuerLogoUrl?: string | null;
+  payableByCurrentUser: boolean;
+  recordableByCurrentUser: boolean;
 }
 
 // ─── Active filters — what gets sent to the API ───────────────────────────────
@@ -117,6 +121,8 @@ export const transformInvoice = (item: InvoiceListItem): Invoice => {
     issuerName: item.issuerName ?? propertyName,
     issuerType: item.issuerType ?? "LANDLORD",
     issuerLogoUrl: item.issuerLogoUrl,
+    payableByCurrentUser: item.payableByCurrentUser ?? false,
+    recordableByCurrentUser: item.recordableByCurrentUser ?? false,
   };
 };
 

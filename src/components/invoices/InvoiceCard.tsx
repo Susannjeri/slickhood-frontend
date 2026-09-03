@@ -4,7 +4,6 @@ import { Invoice } from "@/types/invoice";
 import { InvoiceStatusBadge } from "./InvoiceStatusBadge";
 import { PaymentModal } from "./PaymentModal";
 import { ManualPaymentModal } from "./ManualPaymentModal";
-import Can from "@/components/auth/Can";
 import { Building2, CreditCard, ClipboardList } from "lucide-react";
 
 interface Props {
@@ -106,23 +105,22 @@ export function InvoiceCard({ invoice, isSelected, onClick, onPaymentSuccess }: 
               {invoice.currency} {invoice.pendingAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </p>
 
-            {/* Pay button — non-Landlords only, UNPAID invoices only */}
+            {/* Actions are derived by the backend from invoice ownership and permission. */}
             {invoice.status !== "PAID" && (
               <>
-                <Can roles={["Tenant"]} >
+                {invoice.payableByCurrentUser && (
                   <button onClick={handlePayClick} className={btnBase}>
                     <CreditCard className="w-3 h-3" />
                     Pay
                   </button>
-                </Can>
+                )}
 
-                {/* Record Payment button — Landlords only */}
-                <Can roles={["Landlord"]}>
+                {invoice.recordableByCurrentUser && (
                   <button onClick={handleManualClick} className={btnBase}>
                     <ClipboardList className="w-3 h-3" />
                     Record Payment
                   </button>
-                </Can>
+                )}
               </>
             )}
           </div>

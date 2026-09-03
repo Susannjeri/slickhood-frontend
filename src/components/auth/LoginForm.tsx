@@ -40,6 +40,12 @@ export default function LoginForm() {
     defaultValues: { email: "", password: "" },
   });
 
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("reason") === "session-ended") {
+      setError("Your previous session ended or was replaced by a newer sign-in. Please sign in again.");
+    }
+  }, []);
+
   const handleCredentialResponse = async (response: any) => {
     setLoading(true);
     const result = await handleGoogleLogin(response.credential);

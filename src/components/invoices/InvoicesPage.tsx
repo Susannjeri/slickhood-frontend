@@ -59,7 +59,7 @@ export function InvoicesPage() {
       {/* Right panel — desktop only */}
       <div className="hidden lg:flex flex-1 flex-col bg-white rounded-xl border border-gray-200 p-5 overflow-hidden min-w-0">
         {selectedInvoice
-          ? <InvoiceDetail invoice={selectedInvoice} refetchKey={paymentRefetchKey} />
+          ? <InvoiceDetail invoice={selectedInvoice} refetchKey={paymentRefetchKey} onPaymentSuccess={handlePaymentSuccess} />
           : <EmptyDetail />
         }
       </div>
@@ -72,7 +72,7 @@ export function InvoicesPage() {
           </SheetHeader>
           <div className="flex-1 overflow-hidden p-5 pt-3">
             {selectedInvoice && (
-              <InvoiceDetail invoice={selectedInvoice} refetchKey={paymentRefetchKey} />
+              <InvoiceDetail invoice={selectedInvoice} refetchKey={paymentRefetchKey} onPaymentSuccess={handlePaymentSuccess} />
             )}
           </div>
         </SheetContent>

@@ -14,6 +14,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { apiErrorMessage } from "@/lib/api-error";
+import { ActiveLease, listActiveLeases } from "@/lib/api";
+import { estateService, salesService } from "@/services/business-workflows.service";
+import { PropertyOwnership, SaleTransaction } from "@/types/business-workflows";
 
 const rentalTypes: LeaseDocumentType[] = ["RESIDENTIAL_LEASE_AGREEMENT", "COMMERCIAL_LEASE_AGREEMENT", "LATE_RENT_NOTICE",
   "RENT_DEFAULT_CURE_NOTICE", "LANDLORD_TERMINATION_NOTICE", "TENANT_TERMINATION_NOTICE"];
@@ -25,8 +28,12 @@ export default function DocumentsPage() {
   const searchParams = useSearchParams();
   const activeRole = useAuthStore((state) => state.activeRole);
   const permissions = useAuthStore((state) => state.permissions);
+  const token = useAuthStore((state) => state.token);
   const [documents, setDocuments] = useState<LeaseDocument[]>([]);
   const [templates, setTemplates] = useState<LeaseDocumentTemplate[]>([]);
+  const [leases, setLeases] = useState<ActiveLease[]>([]);
+  const [sales, setSales] = useState<SaleTransaction[]>([]);
+  const [ownerships, setOwnerships] = useState<PropertyOwnership[]>([]);
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -66,6 +73,26 @@ export default function DocumentsPage() {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { void leaseDocumentService.branding().then(response => setLogoConfigured(Boolean(response.data?.data?.configured))).catch(() => undefined); }, []);
+  useEffect(() => {
+    const linkedType = searchParams.get("type") as LeaseDocumentType | null;
+    if (linkedType && allTypes.includes(linkedType)) setType(linkedType);
+    const linkedLease = searchParams.get("leaseId");
+    const linkedSale = searchParams.get("saleId");
+    const linkedProperty = searchParams.get("propertyId");
+    const linkedRecipient = searchParams.get("recipientUserId");
+    if (linkedLease) setLeaseId(linkedLease);
+    if (linkedSale) setSaleId(linkedSale);
+    if (linkedProperty) setPropertyId(linkedProperty);
+    if (linkedRecipient) setRecipientUserId(linkedRecipient);
+  }, [searchParams]);
+  useEffect(() => {
+    if (!canCreate || !token) return;
+    void Promise.allSettled([
+      listActiveLeases(0, 100, token).then(response => setLeases(response.data?.data ?? [])),
+      salesService.list({ page: 0, size: 100 }).then(response => setSales(response.data?.data ?? [])),
+      estateService.listOwnership({ page: 0, size: 100, active: true }).then(response => setOwnerships(response.data?.data ?? [])),
+    ]);
+  }, [canCreate, token]);
 
   async function uploadLogo(event: ChangeEvent<HTMLInputElement>) {
     const logo = event.target.files?.[0];
@@ -146,10 +173,8 @@ export default function DocumentsPage() {
       <CardContent><form onSubmit={generate} className="grid gap-4 md:grid-cols-3">
         <div className="space-y-2 md:col-span-2"><Label htmlFor="document-type">Document type</Label><select id="document-type" value={type} onChange={(e) => setType(e.target.value as LeaseDocumentType)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
           {visibleTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></div>
-        {isSaleDocument ? <div className="space-y-2"><Label htmlFor="sale-id">Sale ID</Label><Input id="sale-id" required type="number" min="1" value={saleId} onChange={(e) => setSaleId(e.target.value)} /></div> : isEstateDocument ? <>
-          <div className="space-y-2"><Label>Property ID</Label><Input required type="number" min="1" value={propertyId} onChange={(e) => setPropertyId(e.target.value)} /></div>
-          <div className="space-y-2"><Label>Resident or homeowner user ID</Label><Input required type="number" min="1" value={recipientUserId} onChange={(e) => setRecipientUserId(e.target.value)} /></div></> :
-          <div className="space-y-2"><Label htmlFor="lease-id">Lease ID</Label><Input id="lease-id" required type="number" min="1" value={leaseId} onChange={(e) => setLeaseId(e.target.value)} /></div>}
+        {isSaleDocument ? <div className="space-y-2"><Label htmlFor="sale-id">Property sale</Label><select id="sale-id" required value={saleId} onChange={(e) => setSaleId(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a sale</option>{saleId && !sales.some(item => String(item.id) === saleId) && <option value={saleId}>Selected sale #{saleId}</option>}{sales.map(sale => <option key={sale.id} value={sale.id}>{sale.propertyName ?? `Property ${sale.propertyId}`} · {sale.unitRef ?? `Unit ${sale.unitId}`} · {sale.buyerName ?? sale.buyerEmail ?? sale.invitedBuyerEmail ?? "Buyer pending"}</option>)}</select>{sales.length === 0 && !saleId && <p className="text-xs text-muted-foreground">Create the sale record first, then prepare its documents.</p>}</div> : isEstateDocument ? <div className="space-y-2"><Label htmlFor="ownership-id">Homeowner and property</Label><select id="ownership-id" required value={propertyId && recipientUserId ? `${propertyId}:${recipientUserId}` : ""} onChange={(e) => { const [property, recipient] = e.target.value.split(":"); setPropertyId(property ?? ""); setRecipientUserId(recipient ?? ""); }} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a current homeowner</option>{propertyId && recipientUserId && !ownerships.some(item => String(item.propertyId) === propertyId && String(item.homeownerUserId) === recipientUserId) && <option value={`${propertyId}:${recipientUserId}`}>Selected homeowner for property #{propertyId}</option>}{ownerships.map(item => <option key={item.id} value={`${item.propertyId}:${item.homeownerUserId}`}>{item.homeownerName || item.homeownerEmail} · {item.propertyName}{item.unitRef ? ` / ${item.unitRef}` : ""}</option>)}</select>{ownerships.length === 0 && !(propertyId && recipientUserId) && <p className="text-xs text-muted-foreground">Add the homeowner in Estate Management first.</p>}</div> :
+          <div className="space-y-2"><Label htmlFor="lease-id">Lease</Label><select id="lease-id" required value={leaseId} onChange={(e) => setLeaseId(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a lease</option>{leaseId && !leases.some(item => String(item.id) === leaseId) && <option value={leaseId}>Selected lease #{leaseId}</option>}{leases.map(lease => <option key={lease.id} value={lease.id}>{lease.name || `Lease ${lease.id}`} · {lease.tenantName || "Tenant pending"}{lease.expiryDate ? ` · expires ${lease.expiryDate}` : ""}</option>)}</select>{leases.length === 0 && !leaseId && <p className="text-xs text-muted-foreground">Create the lease first, then prepare its agreement or notice.</p>}</div>}
         <div className="space-y-2"><Label htmlFor="effective-date">Effective date</Label><Input id="effective-date" type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} /></div>
         <div className="space-y-2"><Label htmlFor="response-due">Response due</Label><Input id="response-due" type="date" value={responseDueDate} onChange={(e) => setResponseDueDate(e.target.value)} /></div>
         <div className="space-y-2"><Label htmlFor="document-amount">Amount</Label><Input id="document-amount" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>

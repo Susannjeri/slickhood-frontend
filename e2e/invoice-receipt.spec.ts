@@ -52,7 +52,7 @@ test("a verified invoice payment exposes a downloadable receipt with the provide
 
   await page.goto("/dashboard/invoices");
   await expect(page.getByText("INV-RENT-401", { exact: true }).first()).toBeVisible();
-  await expect(page.locator("span").filter({ hasText: /^PAID$/ })).toBeVisible();
+  await expect(page.locator("span").filter({ hasText: /^PAID$/ }).first()).toBeVisible();
   await page.getByText("INV-RENT-401", { exact: true }).first().click();
   await page.getByText("Payment Details", { exact: true }).click();
   await expect(page.getByText("MPESA-VERIFIED-901", { exact: true })).toBeVisible();

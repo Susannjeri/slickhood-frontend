@@ -114,6 +114,15 @@ test("an expired access cookie cannot trap the user in a login-dashboard redirec
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 });
 
+test("a replaced single session explains why another sign in is required", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+
+  await page.goto("/login?reason=session-ended");
+
+  await expect(page.getByText("Your previous session ended or was replaced by a newer sign-in. Please sign in again.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
+});
+
 test("an invalid chunked access cookie is fully cleared at the request boundary", async ({ page, context }) => {
   await context.addCookies([
     { name: "tokenChunks", value: "2", url: "http://127.0.0.1:3000" },
@@ -122,7 +131,7 @@ test("an invalid chunked access cookie is fully cleared at the request boundary"
   ]);
 
   await page.goto("/dashboard");
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/login\?reason=session-ended$/);
 
   const cookies = await context.cookies();
   expect(cookies.some(cookie =>

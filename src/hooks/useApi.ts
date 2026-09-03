@@ -133,7 +133,6 @@ export interface ProfileGateResult {
       }
 
 export function useApi() {
-      const { logout } = useAuth()
       const { token } = useAuthStore()
 
       useEffect(() => {
@@ -144,22 +143,11 @@ export function useApi() {
           delete API.defaults.headers.common["Authorization"]
         }
 
-        // optional: add a response interceptor for expired tokens
-        const interceptor = API.interceptors.response.use(
-          (response) => response,
-          (error) => {
-            if (error.response?.status === 401) {
-              // if unauthorized, log user out
-              logout()
-            }
-            return Promise.reject(error)
-          }
-        )
-
         return () => {
-          API.interceptors.response.eject(interceptor)
+          // The shared API client owns token refresh. Component mounts must not
+          // register competing 401 handlers that log out a recoverable session.
         }
-      }, [token, logout])
+      }, [token])
 
       const getUserList = async (params: UserListParams = {}) => {
           try {

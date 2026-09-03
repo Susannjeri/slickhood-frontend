@@ -8,6 +8,35 @@ export const API = axios.create({
   withCredentials: false, // include cookies if backend uses them
 })
 
+type RetryableRequest = NonNullable<Parameters<typeof API.request>[0]> & { _sessionRetry?: boolean };
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshedAccessToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      const refreshed = await fetch("/browser-session/refresh", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!refreshed.ok) return null;
+      const tokenResponse = await fetch("/browser-session/get-token", {
+        method: "GET",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!tokenResponse.ok) return null;
+      const body = await tokenResponse.json();
+      const token = body?.data?.jwt;
+      if (typeof token !== "string" || !token) return null;
+      useAuthStore.getState().setToken(token);
+      return token;
+    })().finally(() => { refreshInFlight = null; });
+  }
+  return refreshInFlight;
+}
+
 export interface HelpDeskMessage {
   id: number;
   senderType: "USER" | "AI" | "AGENT" | "SYSTEM";
@@ -151,6 +180,33 @@ API.interceptors.request.use((config) => {
   }
   return config;
 });
+
+API.interceptors.response.use(
+  response => response,
+  async error => {
+    const request = error?.config as RetryableRequest | undefined;
+    const hadSession = Boolean(useAuthStore.getState().token);
+    const url = String(request?.url ?? "");
+    const isSessionEndpoint = url.includes("/auth/login") || url.includes("/auth/refresh")
+      || url.includes("/auth/register") || url.includes("/otp/");
+    if (typeof window === "undefined" || error?.response?.status !== 401 || !request
+        || request._sessionRetry || !hadSession || isSessionEndpoint) {
+      return Promise.reject(error);
+    }
+
+    request._sessionRetry = true;
+    const token = await refreshedAccessToken();
+    if (!token) {
+      useAuthStore.getState().setToken(null);
+      await fetch("/browser-session/clear-cookie", { method: "POST", credentials: "same-origin" }).catch(() => undefined);
+      window.location.assign("/login?reason=session-ended");
+      return Promise.reject(error);
+    }
+    request.headers = request.headers ?? {};
+    request.headers.Authorization = `Bearer ${token}`;
+    return API.request(request);
+  },
+);
 
 // Auth endpoints
 export const loginUser = (data: { email: string; password: string; roleId?: number; token?: string }) =>
@@ -1369,7 +1425,7 @@ export const getSupportedPaymentChannels = (token: string) => {
 // the only source for this in the modal, so the two params always describe
 // the same account.
 export const initPayment = (invoiceRef: string, accountId: number, channel: string, token: string) => {
-  return API.get(`/payment/init?invoiceRef=${invoiceRef}&accountId=${accountId}&paymentChannel=${channel}`, {
+  return API.post(`/payment/init`, { invoiceRef, accountId, paymentChannel: channel }, {
     headers: {
       "Content-Type": 'application/json',
       Authorization: `Bearer ${token}`,

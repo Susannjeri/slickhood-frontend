@@ -392,7 +392,7 @@ export default function KycPage() {
                         {!kyc.phoneVerified && <li>• Confirm your phone number.</li>}
                         {missingRequirements.map((requirement) => (
                           <li key={requirement.code}>
-                            • Replace or upload: {requirement.label}.
+                            • Replace or upload: {requirementInstruction(requirement, kyc)}.
                           </li>
                         ))}
                       </ul>
@@ -450,17 +450,29 @@ function RequirementCard({
   missing: boolean;
   onUploaded: () => Promise<void>;
 }) {
-  const [type, setType] = useState(requirement.acceptedTypes[0]);
+  const matchingAcceptedTypes = useMemo(() => {
+    if (requirement.code !== "IDENTITY_BACK") return requirement.acceptedTypes;
+    const front = kyc.documents.find((item) =>
+      ["NATIONAL_ID_FRONT", "ALIEN_ID_FRONT", "PASSPORT"].includes(item.documentType) &&
+      item.status !== "REJECTED");
+    if (front?.documentType === "NATIONAL_ID_FRONT") return ["NATIONAL_ID_BACK"];
+    if (front?.documentType === "ALIEN_ID_FRONT") return ["ALIEN_ID_BACK"];
+    return requirement.acceptedTypes;
+  }, [kyc.documents, requirement.acceptedTypes, requirement.code]);
+  const [type, setType] = useState(matchingAcceptedTypes[0]);
   const [uploading, setUploading] = useState(false);
   const [replacing, setReplacing] = useState(false);
+  useEffect(() => {
+    if (!matchingAcceptedTypes.includes(type)) setType(matchingAcceptedTypes[0]);
+  }, [matchingAcceptedTypes, type]);
   const document = kyc.documents.find(
     (item) =>
-      requirement.acceptedTypes.includes(item.documentType) &&
+      matchingAcceptedTypes.includes(item.documentType) &&
       item.status !== "REJECTED",
   );
   const rejected = kyc.documents.find(
     (item) =>
-      requirement.acceptedTypes.includes(item.documentType) &&
+      matchingAcceptedTypes.includes(item.documentType) &&
       item.status === "REJECTED",
   );
   const upload = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -477,6 +489,10 @@ function RequirementCard({
           uploaded.validationIssues?.[0]?.message ||
             uploaded.rejectionReason ||
             "The document could not be read confidently. Upload a clearer original.",
+        );
+      else if (uploaded.validationIssues?.length)
+        toast.warning(
+          `${requirement.label} was saved, but some details need reviewer confirmation. You may replace it now or submit it for review.`,
         );
       else toast.success(`${requirement.label} uploaded and checked.`);
       setReplacing(false);
@@ -547,6 +563,25 @@ function RequirementCard({
               {new Date(document.uploadedAt).toLocaleString()}
             </p>
           </div>
+          {document.validationIssues?.length ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-950">
+              <p className="font-semibold">Saved — reviewer confirmation needed</p>
+              <ul className="mt-2 space-y-2 text-xs">
+                {document.validationIssues.map((issue) => (
+                  <li key={`${issue.field}-${issue.code}-${issue.message}`}>
+                    <span className="font-semibold">
+                      {issue.field === "document" ? "Document" : label(issue.field)}:
+                    </span>{" "}
+                    {issue.message}
+                    {issue.guidance ? ` ${issue.guidance}` : ""}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs">
+                If the original is clear and correct, you can keep it and submit for human review.
+              </p>
+            </div>
+          ) : null}
           <KycDocumentViewer document={document} className="w-full" />
           {!replacing && (
             <Button
@@ -570,7 +605,7 @@ function RequirementCard({
             value={type}
             onChange={(event) => setType(event.target.value)}
           >
-            {requirement.acceptedTypes.map((value) => (
+            {matchingAcceptedTypes.map((value) => (
               <option key={value} value={value}>
                 {label(value)}
               </option>
@@ -611,6 +646,16 @@ function RequirementCard({
       )}
     </article>
   );
+}
+
+function requirementInstruction(requirement: KycRequirement, kyc: KycCase) {
+  if (requirement.code !== "IDENTITY_BACK") return requirement.label;
+  const front = kyc.documents.find((item) =>
+    ["NATIONAL_ID_FRONT", "ALIEN_ID_FRONT", "PASSPORT"].includes(item.documentType) &&
+    item.status !== "REJECTED");
+  if (front?.documentType === "NATIONAL_ID_FRONT") return "Back of the same National ID shown above";
+  if (front?.documentType === "ALIEN_ID_FRONT") return "Back of the same Alien ID shown above";
+  return requirement.label;
 }
 
 function PhoneVerification({

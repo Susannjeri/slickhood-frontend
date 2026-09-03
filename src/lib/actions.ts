@@ -49,8 +49,9 @@ export function decodeIdToken(idToken: string): GoogleIdTokenPayload | null {
 export function decodeServerToken(token: string): ServerToken | null {
   try {
     return jwtDecode<ServerToken>(token);
-  } catch (error) {
-    console.error("Failed to decode server token:", error);
+  } catch {
+    // Browser cookies are untrusted input. The caller clears an invalid session;
+    // avoid emitting attacker-controlled token errors and stack traces to logs.
     return null;
   }
 }

@@ -3,10 +3,73 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { sidebarLinks, settingsLinks, SidebarLink } from "./config/sidebarConfig";
 import { decodeServerToken } from "./lib/actions";
-import { clearAccessTokenCookies, readAccessTokenCookie } from "./lib/access-token-cookie";
+import { clearAccessTokenCookies, readAccessTokenCookie, writeAccessTokenCookies } from "./lib/access-token-cookie";
+import { accessTokenMaxAge } from "./lib/session-token";
+
+type RefreshedSession = { accessToken: string; refreshToken: string; maxAge: number };
+const serverRefreshes = new Map<string, Promise<RefreshedSession | null>>();
+
+async function refreshSession(req: NextRequest): Promise<RefreshedSession | null> {
+  const refreshToken = req.cookies.get("refreshToken")?.value;
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (!refreshToken || !apiUrl) return null;
+  const existing = serverRefreshes.get(refreshToken);
+  if (existing) return existing;
+
+  const attempt = refreshSessionWithToken(refreshToken, apiUrl);
+  serverRefreshes.set(refreshToken, attempt);
+  try {
+    return await attempt;
+  } finally {
+    if (serverRefreshes.get(refreshToken) === attempt) serverRefreshes.delete(refreshToken);
+  }
+}
+
+async function refreshSessionWithToken(refreshToken: string, apiUrl: string): Promise<RefreshedSession | null> {
+  try {
+    const response = await fetch(`${apiUrl}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const provider = await response.json();
+    const tokenData = provider?.data?.[0] ?? provider?.data;
+    const accessToken = tokenData?.jwt;
+    const newRefreshToken = tokenData?.refreshToken;
+    const maxAge = typeof accessToken === "string" ? accessTokenMaxAge(accessToken) : null;
+    if (!provider?.success || !accessToken || !newRefreshToken || !maxAge) return null;
+    return { accessToken, refreshToken: newRefreshToken, maxAge };
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(response: NextResponse, session: RefreshedSession) {
+  writeAccessTokenCookies(response.cookies, session.accessToken, session.maxAge);
+  response.cookies.set("refreshToken", session.refreshToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
+}
+
+function clearSession(response: NextResponse) {
+  clearAccessTokenCookies(response.cookies);
+  response.cookies.set("refreshToken", "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+}
 
 export async function proxy(req: NextRequest) {
-  const token = readAccessTokenCookie(req.cookies);
+  let token = readAccessTokenCookie(req.cookies);
   // if(!token){
   //   return NextResponse.redirect(new URL("/login", req.url));
   // }
@@ -48,16 +111,32 @@ export async function proxy(req: NextRequest) {
     pathname.startsWith(route)
   );
 
+  const requiresAuthentication = isProtectedRoute || isDashboardRoute || isOnboardingRoute;
+  let sessionResponse: NextResponse | null = null;
+  let payload = token ? decodeServerToken(token) : null;
+
+  // A valid refresh session should survive an expired short-lived access token.
+  // Do not refresh on /login: an explicit visit to sign in must remain usable.
+  if (requiresAuthentication && pathname !== "/login"
+      && (!payload?.exp || payload.exp * 1000 <= Date.now())) {
+    const refreshed = await refreshSession(req);
+    if (refreshed) {
+      token = refreshed.accessToken;
+      payload = decodeServerToken(token);
+      sessionResponse = NextResponse.next();
+      writeSession(sessionResponse, refreshed);
+    }
+  }
+
 
   if (token) {
       try {
-        const payload = decodeServerToken(token);
+        payload = payload ?? decodeServerToken(token);
         if (!payload || !payload.exp || payload.exp * 1000 <= Date.now()) {
-          const requiresAuthentication = isProtectedRoute || isDashboardRoute || isOnboardingRoute;
           const response = requiresAuthentication
-            ? NextResponse.redirect(new URL("/login", req.url))
+            ? NextResponse.redirect(new URL("/login?reason=session-ended", req.url))
             : NextResponse.next();
-          clearAccessTokenCookies(response.cookies);
+          clearSession(response);
           return response;
         }
         const permissions = payload?.roles?.flatMap(role => role.permissions) || [];
@@ -73,17 +152,20 @@ export async function proxy(req: NextRequest) {
             );
             
             if (!hasPermission) {
-              return NextResponse.redirect(new URL("/dashboard", req.url));
+              const response = NextResponse.redirect(new URL("/dashboard", req.url));
+              if (sessionResponse) {
+                for (const cookie of sessionResponse.cookies.getAll()) response.cookies.set(cookie);
+              }
+              return response;
             }
           }
         }
     }
     catch {
-      const requiresAuthentication = isProtectedRoute || isDashboardRoute || isOnboardingRoute;
       const response = requiresAuthentication
-        ? NextResponse.redirect(new URL("/login", req.url))
+        ? NextResponse.redirect(new URL("/login?reason=session-ended", req.url))
         : NextResponse.next();
-      clearAccessTokenCookies(response.cookies);
+      clearSession(response);
       return response;
       }
     }
@@ -96,7 +178,7 @@ export async function proxy(req: NextRequest) {
 
 
 
-  return NextResponse.next();
+  return sessionResponse ?? NextResponse.next();
 }
 
 export const config = {
