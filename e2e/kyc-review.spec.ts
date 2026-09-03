@@ -59,6 +59,70 @@ const documents = [
   },
 ];
 
+test("admin corrects an OCR transcription without replacing the original evidence", async ({
+  context,
+  page,
+}) => {
+  await authenticated(context, page, {
+    title: "Superadmin",
+    permissions: ["list_users"],
+  });
+  const reviewDocuments = [
+    { ...documents[0], validationIssues: [] },
+    documents[1],
+  ];
+  await page.route("**/kyc/admin/queue", (route) =>
+    route.fulfill({
+      json: envelope([
+        {
+          userId: 501,
+          fullName: "SlickHood Test Owner",
+          email: "owner.e2e@slickhood.test",
+          kycCase: {
+            id: 44,
+            status: "SUBMITTED",
+            accountStatus: "KYC_UNDER_REVIEW",
+            consentVersion: "2026-08",
+            phoneVerified: true,
+            requirements,
+            missingRequirementCodes: [],
+            documents: reviewDocuments,
+          },
+        },
+      ]),
+    }),
+  );
+  await page.route("**/kyc/admin/44/review", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
+
+  await page.goto("/dashboard/kyc-review");
+  await page.getByRole("button", { name: "Review request" }).click();
+  const identity = page.locator("article").filter({ hasText: "National Id Front" });
+  await expect(identity.getByText("OCR Document Number")).toBeVisible();
+  await expect(identity.getByText("12345678", { exact: true })).toBeVisible();
+  await identity.getByLabel("Verified Document Number for National Id Front").fill("12345679");
+  await expect(
+    page.getByRole("button", { name: "Approve KYC and activate" }),
+  ).toBeDisabled();
+  await identity
+    .getByLabel("Reason for OCR correction on National Id Front")
+    .fill("The protected original clearly shows 9 as the final digit.");
+  await page.getByRole("button", { name: "Accept all remaining documents" }).click();
+
+  const reviewRequest = page.waitForRequest((request) =>
+    request.url().endsWith("/kyc/admin/44/review") && request.method() === "POST",
+  );
+  await page.getByRole("button", { name: "Approve KYC and activate" }).click();
+  const review = (await reviewRequest).postDataJSON();
+  expect(review.documents[0]).toMatchObject({
+    documentId: 81,
+    approved: true,
+    verifiedFields: { documentNumber: "12345679" },
+    correctionReason: "The protected original clearly shows 9 as the final digit.",
+  });
+});
+
 test("admin reviews OCR and originals, accepts good evidence and returns only the inaccurate document", async ({
   context,
   page,

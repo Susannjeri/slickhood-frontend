@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { KycDocumentViewer } from "@/components/auth/KycDocumentViewer";
 import {
   KycAdminCase,
@@ -30,7 +31,21 @@ import {
   reviewKyc,
 } from "@/services/kyc.service";
 
-type DocumentDecision = { approved: boolean | null; reason: string };
+type DocumentDecision = {
+  approved: boolean | null;
+  reason: string;
+  verifiedFields: Record<string, string>;
+  correctionReason: string;
+};
+
+const editableFieldsFor = (documentType: string) => {
+  if (documentType === "KRA_PIN_CERTIFICATE") return ["taxPin", "fullName"];
+  if (["PASSPORT", "NATIONAL_ID_FRONT", "NATIONAL_ID_BACK", "ALIEN_ID_FRONT", "ALIEN_ID_BACK"].includes(documentType)) {
+    return ["documentNumber", "fullName", "dateOfBirth", "expiryDate"];
+  }
+  if (documentType === "SELFIE") return [];
+  return ["fullName"];
+};
 
 const readable = (value: string) =>
   value
@@ -106,6 +121,8 @@ export default function KycReviewPage() {
               ? false
               : null,
         reason: document.rejectionReason ?? "",
+        verifiedFields: { ...(document.reviewerVerifiedFields ?? {}) },
+        correctionReason: document.reviewerCorrectionReason ?? "",
       };
     });
     setDecisions(initial);
@@ -129,6 +146,8 @@ export default function KycReviewPage() {
         reason: approved
           ? ""
           : current[documentId]?.reason?.trim() || suggestedReason,
+        verifiedFields: current[documentId]?.verifiedFields ?? {},
+        correctionReason: current[documentId]?.correctionReason ?? "",
       },
     }));
   };
@@ -138,7 +157,12 @@ export default function KycReviewPage() {
       const next = { ...current };
       documents.forEach((document) => {
         if (next[document.id]?.approved == null) {
-          next[document.id] = { approved: true, reason: "" };
+          next[document.id] = {
+            approved: true,
+            reason: "",
+            verifiedFields: next[document.id]?.verifiedFields ?? {},
+            correctionReason: next[document.id]?.correctionReason ?? "",
+          };
         }
       });
       return next;
@@ -148,9 +172,45 @@ export default function KycReviewPage() {
   const setReason = (documentId: number, reason: string) => {
     setDecisions((current) => ({
       ...current,
-      [documentId]: { approved: false, reason },
+      [documentId]: {
+        ...(current[documentId] ?? { verifiedFields: {}, correctionReason: "" }),
+        approved: false,
+        reason,
+      },
     }));
   };
+
+  const setVerifiedField = (documentId: number, field: string, value: string) => {
+    setDecisions((current) => ({
+      ...current,
+      [documentId]: {
+        ...(current[documentId] ?? { approved: null, reason: "", correctionReason: "" }),
+        verifiedFields: { ...current[documentId]?.verifiedFields, [field]: value },
+      },
+    }));
+  };
+
+  const setCorrectionReason = (documentId: number, correctionReason: string) => {
+    setDecisions((current) => ({
+      ...current,
+      [documentId]: {
+        ...(current[documentId] ?? { approved: null, reason: "", verifiedFields: {} }),
+        correctionReason,
+      },
+    }));
+  };
+
+  const hasChangedVerifiedFields = (document: (typeof documents)[number]) => {
+    const values = decisions[document.id]?.verifiedFields ?? {};
+    return Object.entries(values).some(
+      ([field, value]) => value.trim() !== (document.extractedFields?.[field] ?? "").trim(),
+    );
+  };
+  const correctionReasonsComplete = documents.every(
+    (document) =>
+      !hasChangedVerifiedFields(document) ||
+      (decisions[document.id]?.correctionReason.trim().length ?? 0) > 0,
+  );
 
   const submitDecision = async (decision: "APPROVED" | "REJECTED") => {
     if (!selected?.kycCase.id || !allDecided) return;
@@ -179,6 +239,9 @@ export default function KycReviewPage() {
           documentId: document.id,
           approved: decisions[document.id].approved === true,
           reason: decisions[document.id].reason.trim() || undefined,
+          verifiedFields: decisions[document.id].verifiedFields,
+          correctionReason:
+            decisions[document.id].correctionReason.trim() || undefined,
         })),
       );
       toast.success(
@@ -363,6 +426,8 @@ export default function KycReviewPage() {
                       document.extractedFields?._validationWarnings;
                     const issues = document.validationIssues ?? [];
                     const choice = decisions[document.id];
+                    const editableFields = editableFieldsFor(document.documentType);
+                    const hasCorrections = hasChangedVerifiedFields(document);
                     const isRecordedRejection = document.status === "REJECTED";
                     const isReviewerRejection = choice?.approved === false;
                     const isReviewerAcceptance = choice?.approved === true;
@@ -505,6 +570,66 @@ export default function KycReviewPage() {
                             </p>
                           )}
                         </div>
+                        {editableFields.length > 0 && (pendingReview || Object.keys(document.reviewerVerifiedFields ?? {}).length > 0) && (
+                          <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-blue-900">
+                              Reviewer-verified data
+                            </p>
+                            <p className="mt-1 text-xs text-blue-800">
+                              Correct OCR transcription only after comparing the protected original. The OCR reading remains unchanged in the audit record.
+                            </p>
+                            <div className="mt-3 space-y-3">
+                              {editableFields.map((field) => {
+                                const ocrValue = document.extractedFields?.[field] ?? "";
+                                const correctedValue = choice?.verifiedFields[field]
+                                  ?? document.reviewerVerifiedFields?.[field]
+                                  ?? ocrValue;
+                                return (
+                                  <div key={field} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-end">
+                                    <div>
+                                      <p className="text-xs font-medium text-slate-500">OCR {readable(field)}</p>
+                                      <p className="min-h-10 rounded-lg border bg-white px-3 py-2 text-sm">{ocrValue || "Not read"}</p>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs font-medium text-blue-900" htmlFor={`verified-${document.id}-${field}`}>
+                                        Verified {readable(field)}
+                                      </label>
+                                      <Input
+                                        id={`verified-${document.id}-${field}`}
+                                        aria-label={`Verified ${readable(field)} for ${readable(document.documentType)}`}
+                                        value={correctedValue}
+                                        disabled={!pendingReview || choice?.approved === false}
+                                        maxLength={255}
+                                        onChange={(event) => setVerifiedField(document.id, field, event.target.value)}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {(hasCorrections || document.reviewerCorrectionReason) && (
+                              <div className="mt-3">
+                                <label className="text-xs font-bold text-blue-900" htmlFor={`correction-reason-${document.id}`}>
+                                  Reason for OCR correction
+                                </label>
+                                <Textarea
+                                  id={`correction-reason-${document.id}`}
+                                  aria-label={`Reason for OCR correction on ${readable(document.documentType)}`}
+                                  value={choice?.correctionReason ?? document.reviewerCorrectionReason ?? ""}
+                                  disabled={!pendingReview || choice?.approved === false}
+                                  maxLength={1000}
+                                  onChange={(event) => setCorrectionReason(document.id, event.target.value)}
+                                  placeholder="Explain what was misread and how you confirmed the correct value from the original."
+                                />
+                              </div>
+                            )}
+                            {document.reviewerVerifiedBy && document.reviewerVerifiedAt && (
+                              <p className="mt-3 text-xs text-slate-500">
+                                Verified by reviewer #{document.reviewerVerifiedBy} on {new Date(document.reviewerVerifiedAt).toLocaleString()}.
+                              </p>
+                            )}
+                          </div>
+                        )}
                         <KycDocumentViewer
                           document={document}
                           className="mt-4 w-full"
@@ -613,6 +738,11 @@ export default function KycReviewPage() {
                               .join(", ")}.
                           </p>
                         )}
+                        {!correctionReasonsComplete && (
+                          <p className="text-red-700">
+                            Explain every OCR correction before approval.
+                          </p>
+                        )}
                       </div>
                       {undecidedDocuments.length > 0 && (
                         <Button
@@ -645,6 +775,7 @@ export default function KycReviewPage() {
                           busy ||
                           !allDecided ||
                           hasRejected ||
+                          !correctionReasonsComplete ||
                           !selected.kycCase.phoneVerified ||
                           selected.kycCase.missingRequirementCodes.length > 0
                         }

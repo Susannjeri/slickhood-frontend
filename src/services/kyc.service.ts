@@ -33,6 +33,10 @@ export interface KycDocument {
   qualityScore?: number;
   ocrConfidence?: number;
   extractedFields: Record<string, string>;
+  reviewerVerifiedFields?: Record<string, string>;
+  reviewerCorrectionReason?: string;
+  reviewerVerifiedBy?: number;
+  reviewerVerifiedAt?: string;
   validationIssues?: KycValidationIssue[];
   rejectionReason?: string;
   uploadedAt: string;
@@ -74,6 +78,8 @@ export interface KycDocumentReviewDecision {
   documentId: number;
   approved: boolean;
   reason?: string;
+  verifiedFields?: Record<string, string>;
+  correctionReason?: string;
 }
 
 const first = <T>(response: { data: { data?: T[] } }) =>
