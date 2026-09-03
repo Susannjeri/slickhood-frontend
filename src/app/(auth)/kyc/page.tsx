@@ -21,6 +21,7 @@ import { useAuthStore } from "@/store/authStore";
 import {
   getCurrentKyc,
   KycCase,
+  KycDocument,
   KycRequirement,
   reprocessKycDocuments,
   startKyc,
@@ -37,6 +38,39 @@ const label = (value: string) =>
     .toLowerCase()
     .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+const OCR_FIELD_LABELS: Record<string, string> = {
+  fullName: "Name",
+  documentNumber: "Document number",
+  taxPin: "KRA PIN",
+  dateOfBirth: "Date of birth",
+  expiryDate: "Expiry date",
+};
+const OCR_FIELD_ORDER = ["fullName", "documentNumber", "taxPin", "dateOfBirth", "expiryDate"];
+
+function OcrKeyDetails({ document }: { document: KycDocument }) {
+  const fields = OCR_FIELD_ORDER.filter((field) => document.extractedFields?.[field]?.trim());
+  if (!fields.length) return null;
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-[#071744]">
+      <p className="font-semibold">Key details read from your document</p>
+      <p className="mt-1 text-xs text-slate-600">
+        Check these details against the original. They cannot be edited here; replace the document if they are wrong.
+      </p>
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+        {fields.map((field) => {
+          const confidence = document.extractedFields[`_confidence.${field}`];
+          return (
+            <div key={field} className="rounded-lg border border-blue-100 bg-white px-3 py-2">
+              <dt className="text-xs font-medium text-slate-500">{OCR_FIELD_LABELS[field]}</dt>
+              <dd className="mt-1 break-words font-semibold">{document.extractedFields[field]}</dd>
+              {confidence ? <p className="mt-1 text-[11px] text-slate-500">OCR confidence {confidence}%</p> : null}
+            </div>
+          );
+        })}
+      </dl>
+    </div>
+  );
+}
 const errorMessage = (error: unknown, fallback: string) => {
   const candidate = error as {
     response?: { data?: { description?: string; data?: unknown[] } };
@@ -552,6 +586,9 @@ function RequirementCard({
           <p className="mt-3 text-xs font-semibold text-red-700">
             Your other accepted documents remain saved. Replace only this item.
           </p>
+          <div className="mt-3">
+            <OcrKeyDetails document={rejected} />
+          </div>
         </div>
       )}
       {document ? (
@@ -582,6 +619,7 @@ function RequirementCard({
               </p>
             </div>
           ) : null}
+          <OcrKeyDetails document={document} />
           <KycDocumentViewer document={document} className="w-full" />
           {!replacing && (
             <Button
