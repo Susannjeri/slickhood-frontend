@@ -15,6 +15,20 @@ async function verify(viewport, name) {
   await page.getByRole('button', { name: /^sign in$/i }).waitFor();
   await page.getByRole('button', { name: /continue with google/i }).waitFor();
 
+  await page.getByLabel(/email address/i).fill('auth-contract-probe@example.com');
+  await page.getByLabel(/^password$/i).fill('NotARealPassword1!');
+  const [authenticationResponse] = await Promise.all([
+    page.waitForResponse((response) => response.url().includes('/auth/login')),
+    page.getByRole('button', { name: /^sign in$/i }).click(),
+  ]);
+  const authenticationUrl = new URL(authenticationResponse.url());
+  if (authenticationUrl.pathname !== '/api/auth/login') {
+    failures.push(`${name}: login submitted to ${authenticationUrl.pathname} instead of /api/auth/login`);
+  }
+  if (authenticationResponse.status() !== 401) {
+    failures.push(`${name}: invalid login returned HTTP ${authenticationResponse.status()} instead of 401`);
+  }
+
   const email = page.getByLabel(/email address/i);
   const box = await email.boundingBox();
   if (!box || box.width < Math.min(280, viewport.width - 40)) {

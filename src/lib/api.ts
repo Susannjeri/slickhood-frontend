@@ -3,8 +3,26 @@ import axios from "axios"
 import { Channel } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 
+function configuredApiUrl() {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  if (!configured) return configured;
+  try {
+    const url = new URL(configured);
+    // app.slickhood.com serves Next.js at / and proxies backend traffic at /api.
+    // Keep this defensive normalization so a base-origin-only production build
+    // cannot route authentication calls back into the frontend.
+    if (url.hostname === "app.slickhood.com" && (!url.pathname || url.pathname === "/")) {
+      url.pathname = "/api";
+      return url.toString().replace(/\/$/, "");
+    }
+  } catch {
+    // Axios will surface an invalid configured URL normally.
+  }
+  return configured;
+}
+
 export const API = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL, // e.g. http://localhost:8080
+  baseURL: configuredApiUrl(), // e.g. http://localhost:8080 or https://app.slickhood.com/api
   withCredentials: false, // include cookies if backend uses them
 })
 
