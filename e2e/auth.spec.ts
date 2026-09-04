@@ -67,6 +67,8 @@ test("an unverified account is sent to email verification instead of a tokenless
   await expect(page).toHaveURL(/\/verify-code$/);
   await expect(page.getByRole("heading", { name: "Verify your email" })).toBeVisible();
   await expect(page.getByText("owner@example.test")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Resend in 60s/ })).toBeDisabled();
+  await expect(page.getByText(/Use only the newest code/)).toBeVisible();
 });
 
 test("a successful credential login creates the secure session and leaves the login page", async ({ page, context }) => {

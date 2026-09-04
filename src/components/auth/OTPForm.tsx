@@ -30,8 +30,8 @@ const OTPForm: React.FC = () => {
 
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
-  const [canResend, setCanResend] = useState(true);
-  const [resendCooldown, setResendCooldown] = useState(0);
+  const [canResend, setCanResend] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(60);
   const [expiry, setExpiry] = useState(EXPIRY_SECONDS);
   const [showVerifiedModal, setShowVerifiedModal] = useState(false);
   const guardCheckedRef = useRef(false);
@@ -74,9 +74,9 @@ const OTPForm: React.FC = () => {
     try {
       const result = await get_OTP(email, 'EMAIL');
       if (result.success) {
-        toast.success('New OTP sent successfully');
+        toast.success('Verification email requested. Use only the newest code that arrives.');
         setCanResend(false);
-        setResendCooldown(20);
+        setResendCooldown(60);
         setExpiry(EXPIRY_SECONDS);
       } else {
         toast.error(result.message || 'Failed to resend OTP');
@@ -190,7 +190,9 @@ const OTPForm: React.FC = () => {
         <div>
           <p className="text-sm font-bold text-[#14235C] dark:text-white">Didn&apos;t receive the code?</p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
-            Check your spam folder or resend the code.
+            Delivery can take a few minutes. Check Spam or Junk and allow mail from
+            {' '}noreply@slickhood.com. Use only the newest code; requesting another code
+            invalidates the previous one.
           </p>
         </div>
       </div>
