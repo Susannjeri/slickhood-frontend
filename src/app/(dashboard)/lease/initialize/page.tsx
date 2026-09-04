@@ -1,10 +1,9 @@
 // app/lease/initialize/page.tsx - PART A
 "use client";
 
-import { useState, useEffect, useRef, use } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
-import { useAuth } from "@/hooks/useAuth";
 import { useApi } from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -16,12 +15,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Accordion,
   AccordionContent,
@@ -37,16 +30,15 @@ import {
   Zap,
   ChevronLeft,
   ChevronRight,
-  Eye,
   FileText,
   ArrowRight,
   Receipt,
   LogIn,
 } from "lucide-react";
 
-import ProfileGateModal, { ProfileGateFields } from "@/components/auth/ProfileGateModal";
-import { resumePluginState } from "next/dist/build/build-context";
+import ProfileGateModal from "@/components/auth/ProfileGateModal";
 import {usePropertyMetadata} from "@/app/(dashboard)/dashboard/property/propertyMetadata";
+import { invitationUrl } from "@/lib/invitation-navigation";
 
 
 interface UnitDetails {
@@ -79,12 +71,10 @@ interface UnitCharge {
 
 export default function LeaseInitializePage() {
   const router = useRouter();
-  const { handleTokenRefresh } = useAuth();
-  const { inviteToken, setInviteToken, token: authToken, roleName } = useAuthStore();
+  const { inviteToken, setInviteToken, setStep, token: authToken } = useAuthStore();
   const {
     handleValidateInviteToken,
     getPropertyImage,
-    handleViewLeaseTemplatePublic,
     handleCreateLeaseTenant,
     handleGetUnitCharges,
   } = useApi();
@@ -92,9 +82,6 @@ export default function LeaseInitializePage() {
 
   // Check if user is logged in
   const isLoggedIn = !!authToken;
-
-  //Prevent multiple refresh attempts
-  const hasAttemptedRefresh = useRef(false);
 
   // State
   const [loading, setLoading] = useState(true);
@@ -112,10 +99,6 @@ export default function LeaseInitializePage() {
   const [moveOutDate, setMoveOutDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // PDF Modal state
-  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState("");
-
   // Profile Gate State
     const [profileGate, setProfileGate] = useState<Record<string, boolean> | null>(null);
 
@@ -130,38 +113,6 @@ export default function LeaseInitializePage() {
 
     loadData();
   }, [inviteToken]);
-
- useEffect(() => {
-    console.log("Checking tenant role for lease initialization...");
-    const ensureTenantRole = async () => {
-      // Only run if:
-      // 1. User is logged in
-      // 2. Data has finished loading
-      // 3. Unit details exist
-      // 4. Haven't attempted refresh yet
-      // if (isLoggedIn && !loading && unitDetails && !hasAttemptedRefresh.current)
-      console.log("isLoggedIn:", isLoggedIn);
-      if (isLoggedIn) {
-        const hasTenantRole = roleName?.includes("Tenant");
-        console.log("User roles:", roleName, "Is user tenant? ", hasTenantRole);
-        
-        
-          try {
-            console.log("Tenant role not found, refreshing token to add Tenant role...");
-            await handleTokenRefresh();
-            console.log("Token refreshed successfully, Tenant role should now be available");
-            toast.success("Account updated for lease initialization");
-          } catch (error) {
-            console.error("Failed to refresh token:", error);
-            toast.error("Failed to update your account. Please try logging in again.");
-          }
-        }
-      }
-
-    ensureTenantRole();
-  }, [isLoggedIn]);
-
-
 
   const loadData = async () => {
     try {
@@ -233,30 +184,6 @@ export default function LeaseInitializePage() {
     } 
   };
 
-  const handleViewPdf = async () => {
-    if (!unitDetails) return;
-
-    try {
-      if(!inviteToken) return;
-      const response = await handleViewLeaseTemplatePublic(inviteToken);
-
-      let blob;
-      if (response instanceof Blob) {
-        blob = response;
-      } else {
-        const pdfData = response.data || response;
-        blob = new Blob([pdfData], { type: "application/pdf" });
-      }
-
-      const url = URL.createObjectURL(blob);
-      setPdfUrl(url);
-      setIsPdfModalOpen(true);
-    } catch (error) {
-      console.error("Error viewing PDF:", error);
-      toast.error("Failed to load lease template PDF");
-    }
-  };
-
   const validateDates = (): boolean => {
     if (!moveInDate || !moveOutDate) {
       toast.error("Please select both move in and move out dates");
@@ -306,7 +233,7 @@ export default function LeaseInitializePage() {
         
         // Redirect to dashboard
         setTimeout(() => {
-          router.push(`/dashboard/unit/details/${unitDetails?.unitId}?p=${unitDetails?.propertyId}`);
+          router.push("/dashboard/lease/operations");
         }, 1000);
       } else {
         toast.error(response.description || "Failed to initialize lease");
@@ -322,6 +249,12 @@ export default function LeaseInitializePage() {
   const handleLoginRedirect = () => {
     if (!inviteToken) return;
     router.push(`/login?invitation=tenant&token=${encodeURIComponent(inviteToken)}&returnTo=${encodeURIComponent("/lease/initialize")}`);
+  };
+
+  const handleRegistrationRedirect = () => {
+    if (!inviteToken) return;
+    setStep("account");
+    router.push(invitationUrl("/register", inviteToken, "/lease/initialize"));
   };
 
   const handlePreviousImage = () => {
@@ -808,16 +741,6 @@ export default function LeaseInitializePage() {
           </h3>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            {/* View Lease Agreement - Always visible */}
-            <Button
-              onClick={handleViewPdf}
-              variant="outline"
-              className="flex-1 border-[#141130] text-[#141130] hover:bg-[#141130] hover:text-white"
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              View Lease Agreement
-            </Button>
-
             {/* Conditional Initialize/Login Button */}
             {isLoggedIn ? (
               <Button
@@ -829,14 +752,16 @@ export default function LeaseInitializePage() {
                 Initialize Lease
               </Button>
             ) : (
-              <Button
-                onClick={handleLoginRedirect}
-                className="flex-1 text-white"
-                style={{ backgroundColor: "#EF4217" }}
-              >
-                <LogIn className="w-4 h-4 mr-2" />
-                Login to Initialize Lease
-              </Button>
+              <>
+                <Button onClick={handleLoginRedirect} variant="outline" className="flex-1">
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Sign in
+                </Button>
+                <Button onClick={handleRegistrationRedirect} className="flex-1 text-white" style={{ backgroundColor: "#EF4217" }}>
+                  <FileText className="w-4 h-4 mr-2" />
+                  Create tenant account
+                </Button>
+              </>
             )}
           </div>
 
@@ -876,27 +801,6 @@ export default function LeaseInitializePage() {
           onClose={() => {}} 
         />
 
-      {/* PDF Viewer Modal */}
-      <Dialog open={isPdfModalOpen} onOpenChange={setIsPdfModalOpen}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
-          <DialogHeader className="px-6 py-4 border-b">
-            <DialogTitle className="text-[#141130]">Lease Agreement Template</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 w-full h-full p-4">
-            {pdfUrl ? (
-              <iframe
-                src={pdfUrl}
-                className="w-full h-full border rounded"
-                title="Lease Agreement Template PDF"
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 className="w-8 h-8 animate-spin" style={{ color: "#EF4217" }} />
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
     
   );

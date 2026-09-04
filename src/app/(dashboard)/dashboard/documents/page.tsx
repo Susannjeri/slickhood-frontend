@@ -24,6 +24,21 @@ const saleTypes: LeaseDocumentType[] = ["PROPERTY_SALE_LETTER_OF_OFFER", "PROPER
 const allTypes: LeaseDocumentType[] = [...rentalTypes, "ESTATE_RESIDENTIAL_AGREEMENT", ...saleTypes];
 const label = (value: string) => value.toLowerCase().replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+const tenantStatusMessage = (document: LeaseDocument) => {
+  if (document.status === "DRAFT") return "Draft available for review. Your landlord or manager must issue it before you can acknowledge or sign.";
+  if (document.status === "ISSUED") return "Issued to you. Review the PDF, then acknowledge and sign when you are satisfied.";
+  if (document.status === "ACKNOWLEDGED") return "You acknowledged this agreement. Your signature is still required.";
+  if (document.status === "PARTIALLY_SIGNED") {
+    if (document.recipientSignedAt && !document.issuerSignedAt) return "You signed. Waiting for the landlord or manager to sign.";
+    if (document.issuerSignedAt && !document.recipientSignedAt) return "The landlord or manager signed. Your signature is required.";
+    return "One party has signed. The agreement becomes active after both signatures.";
+  }
+  if (document.status === "SIGNED") return "Complete: you and the landlord or manager have signed.";
+  if (document.status === "CANCELLED") return "This document was cancelled and can no longer be signed.";
+  if (document.status === "EXPIRED") return "This document expired. Ask the landlord or manager to issue a current version.";
+  return null;
+};
+
 export default function DocumentsPage() {
   const searchParams = useSearchParams();
   const activeRole = useAuthStore((state) => state.activeRole);
@@ -56,23 +71,32 @@ export default function DocumentsPage() {
   const canAcknowledge = permissions.includes("acknowledge_lease_document");
   const canSign = permissions.includes("sign_lease_document");
   const canEditTemplates = permissions.includes("manage_lease_document_template");
+  const isTenant = activeRole?.title?.toLowerCase() === "tenant";
   const isSaleDocument = saleTypes.includes(type);
   const isEstateDocument = type === "ESTATE_RESIDENTIAL_AGREEMENT";
   const visibleTypes = useMemo(() => activeRole?.title?.toLowerCase() === "tenant" ? ["TENANT_TERMINATION_NOTICE" as LeaseDocumentType] : allTypes.filter((t) => t !== "TENANT_TERMINATION_NOTICE"), [activeRole]);
 
   const load = useCallback(async () => {
     try {
-      const [documentResponse, templateResponse] = await Promise.all([leaseDocumentService.list({ page, size: 25 }), leaseDocumentService.templates()]);
+      const documentResponse = await leaseDocumentService.list({ page, size: 25 });
       setDocuments(documentResponse.data?.data ?? []);
       setTotalPages(documentResponse.data?.totalPages ?? 0);
-      setTemplates(templateResponse.data?.data ?? []);
+      if (canCreate || canEditTemplates) {
+        const templateResponse = await leaseDocumentService.templates();
+        setTemplates(templateResponse.data?.data ?? []);
+      } else {
+        setTemplates([]);
+      }
     } catch (error: unknown) {
       toast.error(apiErrorMessage(error, "Could not load documents."));
     }
-  }, [page]);
+  }, [canCreate, canEditTemplates, page]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { void leaseDocumentService.branding().then(response => setLogoConfigured(Boolean(response.data?.data?.configured))).catch(() => undefined); }, []);
+  useEffect(() => {
+    if (!canCreate) return;
+    void leaseDocumentService.branding().then(response => setLogoConfigured(Boolean(response.data?.data?.configured))).catch(() => undefined);
+  }, [canCreate]);
   useEffect(() => {
     const linkedType = searchParams.get("type") as LeaseDocumentType | null;
     if (linkedType && allTypes.includes(linkedType)) setType(linkedType);
@@ -163,8 +187,8 @@ export default function DocumentsPage() {
   }
 
   return <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">
-    <div><h1 className="text-3xl font-bold text-[#141130] dark:text-white">Documents & notices</h1>
-      <p className="text-muted-foreground">Versioned agreements and notices with delivery, acknowledgement, signatures, and audit-safe snapshots.</p></div>
+    <div><h1 className="text-3xl font-bold text-[#141130] dark:text-white">{isTenant ? "My lease documents" : "Documents & notices"}</h1>
+      <p className="text-muted-foreground">{isTenant ? "Review the current draft and follow its issue, acknowledgement, and two-party signing status." : "Versioned agreements and notices with delivery, acknowledgement, signatures, and audit-safe snapshots."}</p></div>
 
     {canCreate && <Card><CardHeader><CardTitle>Document owner branding</CardTitle><CardDescription>The logo belongs to this account and is used for properties owned by this account. Employees use their employer/property owner’s saved logo.</CardDescription></CardHeader><CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{logoConfigured ? "Logo configured" : "No logo configured"}</p><p className="text-sm text-muted-foreground">PNG or JPEG, maximum 512 KB. Every generated draft snapshots the current logo.</p></div><div><Label htmlFor="document-logo" className="sr-only">Document owner logo</Label><Input id="document-logo" type="file" accept="image/png,image/jpeg" disabled={busy} onChange={uploadLogo} /></div></CardContent></Card>}
 
@@ -188,7 +212,8 @@ export default function DocumentsPage() {
       {documents.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-center lg:justify-between">
         <div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{item.name}</p><Badge variant="outline">{label(item.status)}</Badge>
           {item.legalReviewRequired && <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Legal review</Badge>}</div>
-          <p className="text-sm text-muted-foreground">#{item.id} · Template v{item.templateVersion} · {item.leaseId ? `Lease ${item.leaseId}` : item.saleId ? `Sale ${item.saleId}` : `Property ${item.propertyId}`}</p></div>
+          <p className="text-sm text-muted-foreground">#{item.id} · Template v{item.templateVersion} · {item.leaseId ? `Lease ${item.leaseId}` : item.saleId ? `Sale ${item.saleId}` : `Property ${item.propertyId}`}</p>
+          {isTenant && tenantStatusMessage(item) && <p className="mt-2 max-w-2xl text-sm font-medium text-[#14235C]">{tenantStatusMessage(item)}</p>}</div>
         <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => viewPdf(item.id)}><Download className="mr-1 h-4 w-4" />PDF</Button>
           {canIssue && item.status === "DRAFT" && <Button size="sm" onClick={() => action(item.id, "issue")} disabled={busy}><Send className="mr-1 h-4 w-4" />Issue</Button>}
           {canAcknowledge && item.status === "ISSUED" && <Button size="sm" variant="outline" onClick={() => action(item.id, "acknowledge")} disabled={busy}>Acknowledge</Button>}

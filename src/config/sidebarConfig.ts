@@ -11,6 +11,7 @@ export interface SidebarLink {
   permissions: string[]
   description?: string
   roles?: string[]
+  excludedRoles?: string[]
   subLinks?: SidebarLink[];
 }
 
@@ -199,6 +200,7 @@ export const sidebarLinks: SidebarLink[] = [
     icon: Building,
     label: "Properties",
     permissions: ["create_property", "view_property"],
+    excludedRoles: ["Tenant", "Buyer", "Homeowner"],
     protected: true,
     subLinks: [
       {
@@ -246,7 +248,7 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
     subLinks: [
       { label: "Lease operations", href: "/dashboard/lease/operations", permissions: ["view_active_lease"], protected: true },
-      { label: "Lease templates", href: "/dashboard/lease/templates", permissions: ["view_lease_template"], protected: true },
+      { label: "Lease templates", href: "/dashboard/lease/templates", permissions: ["view_lease_template"], excludedRoles: ["Tenant"], protected: true },
     ],
   },
   {

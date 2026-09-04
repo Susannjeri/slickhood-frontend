@@ -33,6 +33,7 @@ import { KycDocumentViewer } from "@/components/auth/KycDocumentViewer";
 import { resolveOnboardingContinuation } from "@/services/onboarding-continuation.service";
 import { updateContact, verifyContact } from "@/lib/api";
 import { MAX_KYC_FILE_LABEL, prepareKycUpload } from "@/lib/kyc-upload";
+import { safeInvitationReturnTo } from "@/lib/invitation-navigation";
 
 const label = (value: string) =>
   value
@@ -156,6 +157,7 @@ export default function KycPage() {
   const [profileRemediation, setProfileRemediation] = useState(false);
   const token = useAuthStore((state) => state.token);
   const activeRole = useAuthStore((state) => state.activeRole);
+  const inviteToken = useAuthStore((state) => state.inviteToken);
   const sessionReady = useAuthStore((state) => state.sessionReady);
   const [kyc, setKyc] = useState<KycCase>();
   const [loading, setLoading] = useState(true);
@@ -313,6 +315,11 @@ export default function KycPage() {
 
   const continueSetup = async () => {
     if (!token) return;
+    const returnTo = safeInvitationReturnTo(window.location.search);
+    if (returnTo && inviteToken) {
+      router.replace(returnTo);
+      return;
+    }
     const next = await resolveOnboardingContinuation(token, activeRole);
     router.replace(next.destination);
   };

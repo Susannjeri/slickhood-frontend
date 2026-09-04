@@ -7,11 +7,12 @@ import { useAuthStore } from "@/store/authStore"
 interface CanProps {
   permissions?: string[]
   roles?: string[]
+  excludedRoles?: string[]
   children: ReactNode
   fallback?: ReactNode // what to render if not authorized
 }
 
-export default function Can({ permissions = [], roles = [], children, fallback = null }: CanProps) {
+export default function Can({ permissions = [], roles = [], excludedRoles = [], children, fallback = null }: CanProps) {
   const userPermissions = useAuthStore((s) => s.permissions)
   const activeRole = useAuthStore((s) => s.activeRole)
   const userRoles = activeRole ? [activeRole.title] : []
@@ -26,7 +27,8 @@ export default function Can({ permissions = [], roles = [], children, fallback =
 
   // if (hasPermission && hasRole)
 
-  const isAllowed = hasPermission && hasRole
+  const isExcluded = excludedRoles.some((role) => userRoles.includes(role))
+  const isAllowed = hasPermission && hasRole && !isExcluded
   return <>{isAllowed ? children : fallback}</>
 }
 
@@ -45,5 +47,6 @@ export function usePermissions() {
     if (roles.length === 0) return true
     return roles.some((r) => userRoles.includes(r))
   }
-  return { hasPermission, hasRole, userPermissions, userRoles }
+  const hasExcludedRole = (roles: string[] = []) => roles.some((r) => userRoles.includes(r))
+  return { hasPermission, hasRole, hasExcludedRole, userPermissions, userRoles }
 }

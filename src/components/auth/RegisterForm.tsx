@@ -109,7 +109,9 @@ export default function RegisterForm() {
             settotpEnabled(result.totpEnabled);
             setStep("complete");
             if (returnTo && pendingInvite) setInviteToken(pendingInvite);
-            router.push(returnTo ?? "/account-activated");
+            router.push(returnTo
+                ? `/kyc?returnTo=${encodeURIComponent(returnTo)}`
+                : "/account-activated");
         } else {
             setError(result.message);
         }
@@ -161,10 +163,15 @@ export default function RegisterForm() {
         setLoading(true);
         setError(null);
         try {
+            const pendingInvite = useAuthStore.getState().inviteToken;
+            const returnTo = safeInvitationReturnTo(window.location.search);
             const result = await register(values.email, values.password, values.fullName, values.profileType, values.organizationName);
             if (result.success) {
                 setStep("verify");
-                router.push(invitationUrl("/verify-code", useAuthStore.getState().inviteToken, safeInvitationReturnTo(window.location.search)));
+                // Tenant invitations are consumed only after the lease draft is
+                // created. Keep the email-bound token through OTP and KYC.
+                if (returnTo && pendingInvite) setInviteToken(pendingInvite);
+                router.push(invitationUrl("/verify-code", pendingInvite, returnTo));
             } else {
                 setError(result.message || "Registration failed");
             }

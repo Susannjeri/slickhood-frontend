@@ -91,7 +91,7 @@ export default function AppSidebar() {
   const { handleGetPendingUnits } = useApi();
   const pathname = usePathname();
 
-  const { hasPermission, hasRole } = usePermissions();
+  const { hasPermission, hasRole, hasExcludedRole } = usePermissions();
   const canAccessJobs = hasPermission(["create_unit"]);
 
   const roles = useAuthStore((s) => s.roles);
@@ -237,7 +237,7 @@ export default function AppSidebar() {
 
           {sidebarSections.map((section) => {
             const visibleLinks = section.links.filter((link) =>
-              hasPermission(link.permissions || []) && hasRole(link.roles || [])
+              hasPermission(link.permissions || []) && hasRole(link.roles || []) && !hasExcludedRole(link.excludedRoles || [])
             )
 
             if (visibleLinks.length === 0) return null
@@ -276,7 +276,7 @@ export default function AppSidebar() {
                             <CollapsibleContent>
                               <SidebarMenuSub>
                                 {link.subLinks.map((subLink) => (
-                                  <Can permissions={subLink.permissions || []} key={subLink.href}>
+                                  <Can permissions={subLink.permissions || []} roles={subLink.roles || []} excludedRoles={subLink.excludedRoles || []} key={subLink.href}>
                                     <SidebarMenuSubItem>
                                       <SidebarMenuSubButton
                                         asChild

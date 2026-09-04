@@ -177,7 +177,9 @@ test("a tenant invitation survives sign-in and returns to lease initialization",
 
   await page.goto("/lease/onboard?token=tenant-bound-token");
   await expect(page).toHaveURL(/\/lease\/initialize$/);
-  await page.getByRole("button", { name: "Login to Initialize Lease" }).click();
+  await expect(page.getByText("Unit A-101")).toBeVisible();
+  await expect(page.getByRole("button", { name: "View Lease Agreement" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/login\?.*returnTo=%2Flease%2Finitialize/);
   await page.getByPlaceholder("you@example.com").fill("tenant@example.com");
   await page.getByPlaceholder("••••••••").fill("ValidPass1!");
@@ -186,6 +188,46 @@ test("a tenant invitation survives sign-in and returns to lease initialization",
   await expect(page).toHaveURL(/\/lease\/initialize$/);
   const storedInvite = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state?.inviteToken);
   expect(storedInvite).toBe("tenant-bound-token");
+});
+
+test("a new tenant can start registration directly from the unit invitation", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/validate**", route => route.fulfill({ json: {
+    success: true, code: "S0058", description: "Tenant invite",
+    data: [{ propertyId: 11, unitId: 77, ref: "A-101", propertyType: "APARTMENT", unitType: "APARTMENT", size: 85,
+      measurementUnits: { id: 1, name: "sqm" }, utilities: [], leaseMode: "RENT", price: 25000, currency: "KES",
+      occupied: false, advertise: false, thumbnail: "", images: [], templateId: 9 }],
+  } }));
+  await page.route("**/property/unit/type**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/property/unit/charges**", route => route.fulfill({ json: envelope([]) }));
+
+  await page.goto("/lease/onboard?token=tenant-new-account-token");
+  await page.getByRole("button", { name: "Create tenant account" }).click();
+
+  await expect(page).toHaveURL(/\/register\?.*token=tenant-new-account-token.*returnTo=%2Flease%2Finitialize/);
+});
+
+test("tenant email verification continues to KYC before lease initialization", async ({ page }) => {
+  const jwt = testToken([{ title: "Tenant", permissions: ["create_new_lease"] }]);
+  await page.addInitScript(() => {
+    localStorage.setItem("auth-storage", JSON.stringify({ state: {
+      email: "tenant@example.test", step: "verify", inviteToken: "tenant-otp-token",
+      roles: [], roleName: [], permissions: [], propertyIds: [], propertyNames: [], activeRole: null,
+    }, version: 0 }));
+  });
+  await page.route("**/otp/verify", route => route.fulfill({ json: envelope([{
+    jwt, refreshToken: "tenant-refresh-token-long-enough",
+  }]) }));
+  await page.route("**/kyc/current", route => route.fulfill({ json: envelope([{
+    status: "NOT_STARTED", accountStatus: "PENDING_KYC", consentVersion: "2026-08",
+    phoneVerified: false, requirements: [], missingRequirements: [], documents: [],
+  }]) }));
+
+  await page.goto("/verify-code?token=tenant-otp-token&returnTo=%2Flease%2Finitialize");
+  await page.getByRole("textbox").fill("123456");
+  await page.getByRole("button", { name: "Verify Email" }).click();
+
+  await expect(page).toHaveURL(/\/kyc\?returnTo=%2Flease%2Finitialize/, { timeout: 8_000 });
 });
 
 test("an invalid chunked access cookie is fully cleared at the request boundary", async ({ page, context }) => {

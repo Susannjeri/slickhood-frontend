@@ -32,8 +32,8 @@ test("lease operations routes drafts through governed documents and records a te
   await expect.poll(() => notice).toEqual({ effectiveDate: "2027-08-31", reason: "Tenant notice and scheduled move-out" });
 });
 
-test("tenant can continue to the governed agreement and see both signature states", async ({ context, page }) => {
-  await authenticated(context, page, { title: "Tenant", permissions: ["view_active_lease", "view_lease_document"] });
+test("tenant can continue to the governed agreement and sees no owner catalogue navigation", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: ["view_active_lease", "view_lease_document", "view_property", "view_property_list", "view_lease_template"] });
   await page.route("**/lease/**", async route => {
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith("/lease/list")) {
@@ -59,6 +59,38 @@ test("tenant can continue to the governed agreement and see both signature state
   await expect(page.getByText("Landlord/manager signature: pending")).toBeVisible();
   await expect(page.getByRole("link", { name: "View and sign agreement" }))
     .toHaveAttribute("href", "/dashboard/documents");
+  await expect(page.getByText("Properties", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("All Properties", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Lease templates", { exact: true })).toHaveCount(0);
+});
+
+test("tenant reviews the draft and sees clear two-party signing status without loading templates", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: ["view_lease_document", "acknowledge_lease_document", "sign_lease_document"] });
+  let templateRequests = 0;
+  await page.route("**/lease/documents**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/lease/documents/templates")) {
+      templateRequests += 1;
+      await route.fulfill({ status: 403, json: { success: false } });
+      return;
+    }
+    if (path.endsWith("/lease/documents")) {
+      await route.fulfill({ json: envelope([{
+        id: 81, leaseId: 51, documentType: "RESIDENTIAL_LEASE_AGREEMENT", status: "DRAFT",
+        name: "Apartment A-101 lease", templateVersion: 3, issuerUserId: 10, recipientUserId: 20,
+        legalReviewRequired: false,
+      }]) });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto("/dashboard/documents");
+  await expect(page.getByRole("heading", { name: "My lease documents" })).toBeVisible();
+  await expect(page.getByText(/Draft available for review/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "PDF" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign" })).toHaveCount(0);
+  expect(templateRequests).toBe(0);
 });
 
 test("landlord creates a residential lease agreement without a sales offer letter", async ({ context, page }) => {

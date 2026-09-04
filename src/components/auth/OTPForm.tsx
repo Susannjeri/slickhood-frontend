@@ -103,7 +103,10 @@ const OTPForm: React.FC = () => {
         setShowVerifiedModal(true);
         // Give the user a moment to read the modal before the redirect fires.
         setTimeout(() => {
-          router.replace(safeInvitationReturnTo(window.location.search) ?? '/account-activated');
+          const returnTo = safeInvitationReturnTo(window.location.search);
+          router.replace(returnTo
+            ? `/kyc?returnTo=${encodeURIComponent(returnTo)}`
+            : '/account-activated');
         }, 2000);
       } else {
         toast.error(response.message || 'Invalid verification code');
