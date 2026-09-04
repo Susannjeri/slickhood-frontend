@@ -125,6 +125,32 @@ test("a replaced single session explains why another sign in is required", async
   await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
 });
 
+test("a bound staff invitation survives validation and offers sign-in before registration", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/validate**", route => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      success: true,
+      code: "S00141",
+      description: "Use this invitation to join SlickHood.",
+      data: [],
+    }),
+  }));
+
+  await page.goto("/lease/onboard?token=insurance-invite-token");
+
+  await expect(page).toHaveURL(/\/login\?invitation=ready$/);
+  await expect(page.getByTestId("invitation-ready")).toContainText("Sign in with the invited email");
+  await page.getByRole("link", { name: "Sign up" }).click();
+  await expect(page).toHaveURL(/\/register$/);
+  const storedInvite = await page.evaluate(() => {
+    const stored = JSON.parse(window.localStorage.getItem("auth-storage") || "{}");
+    return stored?.state?.inviteToken;
+  });
+  expect(storedInvite).toBe("insurance-invite-token");
+});
+
 test("an invalid chunked access cookie is fully cleared at the request boundary", async ({ page, context }) => {
   await context.addCookies([
     { name: "tokenChunks", value: "2", url: "http://127.0.0.1:3000" },

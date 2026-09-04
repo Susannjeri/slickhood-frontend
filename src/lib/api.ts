@@ -969,7 +969,7 @@ export const validateInviteToken = (inviteToken: string, token?: string) => {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  return API.get(`/invite/validate?token=${inviteToken}`, headers);
+  return API.get(`/invite/validate?token=${encodeURIComponent(inviteToken)}`, { headers });
 }
 
 export const viewInviteUnit = (inviteToken: string) => {

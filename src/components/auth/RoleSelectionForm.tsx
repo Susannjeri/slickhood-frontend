@@ -125,14 +125,18 @@ const HelpPanel: React.FC<{ roles: Role[] }> = ({ roles }) => (
 const RoleSelectionForm: React.FC = () => {
     const router = useRouter();
     const { roles: fetchRoles } = useAuth();
-    const { setStep, setRole, resetRegistrationData, inviteToken } = useAuthStore();
+    const { setStep, setRole, setInviteToken, resetRegistrationData, inviteToken } = useAuthStore();
     const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
     const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [showHelp, setShowHelp] = useState(false);
 
-    useLayoutEffect(() => { resetRegistrationData(); }, []);
+    useLayoutEffect(() => {
+        const pendingInvite = useAuthStore.getState().inviteToken;
+        resetRegistrationData();
+        if (pendingInvite) setInviteToken(pendingInvite);
+    }, [resetRegistrationData, setInviteToken]);
 
     useEffect(() => {
         const getRoles = async () => {

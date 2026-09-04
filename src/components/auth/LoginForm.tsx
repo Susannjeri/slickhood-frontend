@@ -151,6 +151,12 @@ export default function LoginForm() {
         <p className="text-base text-gray-500 dark:text-gray-400">Welcome back! Please enter your details.</p>
       </div>
 
+      {inviteToken && (
+        <div data-testid="invitation-ready" role="status" className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-950">
+          Invitation found. Sign in with the invited email, or choose Sign up below if you do not yet have a SlickHood account.
+        </div>
+      )}
+
       {/* Form */}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

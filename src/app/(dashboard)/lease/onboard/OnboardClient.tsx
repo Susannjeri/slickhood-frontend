@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 export default function OnboardClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setInviteToken, setStep, resetRegistrationData, logout } = useAuthStore();
+  const { setInviteToken, setStep, resetRegistrationData } = useAuthStore();
   const { token: jwtToken } = useAuthStore.getState();
   const { handleValidateInviteToken } = useApi();
   
@@ -46,46 +46,31 @@ export default function OnboardClient() {
       const code = response.code;
       const isTenantInvite = code === 'S0058';
 
-      // STEP 2: Store the invite token
-      setInviteToken(token);
-
-      // STEP 3: Route based on invite type
+      // STEP 2: Route based on invite type. Registration resets must happen
+      // before storing the token or the one-time invitation is silently lost.
       if (isTenantInvite) {
         // ===== NEW FLOW: EVERYONE GOES TO LEASE INITIALIZE =====
         console.log('Tenant invite - redirecting to lease initialization');
+        setInviteToken(token);
         router.replace('/lease/initialize');
       } else {
-        // ===== OTHER ROLE INVITES - EXISTING FLOW =====
-        
-        // Force logout if user is logged in (for non-tenant invites)
-        if (jwtToken) {
-          console.log('Non-tenant invite - forcing logout to process invite');
-          
-          await fetch('/browser-session/clear-cookie', { 
-            method: 'POST',
-            credentials: 'include'
-          });
-          
-          logout();
-          router.refresh();
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-
-        resetRegistrationData();
-
         if (code === 'S0023' || code === 'S00141') {
-          // Pre-assigned role - skip role selection, go to register
-          console.log('Pre-assigned role - redirecting to registration');
+          // A bound invitation may belong to either an existing or a new user.
+          // Start at sign-in to avoid duplicate accounts; new users can choose
+          // Sign up and the same invitation token remains attached.
+          resetRegistrationData();
+          setInviteToken(token);
           setStep('account');
-          router.replace('/register');
+          router.replace('/login?invitation=ready');
         } else if (code === 'S00143') { 
-          // User already accepted
-          console.log('Invite already accepted');
+          // Authenticated validation has already applied the invited role.
+          setInviteToken(null);
           setStep('complete');
-          router.replace('/login');
-        } else if (code === 'S00142') {
+          router.replace(jwtToken ? '/continue-setup' : '/login');
+        } else if (code === 'S00142' || code === 'S00178') {
           // Self-assign role - show role selection first
-          console.log('Self-assign role - redirecting to role selection');
+          resetRegistrationData();
+          setInviteToken(token);
           setStep('role');
           router.replace('/role');
         } else {

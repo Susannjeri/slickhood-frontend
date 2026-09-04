@@ -788,11 +788,8 @@ export function useAuth() {
       return { success: true, message: description };
     } catch (error: unknown) {
       console.log("Registration error: ", error);
-      const { inviteToken } = useAuthStore.getState();
-      if (inviteToken) {
-        console.log("Clearing invite token after failed registration attempt");
-        setInviteToken(null);
-      }
+      // Keep a one-time invitation available for a corrected retry. It is
+      // cleared only after the backend confirms that it was consumed.
       return { success: false, message: apiErrorMessage(error, "Registration failed") };
     }
   };
@@ -865,11 +862,6 @@ export function useAuth() {
       };
     } catch (error: unknown) {
       console.log("Google login error: ", error);
-      const { inviteToken } = useAuthStore.getState();
-      if (inviteToken) {
-        console.log("Clearing invite token after failed Google login attempt");
-        setInviteToken(null);
-      }
       return apiErrorDetails(error, "Google login failed");
     }
   };
@@ -923,11 +915,6 @@ export function useAuth() {
       };
     } catch (error: unknown) {
       console.log("Google register error: ", error);
-      const { inviteToken } = useAuthStore.getState();
-      if (inviteToken) {
-        console.log("Clearing invite token after failed Google registration attempt");
-        setInviteToken(null);
-      }
       return apiErrorDetails(error, "Google registration failed. Try again");
     }
   };
