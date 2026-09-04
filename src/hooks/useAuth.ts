@@ -790,6 +790,15 @@ export function useAuth() {
       console.log("Registration error: ", error);
       // Keep a one-time invitation available for a corrected retry. It is
       // cleared only after the backend confirms that it was consumed.
+      if (axios.isAxiosError(error)) {
+        const data = error.response?.data as { code?: string; description?: string } | undefined;
+        if (data?.code === "S0002") {
+          return {
+            success: false,
+            message: "An account already exists for this email. Sign in, or use Forgot password if you need to recover access.",
+          };
+        }
+      }
       return { success: false, message: apiErrorMessage(error, "Registration failed") };
     }
   };

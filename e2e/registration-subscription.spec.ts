@@ -54,6 +54,29 @@ test("selected business area invisibly carries the correct role into registratio
   expect(registration?.password).toBe("StrongPass1!");
 });
 
+test("an existing account is directed to sign-in or recovery instead of admin support", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/role/list", route => route.fulfill({ json: envelope([
+    { roleId: 101, roleName: "Landlord", selfAssignable: true },
+  ]) }));
+  await page.route("**/auth/register", route => route.fulfill({
+    status: 409,
+    json: { success: false, code: "S0002", description: "Registration failed. Contact Admin for support." },
+  }));
+
+  await page.goto("/role");
+  await page.locator("article").filter({ hasText: "Rental Management" }).getByRole("button", { name: "Choose this area" }).click();
+  await page.getByPlaceholder("Enter your full name").fill("Existing User");
+  await page.getByPlaceholder("Enter your email").fill("existing@example.com");
+  await page.getByPlaceholder("Create a password").fill("StrongPass1!");
+  await page.getByPlaceholder("Confirm your password").fill("StrongPass1!");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await acceptPolicies(page);
+
+  await expect(page.getByText("An account already exists for this email. Sign in, or use Forgot password if you need to recover access.")).toBeVisible();
+  await expect(page).toHaveURL(/\/register$/);
+});
+
 test("business-area registration remains usable without horizontal overflow", async ({ page }) => {
   await page.route("https://accounts.google.com/**", route => route.abort());
   await page.route("**/role/list", route => route.fulfill({ json: envelope([
