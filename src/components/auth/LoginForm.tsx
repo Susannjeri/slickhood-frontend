@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/form";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
+import { invitationUrl, safeInvitationReturnTo } from "@/lib/invitation-navigation";
 
 const GoogleIcon = () => (
   <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
@@ -51,6 +52,8 @@ export default function LoginForm() {
 
   const handleCredentialResponse = async (response: any) => {
     setLoading(true);
+    const pendingInvite = useAuthStore.getState().inviteToken;
+    const returnTo = safeInvitationReturnTo(window.location.search);
     const result = await handleGoogleLogin(response.credential);
     if (result.success) {
       setStep("complete");
@@ -58,7 +61,8 @@ export default function LoginForm() {
       setmfaEnabled(result.mfaEnabled);
       settotpEnabled(result.totpEnabled);
       setSuccess("Login successful!");
-      router.push("/continue-setup");
+      if (returnTo && pendingInvite) setInviteToken(pendingInvite);
+      router.push(returnTo ?? "/continue-setup");
     } else {
       setError(result.message);
     }
@@ -104,7 +108,7 @@ export default function LoginForm() {
     if (inviteToken) {
       e.preventDefault();
       setStep("account");
-      router.push(`/register?token=${encodeURIComponent(inviteToken)}`);
+      router.push(invitationUrl("/register", inviteToken, safeInvitationReturnTo(window.location.search)));
     }
   };
 
@@ -112,6 +116,8 @@ export default function LoginForm() {
     setError(null);
     setSuccess(null);
     setLoading(true);
+    const pendingInvite = useAuthStore.getState().inviteToken;
+    const returnTo = safeInvitationReturnTo(window.location.search);
     const result = await login(values.email, values.password);
     if (!result.success) {
       setError(result.message || "Login failed");
@@ -123,7 +129,8 @@ export default function LoginForm() {
       setStep("verify");
       setSuccess(result.message || "Verification code sent. Redirecting...");
       setLoading(false);
-      router.push("/verify-code");
+      if (returnTo && pendingInvite) setInviteToken(pendingInvite);
+      router.push(invitationUrl("/verify-code", pendingInvite, returnTo));
       return;
     }
     if (!result.token) {
@@ -135,12 +142,13 @@ export default function LoginForm() {
     setmfaEnabled(result.mfaEnabled);
     settotpEnabled(result.totpEnabled);
     setEmail(values.email.trim().toLowerCase());
+    if (returnTo && pendingInvite) setInviteToken(pendingInvite);
     setSuccess("Welcome back — checking where you left off...");
     setLoading(false);
     // The secure session cookie is created immediately before this hand-off.
     // Force a fresh document request so Next cannot reuse an unauthenticated
     // prefetched response for the protected continuation route.
-    window.location.replace("/continue-setup");
+    window.location.replace(returnTo ?? "/continue-setup");
   }
 
   const inputClass = "h-11 rounded-lg text-base focus-visible:ring-[#EF4217]";
@@ -258,7 +266,7 @@ export default function LoginForm() {
       <p className="text-xs text-center text-gray-500 dark:text-gray-400">
         Don&apos;t have an account?{" "}
         <Link
-          href={inviteToken ? `/register?token=${encodeURIComponent(inviteToken)}` : "/role"}
+          href={inviteToken ? invitationUrl("/register", inviteToken, typeof window !== "undefined" ? safeInvitationReturnTo(window.location.search) : null) : "/role"}
           onClick={handleSignUpClick}
           className="font-semibold text-[#EF4217] hover:text-[#d63600] transition-colors"
         >

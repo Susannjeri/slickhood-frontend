@@ -232,7 +232,7 @@ export default function ViewUnitPage() {
     handleToggleAdvert,
     handleCreateSimilarUnits,
     handleGetUnitCharges,
-    handleCreateInvite,
+    handleCreateEmailOccupantInvite,
     handleGetStaffAndInvites,
     handleShareInvite,
     handleUpdateInvite,
@@ -271,7 +271,7 @@ export default function ViewUnitPage() {
   const [invitesLoading, setInvitesLoading] = useState(false);
   const [createInviteOpen, setCreateInviteOpen] = useState(false);
   const [shareInviteOpen, setShareInviteOpen] = useState(false);
-  const [createdInviteLink, setCreatedInviteLink] = useState("");
+  const [occupantEmail, setOccupantEmail] = useState("");
   const [selectedInviteId, setSelectedInviteId] = useState<number | null>(null);
   const [selectedInviteLink, setSelectedInviteLink] = useState("");
   const [shareRecipient, setShareRecipient] = useState("");
@@ -482,10 +482,11 @@ export default function ViewUnitPage() {
     const inviteLabel = inviteType === "HOMEOWNER" ? "Homeowner" : "Tenant";
     try {
       setActionLoading(true);
-      const response = await handleCreateInvite(inviteType, Number(unitId));
-      if (response.success && response.data && response.data.length > 0) {
-        setCreatedInviteLink(response.data[0]);
-        toast.success(`${inviteLabel} invite created successfully`);
+      const response = await handleCreateEmailOccupantInvite(inviteType, Number(unitId), occupantEmail.trim());
+      if (response.success) {
+        toast.success(`${inviteLabel} invitation sent to ${occupantEmail.trim().toLowerCase()}`);
+        setOccupantEmail("");
+        setCreateInviteOpen(false);
         loadUnitInvites();
       }
     } catch (err: unknown) {
@@ -782,33 +783,25 @@ export default function ViewUnitPage() {
               <DialogTitle className="flex items-center gap-2">
                 <UserPlus className="w-5 h-5" style={{ color: "#EF4217" }} />Create {occupantLabel} Invite
               </DialogTitle>
-              <DialogDescription>Generate an invitation link for the {occupantLabel.toLowerCase()} of this unit.</DialogDescription>
+            <DialogDescription>Enter the {occupantLabel.toLowerCase()}&apos;s email. SlickHood will send a secure, email-bound invitation for this unit.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              {createdInviteLink ? (
-                <div className="space-y-2">
-                  <Label>Generated Invite Link</Label>
-                  <div className="flex gap-2">
-                    <Input value={createdInviteLink} readOnly className="font-mono text-sm" />
-                    <Button size="icon" variant="outline" onClick={() => copyToClipboard(createdInviteLink)}><Copy className="w-4 h-4" /></Button>
-                  </div>
-                  <p className="text-xs text-gray-500">Copy this link to share with the {occupantLabel.toLowerCase()}</p>
-                </div>
-              ) : (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-gray-700">This will create a unique invitation link for the {occupantLabel.toLowerCase()} of Unit {unit.ref}.</p>
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label htmlFor="occupant-email">{occupantLabel} email</Label>
+                <Input id="occupant-email" type="email" autoComplete="email" placeholder="tenant@example.com" value={occupantEmail} onChange={(event) => setOccupantEmail(event.target.value)} required />
+                <p className="text-xs text-gray-500">Only this email address can accept the invitation. Existing users sign in; new users register with the same email.</p>
+              </div>
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-gray-700">The invitation will be linked to Unit {unit.ref} and sent by email. You can revoke or resend it from the invitation list.</p>
+              </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => { setCreateInviteOpen(false); setCreatedInviteLink(""); }}>
-                {createdInviteLink ? "Close" : "Cancel"}
+              <Button variant="outline" onClick={() => { setCreateInviteOpen(false); setOccupantEmail(""); }}>
+                Cancel
               </Button>
-              {!createdInviteLink && (
-                <Button onClick={onCreateOccupantInvite} disabled={actionLoading} className="text-white" style={{ backgroundColor: "#EF4217" }}>
-                  {actionLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</> : <><UserPlus className="w-4 h-4 mr-2" />Create Invite</>}
-                </Button>
-              )}
+              <Button onClick={onCreateOccupantInvite} disabled={actionLoading || !/^\S+@\S+\.\S+$/.test(occupantEmail.trim())} className="text-white" style={{ backgroundColor: "#EF4217" }}>
+                {actionLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</> : <><Mail className="w-4 h-4 mr-2" />Send invitation</>}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1585,7 +1578,7 @@ export default function ViewUnitPage() {
               </Card>
 
               {/* Create Similar Units */}
-              <CanProperty propertyId={Number(propertyId)} permissions={["create_unit"]}>
+              <CanProperty propertyId={Number(propertyId)} permissions={["create_similar_unit"]}>
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base font-semibold" style={{ color: "#141130" }}>Similar Units</CardTitle>
@@ -1615,12 +1608,12 @@ export default function ViewUnitPage() {
                             <p className="text-sm text-gray-700">Action will run in the background and a notification will be sent to your email once completed.</p>
                           </div>
                           <div className="space-y-3">
-                            <Label className="text-sm font-medium" style={{ color: "#141130" }}>Number of Units (1-49)</Label>
+                            <Label htmlFor="similar-units-count" className="text-sm font-medium" style={{ color: "#141130" }}>Number of Units (1-49)</Label>
                             <div className="flex items-center gap-3">
                               <Button variant="outline" size="icon" onClick={decrementCount} disabled={similarUnitsCount <= 1 || isCreatingSimilar} className="h-12 w-12">
                                 <Minus className="w-5 h-5" />
                               </Button>
-                              <Input type="number" min="1" max="49" value={similarUnitsCount} onChange={handleCountChange} disabled={isCreatingSimilar} className="h-12 text-center text-2xl font-bold" style={{ color: "#141130" }} />
+                              <Input id="similar-units-count" type="number" min="1" max="49" value={similarUnitsCount} onChange={handleCountChange} disabled={isCreatingSimilar} className="h-12 text-center text-2xl font-bold" style={{ color: "#141130" }} />
                               <Button variant="outline" size="icon" onClick={incrementCount} disabled={similarUnitsCount >= 49 || isCreatingSimilar} className="h-12 w-12">
                                 <Plus className="w-5 h-5" />
                               </Button>

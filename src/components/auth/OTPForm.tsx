@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from '@/component
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { RegistrationStepper } from '@/components/auth/RegistrationStepper';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { safeInvitationReturnTo } from '@/lib/invitation-navigation';
 
 const EXPIRY_SECONDS = 5 * 60; // 5 minutes
 
@@ -24,7 +25,7 @@ const formSchema = z.object({
 
 const OTPForm: React.FC = () => {
   const { verifyTotpCode, get_OTP } = useAuth();
-  const { email, setStep, resetRegistrationData } = useAuthStore();
+  const { email, setStep, setInviteToken, resetRegistrationData } = useAuthStore();
   const authHydrated = useAuthHydrated();
   const router = useRouter();
 
@@ -40,6 +41,11 @@ const OTPForm: React.FC = () => {
     resolver: zodResolver(formSchema),
     defaultValues: { totpCode: '' },
   });
+
+  useEffect(() => {
+    const invitationToken = new URLSearchParams(window.location.search).get('token')?.trim();
+    if (invitationToken) setInviteToken(invitationToken);
+  }, [setInviteToken]);
 
   // Step guard
   useEffect(() => {
@@ -97,7 +103,7 @@ const OTPForm: React.FC = () => {
         setShowVerifiedModal(true);
         // Give the user a moment to read the modal before the redirect fires.
         setTimeout(() => {
-          router.replace('/account-activated');
+          router.replace(safeInvitationReturnTo(window.location.search) ?? '/account-activated');
         }, 2000);
       } else {
         toast.error(response.message || 'Invalid verification code');

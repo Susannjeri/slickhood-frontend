@@ -647,7 +647,7 @@ export const getAuditLogs = (
 }
 
 export const createSimilarUnits = (unitId: number,count: number, token:string) => {
-  return API.patch(`/property/unit/create/similar?unitId=${unitId}&count=${count}`,{
+  return API.patch(`/property/unit/create/similar?unitId=${unitId}&count=${count}`, null, {
     headers: {
       "Content-Type": 'application/json', 
       Authorization: `Bearer ${token}`
@@ -971,6 +971,16 @@ export const validateInviteToken = (inviteToken: string, token?: string) => {
 
   return API.get(`/invite/validate?token=${encodeURIComponent(inviteToken)}`, { headers });
 }
+
+export const createEmailOccupantInvite = (
+  data: { inviteType: "TENANT" | "HOMEOWNER"; entityId: number; email: string },
+  token: string
+) => API.post("/invite/email", data, {
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  },
+});
 
 export const viewInviteUnit = (inviteToken: string) => {
   return API.get(`/invite/unit/view?token=${inviteToken}`, {  

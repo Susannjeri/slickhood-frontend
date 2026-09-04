@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/form";
 import { TermsAcceptance } from "@/components/auth/TermsAcceptance";
 import { RegistrationStepper } from "@/components/auth/RegistrationStepper";
+import { invitationUrl, safeInvitationReturnTo } from "@/lib/invitation-navigation";
 
 // Google "G" mark
 const GoogleIcon = () => (
@@ -91,6 +92,8 @@ export default function RegisterForm() {
 
     // Google credential callback (unchanged)
     credentialHandlerRef.current = async (response: GoogleCredentialResponse) => {
+        const pendingInvite = useAuthStore.getState().inviteToken;
+        const returnTo = safeInvitationReturnTo(window.location.search);
         const roleId = useAuthStore.getState().roleId || 0;
         const values = form.getValues();
         if (values.profileType === "COMPANY" && values.organizationName.trim().length < 2) {
@@ -105,7 +108,8 @@ export default function RegisterForm() {
             setmfaEnabled(result.mfaEnabled);
             settotpEnabled(result.totpEnabled);
             setStep("complete");
-            router.push("/account-activated");
+            if (returnTo && pendingInvite) setInviteToken(pendingInvite);
+            router.push(returnTo ?? "/account-activated");
         } else {
             setError(result.message);
         }
@@ -160,7 +164,7 @@ export default function RegisterForm() {
             const result = await register(values.email, values.password, values.fullName, values.profileType, values.organizationName);
             if (result.success) {
                 setStep("verify");
-                router.push("/verify-code");
+                router.push(invitationUrl("/verify-code", useAuthStore.getState().inviteToken, safeInvitationReturnTo(window.location.search)));
             } else {
                 setError(result.message || "Registration failed");
             }

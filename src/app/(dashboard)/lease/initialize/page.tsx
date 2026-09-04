@@ -320,15 +320,8 @@ export default function LeaseInitializePage() {
   };
 
   const handleLoginRedirect = () => {
-    // Show persistent toast
-    toast.info("Please click your invite link again after logging in", {
-      duration: 10000, // 10 seconds
-    });
-
-    // Small delay to ensure toast shows
-    setTimeout(() => {
-      router.push("/login");
-    }, 500);
+    if (!inviteToken) return;
+    router.push(`/login?invitation=tenant&token=${encodeURIComponent(inviteToken)}&returnTo=${encodeURIComponent("/lease/initialize")}`);
   };
 
   const handlePreviousImage = () => {
@@ -423,7 +416,7 @@ export default function LeaseInitializePage() {
               ) : (
                 <>
                   <strong>Login Required:</strong> You need to be logged in to initialize this lease. 
-                  Please login or create an account, then click your invite link again.
+                  Sign in or create an account with the invited email. SlickHood will return you here automatically.
                 </>
               )}
             </p>
@@ -850,7 +843,7 @@ export default function LeaseInitializePage() {
           {/* Info text for not logged in users */}
           {!isLoggedIn && (
             <p className="text-xs text-center text-gray-500 pt-2">
-              💡 After logging in, click your invite link again to return to this page
+              Your invitation will remain attached while you sign in or register.
             </p>
           )}
         </div>

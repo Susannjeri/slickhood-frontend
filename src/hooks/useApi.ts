@@ -56,6 +56,7 @@ import {
    listNotifications,
    UpdateInviteParams,
    createInvite,
+   createEmailOccupantInvite,
    listInvites,
    listUnitInvites,
    shareInvite,
@@ -770,6 +771,17 @@ export function useApi() {
                 console.error("Error creating invite:", error);
                 throw error; // rethrow the error after logging it
           }
+        };
+
+        const handleCreateEmailOccupantInvite = async(
+          inviteType: "TENANT" | "HOMEOWNER",
+          entityId: number,
+          email: string
+        ) => {
+          const { token } = useAuthStore.getState();
+          if (!token) throw new Error("No token available");
+          const res = await createEmailOccupantInvite({ inviteType, entityId, email }, token);
+          return res.data;
         };
 
         const handlelistInvites = async(params: SearchParams = {}) => {
@@ -1683,6 +1695,7 @@ export function useApi() {
     handleUpdateUnitCharges,
     getNotificationList,
     handleCreateInvite,
+    handleCreateEmailOccupantInvite,
     handlelistInvites,
     handlelistUnitInvites,
     handleShareInvite,

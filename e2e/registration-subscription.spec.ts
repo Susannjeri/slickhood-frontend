@@ -225,6 +225,41 @@ test("trial duration comes from policy and activation remains attached to the se
   expect(trialRequest).toEqual({ role: "LANDLORD", planCode: "LANDLORD_BRONZE_MONTHLY" });
 });
 
+test("Soko free merchant access uses free activation instead of the trial endpoint", async ({ context, page }) => {
+  await authenticated(context, page, { title: "ServiceProvider", permissions: [] });
+  const plan = {
+    uuid: "soko-free", code: "SOKO_FREE", displayName: "Soko",
+    planCategory: "SERVICE_PROVIDER", roleFamily: "SERVICE_PROVIDER", productKey: "SOKO",
+    billingCycle: "MONTHLY", purchaseMode: "FREE", price: 0, currency: "KES", active: true,
+    features: [{ featureKey: "SOKO_MARKETPLACE", enabled: true }], quotas: [],
+  };
+  await page.route("**/subscription/plans**", route => route.fulfill({ json: envelope([plan]) }));
+  await page.route("**/subscription/trial-policy**", route => route.fulfill({ json: envelope([{ durationDays: 14 }]) }));
+  await page.route("**/subscription/current**", route => route.fulfill({ json: envelope([]) }));
+  let trialCalls = 0;
+  let activation: Record<string, unknown> | undefined;
+  await page.route("**/subscription/trial", route => { trialCalls += 1; return route.abort(); });
+  await page.route("**/subscription/subscribe", async route => {
+    activation = route.request().postDataJSON();
+    await route.fulfill({ json: envelope([{
+      requiresPayment: false,
+      assignedSubscription: {
+        uuid: "soko-sub", role: "SERVICE_PROVIDER", planCode: "SOKO_FREE", productKey: "SOKO",
+        status: "ACTIVE", startAt: new Date().toISOString(), endAt: null, autoRenew: false,
+        planDetails: plan,
+      },
+      pendingPayment: null,
+    }]) });
+  });
+
+  await page.goto("/business-areas/plans?area=soko");
+  await page.getByRole("button", { name: "Continue with this package" }).click();
+
+  await expect(page.getByText(/Subscription active for ServiceProvider/i)).toBeVisible();
+  expect(activation).toEqual({ role: "SERVICE_PROVIDER", planCode: "SOKO_FREE", paymentAccountId: null });
+  expect(trialCalls).toBe(0);
+});
+
 test("adding a business area rechecks KYC before exposing the new workspace", async ({ context, page }) => {
   const landlord = { title: "Landlord", permissions: [] };
   await authenticated(context, page, landlord);

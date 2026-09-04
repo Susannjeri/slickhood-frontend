@@ -155,6 +155,39 @@ test("a bound staff invitation survives validation and offers sign-in before reg
   expect(storedInvite).toBe("insurance-invite-token");
 });
 
+test("a tenant invitation survives sign-in and returns to lease initialization", async ({ page }) => {
+  const jwt = testToken([{ title: "Tenant", permissions: ["create_new_lease"] }]);
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/validate**", route => route.fulfill({ json: {
+    success: true, code: "S0058", description: "Tenant invite",
+    data: [{
+      propertyId: 11, unitId: 77, ref: "A-101", propertyType: "APARTMENT",
+      unitType: "APARTMENT", size: 85, measurementUnits: { id: 1, name: "sqm" },
+      utilities: [], leaseMode: "RENT", price: 25000, currency: "KES",
+      occupied: false, advertise: false, thumbnail: "", images: [], templateId: 9,
+    }],
+  } }));
+  await page.route("**/property/unit/type**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/property/unit/charges/public**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/lease/template/public**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/auth/login", route => route.fulfill({ json: envelope([{
+    jwt, refreshToken: "tenant-refresh-token-long-enough", totpEnabled: false, mfaSetup: true,
+  }]) }));
+  await page.route("**/browser-session/refresh", route => route.fulfill({ json: { success: true } }));
+
+  await page.goto("/lease/onboard?token=tenant-bound-token");
+  await expect(page).toHaveURL(/\/lease\/initialize$/);
+  await page.getByRole("button", { name: "Login to Initialize Lease" }).click();
+  await expect(page).toHaveURL(/\/login\?.*returnTo=%2Flease%2Finitialize/);
+  await page.getByPlaceholder("you@example.com").fill("tenant@example.com");
+  await page.getByPlaceholder("••••••••").fill("ValidPass1!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page).toHaveURL(/\/lease\/initialize$/);
+  const storedInvite = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state?.inviteToken);
+  expect(storedInvite).toBe("tenant-bound-token");
+});
+
 test("an invalid chunked access cookie is fully cleared at the request boundary", async ({ page, context }) => {
   await context.addCookies([
     { name: "tokenChunks", value: "2", url: "http://127.0.0.1:3000" },

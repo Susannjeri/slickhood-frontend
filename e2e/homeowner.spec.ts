@@ -4,7 +4,8 @@ import { authenticated, envelope } from "./support";
 test.beforeEach(async ({ context, page }) => {
   await authenticated(context, page, {
     title: "EstateManager",
-    permissions: ["view_unit", "view_invite_list", "create_invite"],
+    permissions: ["view_unit", "view_invite_list", "create_invite", "share_invite", "create_similar_unit"],
+    propertyIds: [11],
   });
   await page.route("**/property/type**", route => route.fulfill({ json: envelope([{ id: "APARTMENT", name: "Apartment" }]) }));
   await page.route("**/property/unit/type**", route => route.fulfill({ json: envelope([{ id: 1, name: "Apartment" }]) }));
@@ -35,23 +36,38 @@ test.beforeEach(async ({ context, page }) => {
   await page.route("**/lease/documents**", route => route.fulfill({ json: envelope([]) }));
 });
 
-test("service-charge unit creates a homeowner invite rather than tenant access", async ({ page }) => {
+test("service-charge unit sends an email-bound homeowner invite rather than exposing a raw link", async ({ page }) => {
   await page.goto("/dashboard/unit/details/77?p=11&from=homeowners");
 
   await expect(page.getByRole("button", { name: "Assign Homeowner" })).toBeVisible();
   await page.getByRole("button", { name: "Assign Homeowner" }).click();
   await expect(page.getByRole("heading", { name: "Create Homeowner Invite" })).toBeVisible();
 
-  await page.route("**/invite/new", route => route.fulfill({
-    status: 201,
-    json: envelope(["https://slickhood.test/invite/homeowner"]),
+  await page.route("**/invite/email", route => route.fulfill({
+    status: 200,
+    json: envelope([]),
   }));
-  const requestPromise = page.waitForRequest(request => request.url().includes("/invite/new") && request.method() === "POST");
-  await page.getByRole("button", { name: "Create Invite" }).click();
+  await page.getByLabel("Homeowner email").fill("owner@example.com");
+  const requestPromise = page.waitForRequest(request => request.url().includes("/invite/email") && request.method() === "POST");
+  await page.getByRole("button", { name: "Send invitation" }).click();
   const request = await requestPromise;
 
-  expect(request.postDataJSON()).toEqual({ inviteType: "HOMEOWNER", entityId: 77 });
-  await expect(page.locator('input[value="https://slickhood.test/invite/homeowner"]')).toBeVisible();
+  expect(request.postDataJSON()).toEqual({ inviteType: "HOMEOWNER", entityId: 77, email: "owner@example.com" });
+  await expect(page.getByText(/invitation sent to owner@example.com/i)).toBeVisible();
+  await expect(page.getByText("Generated Invite Link")).toHaveCount(0);
+});
+
+test("similar unit generation submits the requested number of additional units", async ({ page }) => {
+  await page.route("**/property/unit/create/similar**", route => route.fulfill({ json: envelope([]) }));
+  await page.goto("/dashboard/unit/details/77?p=11&from=homeowners");
+  await page.getByRole("tab", { name: "Listing" }).click();
+  await page.getByRole("button", { name: "Create Similar Units" }).click();
+  await page.getByLabel("Number of Units (1-49)").fill("12");
+  const requestPromise = page.waitForRequest(request => request.url().includes("/property/unit/create/similar") && request.method() === "PATCH");
+  await page.getByRole("button", { name: "Create 12 Units" }).click();
+  const request = await requestPromise;
+  expect(request.url()).toContain("unitId=77");
+  expect(request.url()).toContain("count=12");
 });
 
 test("homeowner can report maintenance but cannot advance operational status", async ({ page }) => {

@@ -13,6 +13,7 @@ import {
   getSubscriptionCatalog,
   getSubscriptionTrialPolicy,
   requestSubscriptionSalesContact,
+  subscribeToPlan,
   startSubscriptionTrial,
   subscriptionRoleForTitle,
 } from "@/services/subscription.service";
@@ -130,8 +131,11 @@ export default function BusinessAreaPlans() {
                 <button disabled={startingCode !== null} onClick={async () => {
                   setStartingCode(plan.code);
                   try {
-                    const response = await startSubscriptionTrial(token!, subscriptionRole, plan.code);
-                    setCurrent(response.data.data?.[0] ?? null);
+                    const response = plan.purchaseMode === "FREE"
+                      ? await subscribeToPlan(token!, { role: subscriptionRole, planCode: plan.code, paymentAccountId: null })
+                      : await startSubscriptionTrial(token!, subscriptionRole, plan.code);
+                    const result = response.data.data?.[0];
+                    setCurrent(result?.assignedSubscription ?? result ?? null);
                     toast.success("Slick Market access activated.");
                   } catch (error: unknown) {
                     toast.error(axios.isAxiosError(error) ? error.response?.data?.description ?? "Could not activate this package." : "Could not activate this package.");

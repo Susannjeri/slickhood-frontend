@@ -25,6 +25,8 @@ import {
   Copy,
   ExternalLink,
   PlusCircle,
+  Plus,
+  Minus,
 } from "lucide-react";
 import { currencyOptions } from "@/lib/actions";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
@@ -125,10 +127,11 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
     setIsCreatingSimilar(true);
     try {
       await handleCreateSimilarUnits(successData.unitId, similarUnitsCount);
-      toast.success("Similar units creation initiated!");
+      toast.success(`${similarUnitsCount} similar unit${similarUnitsCount === 1 ? "" : "s"} queued. You will be notified when creation finishes.`);
       setSimilarUnitsCount(1);
       setShowSimilarSetup(false);
       setSuccessData(null);
+      router.push(backHref);
     } catch {
       toast.error("Failed to create similar units");
     } finally {
@@ -880,14 +883,30 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
             {/* Actions */}
             <div className="w-full flex flex-col gap-3 pt-1">
 
+              {showSimilarSetup && (
+                <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
+                  <Label htmlFor="similar-unit-count" className="font-semibold text-[#141130]">
+                    How many additional units?
+                  </Label>
+                  <p className="mt-1 text-xs text-gray-600">SlickHood will create 1–49 separate units using {successData?.unitRef} as the template. Each unit receives its own reference.</p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button type="button" aria-label="Decrease unit count" onClick={decrementCount} disabled={similarUnitsCount <= 1} className="h-10 w-10 rounded-lg border bg-white disabled:opacity-40"><Minus className="mx-auto h-4 w-4" /></button>
+                    <Input id="similar-unit-count" aria-label="Number of additional units" type="number" min={1} max={49} value={similarUnitsCount} onChange={handleCountChange} className="h-10 text-center" />
+                    <button type="button" aria-label="Increase unit count" onClick={incrementCount} disabled={similarUnitsCount >= 49} className="h-10 w-10 rounded-lg border bg-white disabled:opacity-40"><Plus className="mx-auto h-4 w-4" /></button>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setShowSimilarSetup(false)} className="rounded-lg border bg-white px-3 py-2 text-sm font-semibold">Cancel</button>
+                    <button type="button" onClick={handleCreateSimilar} disabled={isCreatingSimilar} className="rounded-lg bg-[#EF4217] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                      {isCreatingSimilar ? "Creating…" : `Create ${similarUnitsCount} units`}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Generate Similar Units */}
               <button
-                onClick={() => {
-                  setSuccessData(null);
-                  setValue("uniqueRef", "");
-                  setImage(null);
-                  setImagePreview(null);
-                }}
+                onClick={() => setShowSimilarSetup(true)}
+                disabled={showSimilarSetup}
                 className="w-full flex flex-col items-center justify-center gap-0.5 py-3 px-4 rounded-xl text-white font-semibold transition-all hover:brightness-110 active:scale-[0.98]"
                 style={{ backgroundColor: "#EF4217" }}
               >
