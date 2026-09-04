@@ -32,7 +32,7 @@ export default function LoginForm() {
   const googleBtnRef                    = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
-  const { inviteToken, setEmail, setToken, setmfaEnabled, settotpEnabled, setStep } = useAuthStore();
+  const { inviteToken, setInviteToken, setEmail, setToken, setmfaEnabled, settotpEnabled, setStep } = useAuthStore();
   const { login, handleGoogleLogin } = useAuth();
 
   const form = useForm<LoginSchema>({
@@ -41,10 +41,13 @@ export default function LoginForm() {
   });
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("reason") === "session-ended") {
+    const params = new URLSearchParams(window.location.search);
+    const invitationToken = params.get("token")?.trim();
+    if (invitationToken) setInviteToken(invitationToken);
+    if (params.get("reason") === "session-ended") {
       setError("Your previous session ended or was replaced by a newer sign-in. Please sign in again.");
     }
-  }, []);
+  }, [setInviteToken]);
 
   const handleCredentialResponse = async (response: any) => {
     setLoading(true);
@@ -101,7 +104,7 @@ export default function LoginForm() {
     if (inviteToken) {
       e.preventDefault();
       setStep("account");
-      router.push("/register");
+      router.push(`/register?token=${encodeURIComponent(inviteToken)}`);
     }
   };
 
@@ -255,7 +258,7 @@ export default function LoginForm() {
       <p className="text-xs text-center text-gray-500 dark:text-gray-400">
         Don&apos;t have an account?{" "}
         <Link
-          href={inviteToken ? "/register" : "/role"}
+          href={inviteToken ? `/register?token=${encodeURIComponent(inviteToken)}` : "/role"}
           onClick={handleSignUpClick}
           className="font-semibold text-[#EF4217] hover:text-[#d63600] transition-colors"
         >

@@ -61,7 +61,7 @@ export default function OnboardClient() {
           resetRegistrationData();
           setInviteToken(token);
           setStep('account');
-          router.replace('/login?invitation=ready');
+          router.replace(`/login?invitation=ready&token=${encodeURIComponent(token)}`);
         } else if (code === 'S00143') { 
           // Authenticated validation has already applied the invited role.
           setInviteToken(null);

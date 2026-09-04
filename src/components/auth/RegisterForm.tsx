@@ -55,7 +55,7 @@ export default function RegisterForm() {
     const registrationInFlightRef           = useRef(false);
 
     const router = useRouter();
-    const { setStep, setToken, setmfaEnabled, settotpEnabled } = useAuthStore();
+    const { setStep, setInviteToken, setToken, setmfaEnabled, settotpEnabled } = useAuthStore();
     const authHydrated = useAuthHydrated();
     const { register, handleGoogleRegister } = useAuth();
 
@@ -64,6 +64,17 @@ export default function RegisterForm() {
         defaultValues: { profileType: "INDIVIDUAL", fullName: "", organizationName: "", email: "", password: "", confirmPassword: "" },
     });
     const profileType = form.watch("profileType");
+
+    // Invitation context must survive email clients, cross-origin redirects and
+    // browser-storage restrictions. The backend still validates that the token
+    // is active and bound to the submitted email address.
+    useEffect(() => {
+        const invitationToken = new URLSearchParams(window.location.search).get("token")?.trim();
+        if (invitationToken) {
+            setInviteToken(invitationToken);
+            setStep("account");
+        }
+    }, [setInviteToken, setStep]);
 
     // Keep an authenticated pending account inside the verification journey.
     // Leaving that journey must be an explicit action from the verification page.
