@@ -1310,6 +1310,10 @@ export interface ActiveLease {
   expiryDate?: string;
   signed: boolean;
   tenantName?: string;
+  tenantSignDate?: string;
+  ownerSignDate?: string;
+  ownerSignName?: string;
+  governedDocumentRequired?: boolean;
   lifecycleStatus?: "DRAFT" | "ACTIVE" | "NOTICE_GIVEN" | "TERMINATED";
   terminationEffectiveDate?: string;
 }

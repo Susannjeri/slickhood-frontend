@@ -244,7 +244,6 @@ export default function ViewUnitPage() {
     handlelistUnitInvites,
     handleListLeaseMessages,
     handleLeaseMessage,
-    handleSignLease,
   } = useApi();
 
   const [unit, setUnit] = useState<UnitDetail | null>(null);
@@ -676,19 +675,9 @@ export default function ViewUnitPage() {
   };
 
   const handleSignLeaseAction = async (leaseId: number) => {
-    try {
-      setActionLoading(true);
-      const response = await handleSignLease(leaseId);
-      if (response.success) {
-        toast.success("Lease signed successfully!");
-        await Promise.all([loadTenants(), loadUnitDetails()]);
-      }
-    } catch (err) {
-      console.error("Error signing lease:", err);
-      toast.error("Failed to sign lease");
-    } finally {
-      setActionLoading(false);
-    }
+    // Rental agreements are governed, versioned documents. Signing through the
+    // document workspace preserves the exact PDF, both signatures and the audit trail.
+    router.push(`/dashboard/documents?leaseId=${leaseId}&type=RESIDENTIAL_LEASE_AGREEMENT`);
   };
 
   // ─── Loading / Error states ───────────────────────────────────────────────

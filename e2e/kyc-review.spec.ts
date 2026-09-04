@@ -258,6 +258,28 @@ test("customer sees the exact rejection reason, retains accepted evidence and re
     };
     await route.fulfill({ json: envelope([current.documents[0]]) });
   });
+  await page.route("**/kyc/documents/*/confirm", async (route) => {
+    const documentId = Number(new URL(route.request().url()).pathname.split("/").at(-2));
+    const body = route.request().postDataJSON() as {
+      confirmedFields: Record<string, string>;
+    };
+    current = {
+      ...current,
+      documents: current.documents.map((document) =>
+        document.id === documentId
+          ? {
+              ...document,
+              registrantConfirmedFields: body.confirmedFields,
+              registrantConfirmedAt: "2026-08-30T11:05:00Z",
+              registrantConfirmedBy: 501,
+            }
+          : document,
+      ),
+    };
+    await route.fulfill({
+      json: envelope([current.documents.find((document) => document.id === documentId)]),
+    });
+  });
   await page.route("**/kyc/submit", async (route) => {
     current = {
       ...current,
@@ -291,7 +313,11 @@ test("customer sees the exact rejection reason, retains accepted evidence and re
   await expect(
     page.getByText("The identification number is obscured by glare."),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: /Submit for review/ }).click();
+  await expect(page.getByRole("button", { name: "Submit verification" })).toBeDisabled();
+  await page.getByRole("button", { name: "Confirm these details" }).first().click();
+  await page.getByRole("button", { name: "Confirm these details" }).first().click();
+  await expect(page.getByRole("button", { name: "Submit verification" })).toBeEnabled();
+  await page.getByRole("button", { name: "Submit verification" }).click();
   await expect(
     page.getByRole("heading", { name: "Verification under review" }),
   ).toBeVisible();

@@ -122,7 +122,10 @@ export default function KycReviewPage() {
               ? false
               : null,
         reason: document.rejectionReason ?? "",
-        verifiedFields: { ...(document.reviewerVerifiedFields ?? {}) },
+        verifiedFields: {
+          ...(document.registrantConfirmedFields ?? {}),
+          ...(document.reviewerVerifiedFields ?? {}),
+        },
         correctionReason: document.reviewerCorrectionReason ?? "",
       };
     });
@@ -215,6 +218,7 @@ export default function KycReviewPage() {
   const effectiveField = (document: (typeof documents)[number], field: string) =>
     (decisions[document.id]?.verifiedFields?.[field]
       ?? document.reviewerVerifiedFields?.[field]
+      ?? document.registrantConfirmedFields?.[field]
       ?? document.extractedFields?.[field]
       ?? "").trim();
   const identityTypes = new Set([
@@ -616,6 +620,30 @@ export default function KycReviewPage() {
                             </p>
                           )}
                         </div>
+                        {Object.keys(document.registrantConfirmedFields ?? {}).length > 0 && (
+                          <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                            <p className="text-xs font-bold uppercase tracking-wide text-indigo-900">
+                              Registrant-confirmed data
+                            </p>
+                            <p className="mt-1 text-xs text-indigo-800">
+                              Compare this declaration with both the immutable OCR reading and the protected original.
+                            </p>
+                            <dl className="mt-3 space-y-2 text-sm">
+                              {Object.entries(document.registrantConfirmedFields ?? {}).map(([field, value]) => {
+                                const differs = value.trim() !== (document.extractedFields?.[field] ?? "").trim();
+                                return (
+                                  <div key={field} className={`flex justify-between gap-4 rounded-lg border px-3 py-2 ${differs ? "border-amber-300 bg-amber-50" : "border-indigo-100 bg-white"}`}>
+                                    <dt className="text-slate-600">{readable(field)}</dt>
+                                    <dd className="text-right font-semibold">
+                                      {value}
+                                      {differs && <span className="ml-2 text-xs text-amber-700">Differs from OCR</span>}
+                                    </dd>
+                                  </div>
+                                );
+                              })}
+                            </dl>
+                          </div>
+                        )}
                         {editableFields.length > 0 && (pendingReview || Object.keys(document.reviewerVerifiedFields ?? {}).length > 0) && (
                           <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
                             <p className="text-xs font-bold uppercase tracking-wide text-blue-900">
@@ -627,8 +655,9 @@ export default function KycReviewPage() {
                             <div className="mt-3 space-y-3">
                               {editableFields.map((field) => {
                                 const ocrValue = document.extractedFields?.[field] ?? "";
-                                const correctedValue = choice?.verifiedFields[field]
+                                  const correctedValue = choice?.verifiedFields[field]
                                   ?? document.reviewerVerifiedFields?.[field]
+                                  ?? document.registrantConfirmedFields?.[field]
                                   ?? ocrValue;
                                 return (
                                   <div key={field} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] sm:items-end">

@@ -33,6 +33,9 @@ export interface KycDocument {
   qualityScore?: number;
   ocrConfidence?: number;
   extractedFields: Record<string, string>;
+  registrantConfirmedFields?: Record<string, string>;
+  registrantConfirmedBy?: number;
+  registrantConfirmedAt?: string;
   reviewerVerifiedFields?: Record<string, string>;
   reviewerCorrectionReason?: string;
   reviewerVerifiedBy?: number;
@@ -103,6 +106,16 @@ export async function uploadKycDocument(documentType: string, file: File) {
   body.append("documentType", documentType);
   body.append("file", file);
   const response = await API.post("/kyc/documents", body);
+  return first<KycDocument>(response)!;
+}
+
+export async function confirmKycDocument(
+  documentId: number,
+  confirmedFields: Record<string, string>,
+) {
+  const response = await API.post(`/kyc/documents/${documentId}/confirm`, {
+    confirmedFields,
+  });
   return first<KycDocument>(response)!;
 }
 

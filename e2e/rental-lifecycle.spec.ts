@@ -23,13 +23,42 @@ test("lease operations routes drafts through governed documents and records a te
   });
 
   await page.goto("/dashboard/lease/operations");
-  await expect(page.getByRole("link", { name: "Prepare lease agreement" })).toHaveAttribute("href", "/dashboard/documents?leaseId=41&type=RESIDENTIAL_LEASE_AGREEMENT");
+  await expect(page.getByRole("link", { name: "Prepare or continue agreement" })).toHaveAttribute("href", "/dashboard/documents?leaseId=41&type=RESIDENTIAL_LEASE_AGREEMENT");
 
   await page.getByRole("button", { name: "Give termination notice" }).click();
   await page.getByLabel("Termination effective date").fill("2027-08-31");
   await page.getByLabel("Termination reason").fill("Tenant notice and scheduled move-out");
   await page.getByRole("button", { name: "Record notice" }).click();
   await expect.poll(() => notice).toEqual({ effectiveDate: "2027-08-31", reason: "Tenant notice and scheduled move-out" });
+});
+
+test("tenant can continue to the governed agreement and see both signature states", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: ["view_active_lease", "view_lease_document"] });
+  await page.route("**/lease/**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/lease/list")) {
+      await route.fulfill({ json: envelope([{
+        id: 51,
+        name: "Tenant lease proposal",
+        leaseMode: "RENT",
+        tenantName: "Mama Njeri",
+        signed: false,
+        lifecycleStatus: "DRAFT",
+        expiryDate: "2027-08-31",
+        tenantSignDate: "2026-09-04",
+        ownerSignDate: null,
+        governedDocumentRequired: true,
+      }]) });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto("/dashboard/lease/operations");
+  await expect(page.getByText("Tenant signature: completed")).toBeVisible();
+  await expect(page.getByText("Landlord/manager signature: pending")).toBeVisible();
+  await expect(page.getByRole("link", { name: "View and sign agreement" }))
+    .toHaveAttribute("href", "/dashboard/documents");
 });
 
 test("landlord creates a residential lease agreement without a sales offer letter", async ({ context, page }) => {

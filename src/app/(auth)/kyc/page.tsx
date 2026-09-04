@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { useAuthStore } from "@/store/authStore";
 import {
   getCurrentKyc,
+  confirmKycDocument,
   KycCase,
   KycDocument,
   KycRequirement,
@@ -47,6 +48,14 @@ const OCR_FIELD_LABELS: Record<string, string> = {
 };
 const OCR_FIELD_ORDER = ["fullName", "documentNumber", "taxPin", "dateOfBirth", "expiryDate"];
 
+const confirmableFieldsFor = (documentType: string) => {
+  if (documentType === "KRA_PIN_CERTIFICATE") return ["fullName", "taxPin"];
+  if (["PASSPORT", "NATIONAL_ID_FRONT", "ALIEN_ID_FRONT"].includes(documentType))
+    return ["fullName", "documentNumber"];
+  if (["NATIONAL_ID_BACK", "ALIEN_ID_BACK"].includes(documentType)) return ["documentNumber"];
+  return [];
+};
+
 function OcrKeyDetails({ document }: { document: KycDocument }) {
   const fields = OCR_FIELD_ORDER.filter((field) => document.extractedFields?.[field]?.trim());
   if (!fields.length) return null;
@@ -54,7 +63,7 @@ function OcrKeyDetails({ document }: { document: KycDocument }) {
     <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-[#071744]">
       <p className="font-semibold">Key details read from your document</p>
       <p className="mt-1 text-xs text-slate-600">
-        Check these details against the original. They cannot be edited here; replace the document if they are wrong.
+        Check these details against the original. You will confirm or correct the key values below.
       </p>
       <dl className="mt-3 grid gap-2 sm:grid-cols-2">
         {fields.map((field) => {
@@ -68,6 +77,65 @@ function OcrKeyDetails({ document }: { document: KycDocument }) {
           );
         })}
       </dl>
+    </div>
+  );
+}
+
+function RegistrantConfirmation({
+  document,
+  onConfirmed,
+}: {
+  document: KycDocument;
+  onConfirmed: () => Promise<void>;
+}) {
+  const fields = confirmableFieldsFor(document.documentType);
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(fields.map((field) => [
+      field,
+      document.registrantConfirmedFields?.[field] ?? document.extractedFields?.[field] ?? "",
+    ])),
+  );
+  const [saving, setSaving] = useState(false);
+  if (!fields.length) return null;
+  const complete = fields.every((field) => values[field]?.trim());
+  const confirmed = Boolean(document.registrantConfirmedAt);
+  const save = async () => {
+    if (!complete) return;
+    setSaving(true);
+    try {
+      await confirmKycDocument(document.id, values);
+      toast.success("Your confirmed document details were saved.");
+      await onConfirmed();
+    } catch (error) {
+      toast.error(errorMessage(error, "The confirmed details could not be saved."));
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+      <p className="font-semibold text-indigo-950">Confirm the key details</p>
+      <p className="mt-1 text-xs text-indigo-800">
+        Enter what is printed on the original. OCR is retained separately. If your entry differs, an administrator will verify the document.
+      </p>
+      <div className="mt-3 space-y-3">
+        {fields.map((field) => (
+          <label key={field} className="block text-xs font-medium text-indigo-950">
+            {OCR_FIELD_LABELS[field]}
+            <Input
+              className="mt-1 bg-white"
+              value={values[field] ?? ""}
+              maxLength={255}
+              onChange={(event) => setValues((current) => ({ ...current, [field]: event.target.value }))}
+            />
+          </label>
+        ))}
+      </div>
+      <Button type="button" className="mt-3 w-full" disabled={!complete || saving} onClick={() => void save()}>
+        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {confirmed ? "Update confirmed details" : "Confirm these details"}
+      </Button>
+      {confirmed && <p className="mt-2 text-xs font-medium text-emerald-700">Confirmed and saved.</p>}
     </div>
   );
 }
@@ -139,6 +207,16 @@ export default function KycPage() {
 
   const missing = useMemo(
     () => new Set(kyc?.missingRequirementCodes ?? []),
+    [kyc],
+  );
+  const unconfirmedDocuments = useMemo(
+    () =>
+      (kyc?.documents ?? []).filter(
+        (document) =>
+          document.status !== "REJECTED" &&
+          confirmableFieldsFor(document.documentType).length > 0 &&
+          !document.registrantConfirmedAt,
+      ),
     [kyc],
   );
   const waiting =
@@ -219,8 +297,11 @@ export default function KycPage() {
   const finish = async () => {
     setBusy(true);
     try {
-      setKyc(await submitKyc());
-      toast.success("Identity verification submitted for review.");
+      const result = await submitKyc();
+      setKyc(result);
+      toast.success(result.status === "APPROVED"
+        ? "Identity verification completed automatically."
+        : "Identity verification submitted for review.");
     } catch (error) {
       toast.error(
         errorMessage(error, "Identity verification could not be submitted."),
@@ -330,9 +411,9 @@ export default function KycPage() {
                   Verify your identity
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
-                  Upload clear original documents. Manual entry of identity
-                  numbers is disabled to protect your account and other
-                  SlickHood users.
+                  Upload clear original documents, then confirm the key details
+                  that the system reads. Your confirmation and the original OCR
+                  result are retained separately for a secure audit trail.
                 </p>
               </div>
             </div>
@@ -421,7 +502,9 @@ export default function KycPage() {
                       Requirements are combined safely across all roles
                       currently assigned to your account.
                     </p>
-                    {(missingRequirements.length > 0 || !kyc.phoneVerified) && (
+                    {(missingRequirements.length > 0 ||
+                      unconfirmedDocuments.length > 0 ||
+                      !kyc.phoneVerified) && (
                       <ul className="mt-3 space-y-1 text-sm text-amber-800" role="status">
                         {!kyc.phoneVerified && <li>• Confirm your phone number.</li>}
                         {missingRequirements.map((requirement) => (
@@ -429,6 +512,12 @@ export default function KycPage() {
                             • Replace or upload: {requirementInstruction(requirement, kyc)}.
                           </li>
                         ))}
+                        {unconfirmedDocuments.length > 0 && (
+                          <li>
+                            • Confirm the key details for {unconfirmedDocuments.length}{" "}
+                            uploaded document{unconfirmedDocuments.length === 1 ? "" : "s"}.
+                          </li>
+                        )}
                       </ul>
                     )}
                   </div>
@@ -446,22 +535,29 @@ export default function KycPage() {
                 </section>
                 <div className="flex flex-col justify-between gap-4 rounded-2xl bg-slate-50 p-5 sm:flex-row sm:items-center">
                   <div>
-                    <p className="font-bold">Ready for review?</p>
+                    <p className="font-bold">Ready to complete verification?</p>
                     <p className="text-sm text-slate-500">
                       {missing.size
                         ? `${missing.size} required item${missing.size === 1 ? "" : "s"} remaining.`
+                        : unconfirmedDocuments.length
+                          ? `${unconfirmedDocuments.length} document confirmation${unconfirmedDocuments.length === 1 ? "" : "s"} remaining.`
                         : kyc.phoneVerified
-                          ? "All required items are ready."
+                          ? "All required items are ready. Tenant-only registrations that pass every automated check are approved immediately; all other registrations go to an administrator."
                           : "Verify your phone number first."}
                     </p>
                   </div>
                   <Button
                     className="bg-[#EF4217] hover:bg-[#d93a13]"
-                    disabled={busy || missing.size > 0 || !kyc.phoneVerified}
+                    disabled={
+                      busy ||
+                      missing.size > 0 ||
+                      unconfirmedDocuments.length > 0 ||
+                      !kyc.phoneVerified
+                    }
                     onClick={finish}
                   >
                     {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Submit for review <ArrowRight className="ml-2 h-4 w-4" />
+                    Submit verification <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
               </>
@@ -620,6 +716,7 @@ function RequirementCard({
             </div>
           ) : null}
           <OcrKeyDetails document={document} />
+          <RegistrantConfirmation document={document} onConfirmed={onUploaded} />
           <KycDocumentViewer document={document} className="w-full" />
           {!replacing && (
             <Button

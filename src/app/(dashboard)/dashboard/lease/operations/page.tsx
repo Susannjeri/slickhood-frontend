@@ -17,6 +17,7 @@ type Envelope = { data?: ActiveLease[]; totalElements?: number; totalPages?: num
 
 export default function LeaseOperationsPage() {
   const token = useAuthStore((state) => state.token);
+  const activeRole = useAuthStore((state) => state.activeRole);
   const [leases, setLeases] = useState<ActiveLease[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<number | null>(null);
@@ -62,8 +63,13 @@ export default function LeaseOperationsPage() {
       <div className="grid gap-4">{leases.map((lease) => <div key={lease.id} className="rounded-xl border bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4"><div className="flex gap-3"><FileSignature className="mt-1 h-5 w-5 text-[#EF4217]" /><div><h2 className="font-semibold">{lease.name || `Lease #${lease.id}`}</h2><p className="text-sm text-muted-foreground">{lease.tenantName || "Tenant pending"}{lease.expiryDate ? ` · expires ${lease.expiryDate}` : ""}</p></div></div><Badge variant={lease.lifecycleStatus === "NOTICE_GIVEN" ? "destructive" : lease.signed ? "default" : "outline"}>{lease.lifecycleStatus || (lease.signed ? "ACTIVE" : "DRAFT")}</Badge></div>
         {lease.terminationEffectiveDate && <p className="mt-3 text-sm text-amber-700">Termination effective {lease.terminationEffectiveDate}</p>}
+        {!lease.signed && <div className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 text-sm sm:grid-cols-2">
+          <p className={lease.tenantSignDate ? "text-emerald-700" : "text-amber-700"}>Tenant signature: {lease.tenantSignDate ? "completed" : "pending"}</p>
+          <p className={lease.ownerSignDate ? "text-emerald-700" : "text-amber-700"}>Landlord/manager signature: {lease.ownerSignDate ? `completed${lease.ownerSignName ? ` by ${lease.ownerSignName}` : ""}` : "pending"}</p>
+        </div>}
         <div className="mt-4 flex flex-wrap gap-2">
-          {!lease.signed && <Can permissions={["create_lease_document"]}><Button size="sm" asChild><Link href={`/dashboard/documents?leaseId=${lease.id}&type=RESIDENTIAL_LEASE_AGREEMENT`}>Prepare lease agreement</Link></Button></Can>}
+          {!lease.signed && activeRole?.title?.toLowerCase() === "tenant" && <Button size="sm" asChild><Link href="/dashboard/documents">View and sign agreement</Link></Button>}
+          {!lease.signed && activeRole?.title?.toLowerCase() !== "tenant" && <Can permissions={["create_lease_document"]}><Button size="sm" asChild><Link href={`/dashboard/documents?leaseId=${lease.id}&type=RESIDENTIAL_LEASE_AGREEMENT`}>Prepare or continue agreement</Link></Button></Can>}
           {lease.signed && lease.lifecycleStatus !== "NOTICE_GIVEN" && <Can permissions={["delete_lease"]}><Button size="sm" variant="outline" onClick={() => setTerminating(terminating === lease.id ? null : lease.id)}>Give termination notice</Button></Can>}
         </div>
         {terminating === lease.id && <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-[220px_1fr_auto]">
