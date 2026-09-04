@@ -212,6 +212,47 @@ export default function KycReviewPage() {
       !hasChangedVerifiedFields(document) ||
       (decisions[document.id]?.correctionReason.trim().length ?? 0) > 0,
   );
+  const effectiveField = (document: (typeof documents)[number], field: string) =>
+    (decisions[document.id]?.verifiedFields?.[field]
+      ?? document.reviewerVerifiedFields?.[field]
+      ?? document.extractedFields?.[field]
+      ?? "").trim();
+  const identityTypes = new Set([
+    "PASSPORT",
+    "NATIONAL_ID_FRONT",
+    "ALIEN_ID_FRONT",
+  ]);
+  const acceptedIdentityDocuments = documents.filter(
+    (document) =>
+      identityTypes.has(document.documentType) &&
+      decisions[document.id]?.approved === true,
+  );
+  const identityEvidenceMissing =
+    acceptedIdentityDocuments.length > 0 &&
+    acceptedIdentityDocuments.every(
+      (document) => !effectiveField(document, "documentNumber"),
+    );
+  const taxEvidenceRequired = selected?.kycCase.requirements.some(
+    (requirement) => requirement.required && requirement.code === "TAX",
+  );
+  const acceptedTaxDocuments = documents.filter(
+    (document) =>
+      document.documentType === "KRA_PIN_CERTIFICATE" &&
+      decisions[document.id]?.approved === true,
+  );
+  const taxEvidenceMissing =
+    taxEvidenceRequired === true &&
+    acceptedTaxDocuments.every(
+      (document) => !effectiveField(document, "taxPin"),
+    );
+  const approvalEvidenceMessages = [
+    identityEvidenceMissing
+      ? "Enter the verified document number from the accepted identity document."
+      : null,
+    taxEvidenceMissing
+      ? "Enter the verified KRA PIN from the accepted KRA PIN certificate."
+      : null,
+  ].filter((item): item is string => item !== null);
 
   const submitDecision = async (decision: "APPROVED" | "REJECTED") => {
     if (!selected?.kycCase.id || !allDecided) return;
@@ -219,6 +260,10 @@ export default function KycReviewPage() {
       toast.error(
         "Resolve every rejected document before approving the account.",
       );
+      return;
+    }
+    if (decision === "APPROVED" && approvalEvidenceMessages.length > 0) {
+      toast.error(approvalEvidenceMessages.join(" "));
       return;
     }
     if (
@@ -744,6 +789,11 @@ export default function KycReviewPage() {
                             Explain every OCR correction before approval.
                           </p>
                         )}
+                        {approvalEvidenceMessages.map((evidenceMessage) => (
+                          <p key={evidenceMessage} className="text-red-700">
+                            {evidenceMessage}
+                          </p>
+                        ))}
                       </div>
                       {undecidedDocuments.length > 0 && (
                         <Button
@@ -777,6 +827,7 @@ export default function KycReviewPage() {
                           !allDecided ||
                           hasRejected ||
                           !correctionReasonsComplete ||
+                          approvalEvidenceMessages.length > 0 ||
                           !selected.kycCase.phoneVerified ||
                           selected.kycCase.missingRequirementCodes.length > 0
                         }
