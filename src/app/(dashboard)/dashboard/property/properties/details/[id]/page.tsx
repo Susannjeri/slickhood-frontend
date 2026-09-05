@@ -804,6 +804,11 @@ export default function PropertyDetailsPage() {
                     <PropertyAccountsSheet
                         propertyId={Number(propertyId)}
                         propertyName={property.name}
+                        accountCategory={property.managementMode === "SALE"
+                            ? "PROPERTY_SALES"
+                            : property.managementMode === "SERVICE_CHARGE"
+                                ? "ESTATE_MANAGEMENT"
+                                : "LANDLORD"}
                         open={accountsSheetOpen}
                         onOpenChange={setAccountsSheetOpen}
                     />

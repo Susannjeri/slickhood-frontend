@@ -12,6 +12,8 @@ export interface SidebarLink {
   description?: string
   roles?: string[]
   excludedRoles?: string[]
+  /** Any one of these plan features enables the link for a subscribed primary business role. */
+  subscriptionFeatures?: string[]
   subLinks?: SidebarLink[];
 }
 
@@ -61,6 +63,7 @@ export const sidebarLinks: SidebarLink[] = [
     description: "Operational, financial, property, security and marketplace reporting.",
     protected: false,
     permissions: [],
+    subscriptionFeatures: ["ANALYTICS_AND_REPORTS", "SALES_REPORTING"],
   },
   {
     icon: Calculator,
@@ -78,6 +81,7 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
     permissions: ["view_account"],
     roles: ["Landlord"],
+    subscriptionFeatures: ["LANDLORD_PAYMENT_SETUP", "PER_PROPERTY_PAYMENT_ACCOUNT"],
   },
   {
     icon: Wallet,
@@ -87,6 +91,17 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
     permissions: ["view_account"],
     roles: ["SalesAgent"],
+    subscriptionFeatures: ["PER_PROPERTY_PAYMENT_ACCOUNT"],
+  },
+  {
+    icon: Wallet,
+    label: "Estate Payment Setup",
+    href: "/dashboard/estate/accounts",
+    description: "Configure verified destinations for service charges and estate operating collections.",
+    protected: true,
+    permissions: ["view_account"],
+    roles: ["EstateManager"],
+    subscriptionFeatures: ["PER_PROPERTY_PAYMENT_ACCOUNT"],
   },
   {
     icon: Landmark,
@@ -136,6 +151,7 @@ export const sidebarLinks: SidebarLink[] = [
     href: "/dashboard/community-funds",
     protected: true,
     permissions: ["view_community_funds"],
+    subscriptionFeatures: ["COMMUNITY_FUNDS"],
     description: "Transparent welfare, project, reserve and emergency funds.",
   },
   {
@@ -210,42 +226,49 @@ export const sidebarLinks: SidebarLink[] = [
     label: "Properties",
     permissions: ["create_property", "view_property"],
     excludedRoles: ["Tenant", "Buyer", "Homeowner"],
+    subscriptionFeatures: ["PROPERTY_AND_UNIT_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT", "PROPERTY_SALES"],
     protected: true,
     subLinks: [
       {
         label: "All Properties",
         href: "/dashboard/property/properties",
         permissions: ["create_property", "view_property"],
+        subscriptionFeatures: ["PROPERTY_AND_UNIT_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT", "PROPERTY_SALES"],
         protected: true,
       },
       {
         label: "Sale Units",
         href: "/dashboard/property/sale-units",
         permissions: ["view_sale_pipeline"],
+        subscriptionFeatures: ["PROPERTY_SALES"],
         protected: true,
       },
       {
         label: "Homeowners",
         href: "/dashboard/homeowners",
         permissions: ["view_estate"],
+        subscriptionFeatures: ["ESTATE_AND_HOMEOWNER_MANAGEMENT"],
         protected: true,
       },
       {
         label: "Rentals",
         href: "/dashboard/property/rentals",
         permissions: ["create_property", "view_property"],
+        subscriptionFeatures: ["PROPERTY_AND_UNIT_MANAGEMENT"],
         protected: true,
       },
       {
         label: "Create Unit",
         href: "/dashboard/unit/create",
         permissions: ["create_unit"],
+        subscriptionFeatures: ["PROPERTY_AND_UNIT_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT", "PROPERTY_SALES"],
         protected: true,
       },
       {
         label: "Listing Enquiries",
         href: "/dashboard/property-listing-inquiries",
         permissions: ["advertise_unit"],
+        subscriptionFeatures: ["PROPERTY_LISTINGS"],
         protected: true,
       }
     ],
@@ -254,6 +277,7 @@ export const sidebarLinks: SidebarLink[] = [
     icon: FileSignature,
     label: "Leases",
     permissions: ["view_active_lease", "view_lease_template", "create_lease_template", "edit_lease_template", "delete_lease_template"],
+    subscriptionFeatures: ["LEASE_MANAGEMENT"],
     protected: true,
     subLinks: [
       { label: "Lease operations", href: "/dashboard/lease/operations", permissions: ["view_active_lease"], protected: true },
@@ -274,6 +298,7 @@ export const sidebarLinks: SidebarLink[] = [
     href: "/dashboard/estate",
     permissions: ["view_estate"],
     roles: ["EstateManager", "EstateOperationsManager", "Superadmin"],
+    subscriptionFeatures: ["ESTATE_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT"],
     protected: true,
     description: "Homeowners, ownership history, service charges and estate operations.",
   },
@@ -292,6 +317,7 @@ export const sidebarLinks: SidebarLink[] = [
     href: "/dashboard/sales",
     permissions: ["view_sale_pipeline"],
     roles: ["SalesAgent", "SalesCoordinator", "ListingAgent", "Superadmin"],
+    subscriptionFeatures: ["PROPERTY_SALES", "BUYER_PIPELINE"],
     protected: true,
     description: "Buyer journeys, viewings, offers, due diligence, completion and handover.",
   },
@@ -367,6 +393,7 @@ export const sidebarLinks: SidebarLink[] = [
     protected: false,
     permissions: [],
     roles: ["Landlord", "EstateManager", "SalesAgent", "WorkspaceAdmin"],
+    subscriptionFeatures: ["MULTIPLE_USER_ROLES"],
     description: "Invite team members, assign secure roles and control their workspace scope.",
   },
   {
@@ -376,6 +403,7 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
     description: "Register, view, and manage visitors to your property.",
     permissions: ["view_visitor_list"],
+    subscriptionFeatures: ["VISITOR_MANAGEMENT"],
   },
   {
     icon: Users,
@@ -384,6 +412,7 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
     description: "Manage visitor check-ins, check-outs, and status updates.",
     permissions: ["update_visitor_status"],
+    subscriptionFeatures: ["VISITOR_MANAGEMENT"],
   },
   {
     icon: ShieldCheck,
@@ -392,6 +421,7 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
     description: "Gate controllers, access decisions, and security audit trail.",
     permissions: ["view_gate_events", "manage_gate_devices"],
+    subscriptionFeatures: ["GATE_MANAGEMENT_INCLUDED_UNITS", "GATE_MANAGEMENT"],
   },
 
   {
@@ -482,7 +512,7 @@ export const sidebarLinks: SidebarLink[] = [
 const sectionDefinitions = [
   { label: "Overview", links: ["Home", "Business Areas", "My Wealth"] },
   { label: "Property & Leasing", links: ["Properties", "Leases", "Documents & Notices", "Estate Management", "My Home", "Property Sale Management", "My Property Purchase", "Community Funds"] },
-  { label: "Money", links: ["Payment Setup", "Sales Payment Setup", "Payments", "Invoices", "Tax Assist", "Reports", "Insurance Hub"] },
+  { label: "Money", links: ["Payment Setup", "Estate Payment Setup", "Sales Payment Setup", "Payments", "Invoices", "Tax Assist", "Reports", "Insurance Hub"] },
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "Soko", "My Services", "Merchant Accounts", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre", "Subscriptions", "Upgrade Plan"] },

@@ -32,10 +32,18 @@ test("estate manager can open the estate-management operator workspace", async (
   });
   await page.route("**/estate/ownership**", route => route.fulfill({ json: { success: true, data: [] } }));
   await page.route("**/estate/service-charges**", route => route.fulfill({ json: { success: true, data: [] } }));
+  await page.route("**/property/list**", route => route.fulfill({ json: { success: true, data: [
+    { id: 41, name: "Green Court", managementMode: "SERVICE_CHARGE" },
+    { id: 42, name: "Rental Court", managementMode: "RENTAL" },
+  ] } }));
+  await page.route("**/property/unit/list**", route => route.fulfill({ json: { success: true, data: [] } }));
 
   await page.goto("/dashboard/estate");
 
   await expect(page.locator("main").getByRole("heading", { name: "Estate Management", exact: true })).toBeVisible();
+  await page.getByRole("combobox", { name: "Estate" }).click();
+  await expect(page.getByRole("option", { name: "Green Court" })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Rental Court" })).toHaveCount(0);
 });
 
 test("switching a primary business role selects its product and opens its own workspace", async ({ context, page }) => {

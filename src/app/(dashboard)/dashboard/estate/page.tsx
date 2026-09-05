@@ -14,13 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { EstateOperationsPanel } from "@/components/estate/EstateOperationsPanel";
 import RequireRole from "@/components/auth/RequireRole";
-import { fetchUnitList } from "@/lib/api";
+import { fetchPropertyList, fetchUnitList } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-error";
 import { estateService } from "@/services/business-workflows.service";
 import { useAuthStore } from "@/store/authStore";
 import { EstateServiceCharge, PropertyOwnership } from "@/types/business-workflows";
 
 type UnitOption = { unitId: number; propertyId: number; ref: string; currency?: string };
+type PropertyOption = { id: number; name: string; managementMode?: string };
 
 export default function EstatePage() {
   const router = useRouter();
@@ -34,10 +35,10 @@ export default function EstatePage() {
   const requestedPropertyId = Number(searchParams.get("propertyId"));
   const initialPropertyId = Number.isSafeInteger(requestedPropertyId) && scopedPropertyIds.includes(requestedPropertyId)
     ? String(requestedPropertyId) : "all";
-  const requestedScopedPropertyId = Number.isSafeInteger(requestedPropertyId) && scopedPropertyIds.includes(requestedPropertyId)
-    ? requestedPropertyId : undefined;
 
   const [propertyFilter, setPropertyFilter] = useState(initialPropertyId);
+  const [properties, setProperties] = useState<PropertyOption[]>([]);
+  const [propertiesLoading, setPropertiesLoading] = useState(canManage && Boolean(token));
   const [items, setItems] = useState<PropertyOwnership[]>([]);
   const [charges, setCharges] = useState<EstateServiceCharge[]>([]);
   const [units, setUnits] = useState<UnitOption[]>([]);
@@ -53,20 +54,43 @@ export default function EstatePage() {
   const [chargeDescription, setChargeDescription] = useState("Service charge");
   const queryScopeApplied = useRef(false);
 
-  const properties = useMemo(() => scopedPropertyIds.map((id, index) => ({
+  const tokenProperties = useMemo(() => scopedPropertyIds.map((id, index) => ({
     id, name: scopedPropertyNames[index] ?? `Property #${id}`,
   })), [scopedPropertyIds, scopedPropertyNames]);
 
   useEffect(() => {
-    if (!queryScopeApplied.current && Number.isSafeInteger(requestedPropertyId) && scopedPropertyIds.includes(requestedPropertyId)) {
+    if (!canManage || !token) {
+      return;
+    }
+    let current = true;
+    void fetchPropertyList({ page: 0, size: 100, sort: "name,asc" }, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(response => {
+        if (!current) return;
+        const available = ((response.data?.data ?? []) as PropertyOption[])
+          .filter(property => property.managementMode === "SERVICE_CHARGE");
+        setProperties(available);
+      })
+      .catch((error: unknown) => {
+        if (!current) return;
+        setProperties(tokenProperties);
+        toast.error(apiErrorMessage(error, "Could not load your estate properties."));
+      })
+      .finally(() => { if (current) setPropertiesLoading(false); });
+    return () => { current = false; };
+  }, [canManage, token, tokenProperties]);
+
+  useEffect(() => {
+    if (!queryScopeApplied.current && Number.isSafeInteger(requestedPropertyId) && properties.some(property => property.id === requestedPropertyId)) {
       queryScopeApplied.current = true;
       setPropertyFilter(String(requestedPropertyId));
     }
-  }, [requestedPropertyId, scopedPropertyIds]);
+  }, [properties, requestedPropertyId]);
 
   const load = useCallback(async () => {
     try {
-      const propertyId = propertyFilter === "all" ? requestedScopedPropertyId : Number(propertyFilter);
+      const propertyId = propertyFilter === "all" ? undefined : Number(propertyFilter);
       const [ownershipResponse, chargeResponse] = await Promise.all([
         estateService.listOwnership({ propertyId }),
         estateService.listServiceCharges({ propertyId }),
@@ -76,7 +100,7 @@ export default function EstatePage() {
     } catch (error: unknown) {
       toast.error(apiErrorMessage(error, "Could not load estate records."));
     }
-  }, [propertyFilter, requestedScopedPropertyId]);
+  }, [propertyFilter]);
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
@@ -133,13 +157,13 @@ export default function EstatePage() {
   const outstandingLabel = outstandingByCurrency.length === 0 ? "KES 0.00" : outstandingByCurrency
     .map(([currency, amount]) => `${currency} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
     .join(" · ");
-  const estatePropertyIds = Array.from(new Set([...currentOwnerships.map(item => item.propertyId), ...(canManage ? scopedPropertyIds : [])]));
+  const estatePropertyIds = Array.from(new Set([...currentOwnerships.map(item => item.propertyId), ...(canManage ? properties.map(property => property.id) : [])]));
 
   return <RequireRole roles={["EstateManager", "EstateOperationsManager", "Homeowner", "Superadmin"]} permissions={["view_estate"]}>
   <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="text-sm font-semibold uppercase tracking-[.18em] text-[#EF4217]">SlickHood Estates</p><h1 className="mt-1 text-3xl font-bold">{canManage ? "Estate Management" : "My Home"}</h1><p className="text-muted-foreground">{canManage ? "Manage homeowner onboarding, ownership history, service charges and estate operations." : "View your homes, service charges, balances and payment documents."}</p></div>
-      {canManage && <div className="w-full sm:w-72"><Label id="estate-filter-label" htmlFor="estate-filter">Estate</Label><Select value={propertyFilter} onValueChange={value => { setPropertyFilter(value); setAssignmentUnitId(""); }}><SelectTrigger id="estate-filter" aria-labelledby="estate-filter-label"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All estates</SelectItem>{properties.map(property => <SelectItem key={property.id} value={String(property.id)}>{property.name}</SelectItem>)}</SelectContent></Select></div>}
+      {canManage && <div className="w-full sm:w-72"><Label id="estate-filter-label" htmlFor="estate-filter">Estate</Label><Select value={propertyFilter} onValueChange={value => { setPropertyFilter(value); setAssignmentUnitId(""); setUnits([]); }} disabled={propertiesLoading}><SelectTrigger id="estate-filter" aria-labelledby="estate-filter-label"><SelectValue placeholder={propertiesLoading ? "Loading estates…" : "Select an estate"} /></SelectTrigger><SelectContent><SelectItem value="all">All estates</SelectItem>{properties.map(property => <SelectItem key={property.id} value={String(property.id)}>{property.name}</SelectItem>)}</SelectContent></Select>{!propertiesLoading && properties.length === 0 && <p className="mt-2 text-sm text-amber-700">No estate properties are available. Create a property with the Estate Management business area first.</p>}</div>}
     </div>
 
     {!canManage && <div className="grid gap-4 sm:grid-cols-3"><Card><CardHeader className="pb-2"><CardDescription>Owned units</CardDescription><CardTitle>{currentOwnerships.length}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Outstanding balance</CardDescription><CardTitle>{outstandingLabel}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Overdue charges</CardDescription><CardTitle className={overdue.length ? "text-red-600" : "text-emerald-600"}>{overdue.length}</CardTitle></CardHeader></Card></div>}

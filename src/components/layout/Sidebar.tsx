@@ -1,7 +1,7 @@
 "use client"
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { sidebarLinks, sidebarSections, settingsLinks } from "@/config/sidebarConfig";
+import { sidebarLinks, sidebarSections, settingsLinks, type SidebarLink } from "@/config/sidebarConfig";
 import Can, { usePermissions } from "@/components/auth/Can";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -53,6 +53,7 @@ import { FaUserTie, FaBuilding, FaTools, FaHandshake } from "react-icons/fa";
 import JobsDrawer from "@/components/JobsDrawer";
 import { cn } from "@/lib/utils";
 import { businessAreaForRoleTitle, roleDisplayName, workspaceHrefForRole } from "@/config/businessAreas";
+import { getSubscriptionOverview, subscriptionRoleForTitle } from "@/services/subscription.service";
 
 const commitHash = process.env.NEXT_PUBLIC_COMMIT_HASH || "unknown";
 const githubUrl = `https://github.com/naphtron/PMS/${commitHash}`;
@@ -109,6 +110,45 @@ export default function AppSidebar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
+  const [subscriptionEntitlements, setSubscriptionEntitlements] = useState<{ scope: string; features: Set<string> } | null>(null);
+  const activeBusinessArea = businessAreaForRoleTitle(activeRole?.title);
+  const entitlementScope = activeBusinessArea ? `${activeRole?.title}:${activeBusinessArea.subscriptionProduct}` : null;
+
+  useEffect(() => {
+    const area = activeBusinessArea;
+    const subscriptionRole = subscriptionRoleForTitle(activeRole?.title);
+    if (!token || !area || !subscriptionRole) {
+      return;
+    }
+    let current = true;
+    const scope = `${activeRole?.title}:${area.subscriptionProduct}`;
+    void getSubscriptionOverview(token, subscriptionRole, area.subscriptionProduct)
+      .then(response => {
+        if (!current) return;
+        const overview = response.data.data?.[0];
+        const enabled = overview?.subscription?.planDetails?.features
+          ?.filter(feature => feature.enabled)
+          .map(feature => feature.featureKey) ?? [];
+        setSubscriptionEntitlements({ scope, features: new Set(enabled) });
+      })
+      // The backend remains authoritative. A temporary entitlement lookup error
+      // must not make navigation disappear while the rest of the session works.
+      .catch(() => { /* Preserve permission navigation; backend remains authoritative. */ });
+    return () => { current = false; };
+  }, [activeBusinessArea, activeRole?.title, token]);
+
+  const subscriptionAllows = (link: SidebarLink) => !link.subscriptionFeatures?.length
+    || entitlementScope === null
+    || subscriptionEntitlements?.scope !== entitlementScope
+    || link.subscriptionFeatures.some(feature => subscriptionEntitlements.features.has(feature));
+  const permissionAllows = (link: SidebarLink) => hasPermission(link.permissions || [])
+    && hasRole(link.roles || [])
+    && !hasExcludedRole(link.excludedRoles || []);
+  const visibleSubLinks = (link: SidebarLink) => (link.subLinks ?? [])
+    .filter(subLink => permissionAllows(subLink) && subscriptionAllows(subLink));
+  const linkIsVisible = (link: SidebarLink) => permissionAllows(link)
+    && subscriptionAllows(link)
+    && (!link.subLinks?.length || visibleSubLinks(link).length > 0);
 
   const handleRoleSwitch = (role: typeof roles[0]) => {
     if (role.title === activeRole?.title) { setRoleSwitcherOpen(false); return; }
@@ -238,9 +278,7 @@ export default function AppSidebar() {
           )}
 
           {sidebarSections.map((section) => {
-            const visibleLinks = section.links.filter((link) =>
-              hasPermission(link.permissions || []) && hasRole(link.roles || []) && !hasExcludedRole(link.excludedRoles || [])
-            )
+            const visibleLinks = section.links.filter(linkIsVisible)
 
             if (visibleLinks.length === 0) return null
 
@@ -277,7 +315,7 @@ export default function AppSidebar() {
 
                             <CollapsibleContent>
                               <SidebarMenuSub>
-                                {link.subLinks.map((subLink) => (
+                                {visibleSubLinks(link).map((subLink) => (
                                   <Can permissions={subLink.permissions || []} roles={subLink.roles || []} excludedRoles={subLink.excludedRoles || []} key={subLink.href}>
                                     <SidebarMenuSubItem>
                                       <SidebarMenuSubButton

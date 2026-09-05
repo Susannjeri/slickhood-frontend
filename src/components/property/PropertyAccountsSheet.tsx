@@ -37,11 +37,12 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Account } from "@/types/account";
+import { Account, AccountCategory } from "@/types/account";
 
 interface PropertyAccountsSheetProps {
   propertyId: number;
   propertyName: string;
+  accountCategory: AccountCategory;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -112,6 +113,7 @@ function RowSkeleton() {
 export default function PropertyAccountsSheet({
   propertyId,
   propertyName,
+  accountCategory,
   open,
   onOpenChange,
 }: PropertyAccountsSheetProps) {
@@ -163,7 +165,7 @@ export default function PropertyAccountsSheet({
       setPickerLoading(true);
       const res = await handleListAccounts({ byLandlord: true });
       if (res?.success && res.data) {
-        setLandlordAccounts(res.data);
+        setLandlordAccounts(res.data.filter((account: Account) => account.category === accountCategory));
       }
       setPickerLoaded(true);
     } catch (err: any) {

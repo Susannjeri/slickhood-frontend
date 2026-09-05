@@ -129,3 +129,24 @@ test("landlord navigation is grouped in task order", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Properties", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Payment Setup" })).toBeVisible();
 });
+
+test("landlord navigation follows the active subscription feature set", async ({ page }) => {
+  await page.route("**/subscription/overview**", route => route.fulfill({ json: envelope([{
+    subscription: {
+      uuid: "subscription-1", role: "LANDLORD", planCode: "LANDLORD_LIMITED", status: "ACTIVE",
+      startAt: "2026-09-01T00:00:00Z", endAt: null, autoRenew: true, productKey: "LANDLORD", termVersion: 1,
+      planDetails: {
+        uuid: "plan-1", code: "LANDLORD_LIMITED", displayName: "Limited", planCategory: "LANDLORD",
+        roleFamily: "LANDLORD", billingCycle: "MONTHLY", price: 1000, currency: "KES", active: true,
+        productKey: "LANDLORD", purchaseMode: "SELF_SERVICE", tierRank: 10,
+        features: [{ featureKey: "PROPERTY_AND_UNIT_MANAGEMENT", enabled: true }], quotas: [],
+      },
+    }, propertiesUsed: 0, unitsUsed: 0, cancellationScheduled: false, scheduledPlanCode: null,
+  }]) }));
+
+  await page.goto("/dashboard/property/create");
+  await expect(page.getByRole("button", { name: "Properties", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Payment Setup" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Reports" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Subscriptions" })).toBeVisible();
+});

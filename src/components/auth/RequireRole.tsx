@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { Loader2 } from "lucide-react";
 
@@ -22,14 +22,23 @@ interface RequireRoleProps {
 export default function RequireRole({ roles, permissions = [], children, redirectTo = "/dashboard" }: RequireRoleProps) {
   const activeRole = useAuthStore((s) => s.activeRole);
   const router = useRouter();
+  const pathname = usePathname();
   const hasRole = !!activeRole && roles.includes(activeRole.title);
   const hasPermission =
     permissions.length === 0 || permissions.some((p) => activeRole?.permissions.includes(p));
   const allowed = hasRole && hasPermission;
 
   useEffect(() => {
-    if (!allowed) router.replace(redirectTo);
-  }, [allowed, redirectTo, router]);
+    if (allowed || pathname === redirectTo) return;
+    router.replace(redirectTo);
+    // A page-level role guard must fail closed even if a client transition is
+    // interrupted while layouts are hydrating. The hard-navigation fallback
+    // also clears the forbidden route from the address bar.
+    const fallback = window.setTimeout(() => {
+      if (window.location.pathname !== redirectTo) window.location.replace(redirectTo);
+    }, 750);
+    return () => window.clearTimeout(fallback);
+  }, [allowed, pathname, redirectTo, router]);
 
   if (!allowed) {
     return (

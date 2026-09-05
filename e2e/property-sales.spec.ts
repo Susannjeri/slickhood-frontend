@@ -6,7 +6,8 @@ const pageEnvelope=(data:unknown[])=>({success:true,code:"s00000",description:"S
 test("sales owner starts an email-bound sale from scoped property and unit selectors",async({context,page})=>{
  await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline","view_property","view_unit","view_account"]});
  await page.route("**/property/list**",route=>route.fulfill({json:pageEnvelope([{id:11,name:"Acacia Court",managementMode:"SALE"}])}));
- await page.route("**/property/unit/list**",route=>route.fulfill({json:pageEnvelope([{unitId:77,propertyId:11,ref:"A-07",currency:"KES",price:15000000,leaseMode:"SALE"}])}));
+ let unitListUrl="";
+ await page.route("**/property/unit/list**",route=>{unitListUrl=route.request().url();return route.fulfill({json:pageEnvelope([{unitId:77,propertyId:11,ref:"A-07",currency:"KES",price:15000000,leaseMode:"SALE"}])})});
  await page.route("**/sales**",async route=>{
   const path=new URL(route.request().url()).pathname;
   if(path!=="/sales"&&path!=="/api/sales"){await route.continue();return}
@@ -19,6 +20,9 @@ test("sales owner starts an email-bound sale from scoped property and unit selec
  await page.getByRole("option",{name:"Acacia Court"}).click();
  await page.getByRole("combobox").nth(1).click();
  await page.getByRole("option",{name:/A-07/}).click();
+ const unitQuery=new URL(unitListUrl).searchParams;
+ expect(unitQuery.get("sort")).toBe("ref,asc");
+ expect(unitQuery.get("leaseMode")).toBe("SALE");
  await page.getByLabel("Buyer email").fill("newbuyer@example.com");
  await expect(page.getByLabel("Asking price")).toHaveValue("15000000");
  const requestPromise=page.waitForRequest(request=>request.url().includes("/sales")&&request.method()==="POST");
