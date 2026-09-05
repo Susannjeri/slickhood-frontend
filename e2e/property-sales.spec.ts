@@ -4,7 +4,7 @@ import { authenticated } from "./support";
 const pageEnvelope=(data:unknown[])=>({success:true,code:"s00000",description:"Success",data,size:25,totalPages:data.length?1:0,totalElements:data.length});
 
 test("sales owner starts an email-bound sale from scoped property and unit selectors",async({context,page})=>{
- await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline","view_property","view_unit"]});
+ await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline","view_property","view_unit","view_account"]});
  await page.route("**/property/list**",route=>route.fulfill({json:pageEnvelope([{id:11,name:"Acacia Court",managementMode:"SALE"}])}));
  await page.route("**/property/unit/list**",route=>route.fulfill({json:pageEnvelope([{unitId:77,propertyId:11,ref:"A-07",currency:"KES",price:15000000,leaseMode:"SALE"}])}));
  await page.route("**/sales**",async route=>{
@@ -42,13 +42,14 @@ test("buyer is routed to review and sign the sale letter of offer",async({contex
 });
 
 test("sales escrow is backed by a buyer invoice and never a typed payment reference",async({context,page})=>{
- await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline"]});
+ await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline","view_account"]});
  let invoiced=false;
  const base={id:5,propertyId:11,propertyName:"Acacia Court",unitId:77,unitRef:"A-07",salesAgentUserId:100,buyerUserId:200,buyerEmail:"buyer@example.com",status:"RESERVED",askingPrice:15000000,offerAmount:14500000,currency:"KES"};
+ await page.route("**/account/list**",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:81,name:"Sales collections",channel:"MPESA",channelDisplayName:"M-Pesa",category:"PROPERTY_SALES",active:true,verified:true}]}}));
  await page.route("**/sales/5/**",async route=>{
   const path=new URL(route.request().url()).pathname;
   if(path.endsWith("/escrow-invoice")&&route.request().method()==="POST"){
-   expect(route.request().postDataJSON()).toEqual({amount:250000});
+   expect(route.request().postDataJSON()).toEqual({amount:250000,paymentAccountId:81});
    invoiced=true;
    await route.fulfill({json:{success:true,code:"S00297",description:"Escrow invoice created.",data:{invoiceId:301,invoiceRef:"INV-SALE-301",amount:250000,currency:"KES",paid:false,pendingAmount:250000,dueDate:"2026-09-11"}}});return;
   }
@@ -67,10 +68,13 @@ test("sales escrow is backed by a buyer invoice and never a typed payment refere
  });
 
  await page.goto("/dashboard/sales");
+ await expect(page.getByRole("link", { name: "Sales Payment Setup" })).toBeVisible();
  await page.getByText("Due diligence, verified payment and handover evidence").click();
  await page.getByRole("combobox").filter({hasText:"Select milestone"}).click();
  await page.getByRole("option",{name:"Escrow Funded"}).click();
  await page.getByLabel("Contractual escrow amount").fill("250000");
+ await page.getByRole("combobox").filter({hasText:"Select verified Property Sales account"}).click();
+ await page.getByRole("option",{name:"Sales collections · M-Pesa"}).click();
  await page.getByRole("button",{name:"Create buyer escrow invoice"}).click();
  await expect(page.getByText(/Buyer escrow invoice #301/)).toBeVisible();
  await expect(page.getByPlaceholder("Payment/external reference")).toHaveCount(0);

@@ -133,7 +133,7 @@ export default function CreateAccountDialog({
     try {
       setCreating(true);
       const category = forceCategory ?? (isSuperadmin ? "SLICKHOOD" : "LANDLORD");
-      const res = category === "COMMUNITY_FUND" || category === "AFFILIATE" || category === "INSURANCE"
+      const res = category === "COMMUNITY_FUND" || category === "AFFILIATE" || category === "INSURANCE" || category === "PROPERTY_SALES"
         ? (await API.post("/account/create",{channel:selectedChannel.id,name:name.trim(),category})).data
         : await (category === "SLICKHOOD" ? handleCreateSlickHoodAccount : category === "MERCHANT" ? handleCreateMerchantAccount : handleCreateLandlordAccount)(selectedChannel.id as paymentChannel, name.trim(), category as accountCategory);
 

@@ -117,32 +117,6 @@ export default function ConfigurationSettingsPage() {
         ],
       },
       {
-        title: "M-Pesa Credentials",
-        description: "M-Pesa authentication credentials",
-        configNames: [
-          "GLOBAL_MPESA_PAYBILL",
-          "GLOBAL_MPESA_STK_PASSKEY",
-          "GLOBAL_MPESA_CONSUMER_KEY",
-          "GLOBAL_MPESA_CONSUMER_SECRET",
-        ],
-      },
-      {
-        title: "Flutterwave Configuration",
-        description: "Flutterwave payment gateway settings",
-        configNames: [
-          "FW_REDIRECT_URL",
-          "FW_PUBLIC_KEY",
-          "FW_SECRET_KEY",
-          "FW_ENCRYPTION_KEY",
-          "FW_CARD_PAYMENT_URL",
-          "FW_CALLBACK_URL",
-          "FW_LOGO_URL",
-          "FW_SESSION_DURATION",
-          "FW_MAX_RETRIES",
-          "FW_MAX_VERIFY_RETRIES",
-        ],
-      },
-      {
         title: "SMS Configuration",
         description: "Africa's Talking SMS service settings",
         configNames: [
@@ -206,7 +180,16 @@ export default function ConfigurationSettingsPage() {
     });
 
     const categorizedConfigs = sectionDefinitions.flatMap((s) => s.configNames);
-    const uncategorized = names.filter((name) => !categorizedConfigs.includes(name));
+    // Recipient credentials belong to role-scoped Payment Setup accounts and
+    // are write-only there. Retain legacy values server-side for migration,
+    // but never surface them through the generic reveal-capable config UI.
+    const hiddenLegacyPaymentConfigs = new Set([
+      "GLOBAL_MPESA_PAYBILL", "GLOBAL_MPESA_STK_PASSKEY", "GLOBAL_MPESA_CONSUMER_KEY", "GLOBAL_MPESA_CONSUMER_SECRET",
+      "FW_REDIRECT_URL", "FW_PUBLIC_KEY", "FW_SECRET_KEY", "FW_ENCRYPTION_KEY", "FW_CARD_PAYMENT_URL",
+      "FW_CALLBACK_URL", "FW_LOGO_URL", "FW_SESSION_DURATION", "FW_MAX_RETRIES", "FW_MAX_VERIFY_RETRIES",
+    ]);
+    const uncategorized = names.filter((name) =>
+      !categorizedConfigs.includes(name) && !hiddenLegacyPaymentConfigs.has(name));
     
     if (uncategorized.length > 0) {
       sections.push({

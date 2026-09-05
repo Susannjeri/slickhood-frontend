@@ -73,11 +73,20 @@ export const sidebarLinks: SidebarLink[] = [
   },
   {
     icon: Wallet,
-    label: "Accounts",
+    label: "Payment Setup",
     href: "/dashboard/accounts",
     protected: true,
     permissions: ["view_account"],
     roles: ["Landlord"],
+  },
+  {
+    icon: Wallet,
+    label: "Sales Payment Setup",
+    href: "/dashboard/sales/accounts",
+    description: "Configure verified destinations for deposits and property-sale proceeds.",
+    protected: true,
+    permissions: ["view_account"],
+    roles: ["SalesAgent"],
   },
   {
     icon: Landmark,
@@ -473,7 +482,7 @@ export const sidebarLinks: SidebarLink[] = [
 const sectionDefinitions = [
   { label: "Overview", links: ["Home", "Business Areas", "My Wealth"] },
   { label: "Property & Leasing", links: ["Properties", "Leases", "Documents & Notices", "Estate Management", "My Home", "Property Sale Management", "My Property Purchase", "Community Funds"] },
-  { label: "Money", links: ["Accounts", "Payments", "Invoices", "Tax Assist", "Reports", "Insurance Hub"] },
+  { label: "Money", links: ["Payment Setup", "Sales Payment Setup", "Payments", "Invoices", "Tax Assist", "Reports", "Insurance Hub"] },
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "Soko", "My Services", "Merchant Accounts", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre", "Subscriptions", "Upgrade Plan"] },
@@ -501,12 +510,6 @@ export const settingsLinks: SidebarLink[] = [
         label: "General Settings",
         href: "/dashboard/user",
         permissions: ["manage_settings"],
-        protected: true,
-      },
-      {
-        label: "Payment Settings",
-        href: "/dashboard/params",
-        permissions: ["view_param"],
         protected: true,
       },
       {

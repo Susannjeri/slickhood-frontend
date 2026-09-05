@@ -127,5 +127,5 @@ test("landlord navigation is grouped in task order", async ({ page }) => {
   await expect(labels).toContainText(["Overview", "Property & Leasing", "Money", "Support"]);
   await expect(page.getByRole("link", { name: "Home" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Properties", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Accounts" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Payment Setup" })).toBeVisible();
 });
