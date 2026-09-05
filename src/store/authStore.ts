@@ -20,6 +20,7 @@ interface AuthState {
   email: string | null;
   roleId: number | null;
   selectedBusinessAreaId: string | null;
+  activeWorkspaceId: number | null;
   inviteToken: string | null;
 
   // from decoded token
@@ -44,6 +45,7 @@ interface AuthState {
   setEmail: (email: string) => void;
   setRole: (roleId: number) => void;
   setSelectedBusinessAreaId: (businessAreaId: string | null) => void;
+  setActiveWorkspaceId: (workspaceId: number | null) => void;
   setInviteToken: (inviteToken: string | null) => void;
   setRoleName: (roleName: string[]) => void;
   setPermissions: (permissions: string[]) => void;
@@ -68,6 +70,7 @@ export const useAuthStore = create<AuthState>()(
       email: null,
       roleId: null,
       selectedBusinessAreaId: null,
+      activeWorkspaceId: null,
       inviteToken: null,
       roles: [],
       roleName: [],
@@ -85,6 +88,7 @@ export const useAuthStore = create<AuthState>()(
       setEmail: (email) => set({ email }),
       setRole: (roleId) => set({ roleId }),
       setSelectedBusinessAreaId: (selectedBusinessAreaId) => set({ selectedBusinessAreaId }),
+      setActiveWorkspaceId: (activeWorkspaceId) => set({ activeWorkspaceId }),
       setInviteToken: (inviteToken) => set({ inviteToken }),
       setRoleName: (roleName) => set({ roleName }),
       setPermissions: (permissions) => set({ permissions }),
@@ -117,6 +121,7 @@ export const useAuthStore = create<AuthState>()(
           email: null,
           roleId: null,
           selectedBusinessAreaId: null,
+          activeWorkspaceId: null,
           inviteToken: null,
           roles: [],
           roleName: [],
@@ -132,6 +137,7 @@ export const useAuthStore = create<AuthState>()(
           email: null,
           roleId: null,
           selectedBusinessAreaId: null,
+          activeWorkspaceId: null,
           token: null,
           mfaEnabled: false,
           totpEnabled: false,
@@ -154,6 +160,7 @@ export const useAuthStore = create<AuthState>()(
         email: state.email,
         roleId: state.roleId,
         selectedBusinessAreaId: state.selectedBusinessAreaId,
+        activeWorkspaceId: state.activeWorkspaceId,
         step: state.step,
         inviteToken: state.inviteToken,
         roles: state.roles,

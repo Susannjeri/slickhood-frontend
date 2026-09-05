@@ -1,12 +1,14 @@
 # Estate Management and Property Sale go-live audit
 
-Date: 2026-09-04
+Date: 2026-09-06
 
 ## Decision
 
 - **Estate Management:** release candidate after the changes in this audit, subject to the normal MySQL migration test and authenticated staging smoke test.
 - **Property Sale Management:** release candidate after replacing manual escrow references with a buyer invoice that must be fully reconciled before the escrow milestone can complete.
 - **Google Maps:** the feature exists, but the production frontend was built with an effectively empty `NEXT_PUBLIC_GOOGLE_MAPS_KEY`. A validated key was available locally and a production build with it succeeds. Because `NEXT_PUBLIC_` values are frozen into the browser bundle, setting the value only after build will not activate Maps.
+- **Bronze, Silver and Gold:** retain the same essential business workflows. The tiers intentionally differ by unit/property quotas, team seats, support/service levels and price; add-ons extend entitlements independently. Removing core operational screens from lower tiers would strand customer data and is not supported by the canonical subscription catalogue.
+- **Production data classification:** the only active AWS property found during the read-only audit was `78 GTC Centre`; it is a rental property with four rent-mode units, so its existing `RENTAL` classification is correct. No active estate or sale property existed to reclassify, and no production data was changed.
 
 ## Audited journeys
 
@@ -46,6 +48,10 @@ Date: 2026-09-04
 - Prevented legacy units with no rent value from crashing the unit details screen.
 - Prevented legacy units with no measurement-unit record from crashing the unit details screen.
 - Replaced manually entered escrow payment claims with a server-created, sale-bound buyer invoice and locked reconciliation check.
+- Added one effective-entitlements response that unions enabled primary-plan features with enabled features from live, unexpired add-ons; expired and disabled add-ons are excluded.
+- Added server-side searchable pagination for Estate and Property Sales property/unit selectors, including a safe token-scope fallback while the first page loads.
+- Required staff who hold the same membership role in multiple workspaces to choose a workspace explicitly. The selected workspace is sent on every request and changing it reloads the screen to clear data from the prior authorization boundary.
+- Prevented the debounced property/home selectors from becoming briefly clickable with an empty result set, and stopped effect cleanup from discarding a valid latest response.
 
 ## Google Maps activation checklist
 
@@ -58,16 +64,18 @@ Date: 2026-09-04
 
 ## Validation evidence
 
-- Backend focused Estate/Sales tests: 25 passed after the escrow guard was added.
-- Backend `mvnw clean verify`: 559 unit tests passed, 1 application-context test skipped; 2 payment integration tests passed.
-- Docker-capable release rehearsal: the data-free production V67 schema migrated cleanly through V68, V69 and V70 on MySQL 8.4; `RentalPaymentMySqlIT` also passed against real MySQL.
-- Frontend TypeScript through optimized build: passed; 91 routes generated.
-- ESLint: 0 errors, 451 warnings within the 478-warning budget.
-- Playwright against the optimized production artifact: 95 passed, 2 keyless-only tests intentionally skipped. The configured Maps request test passed.
-- Keyless source run separately: 2 passed, confirming create/edit manual-coordinate fallback.
+- Backend `mvnw clean verify`: 589 tests passed, 1 existing application-context test skipped; the final two effective-entitlement edge tests also passed after the full run.
+- Real MySQL 8.4.11 payment integration: `RentalPaymentMySqlIT` passed against an isolated local server, covering users, property, units, lease, invoice, reconciliation, ledger entries and authorization queries.
+- Production-schema migration validation: a schema-only V71 export (132 tables and no row data) validated with no failed or pending Flyway migration. No migration is introduced by this release.
+- Frontend TypeScript and optimized production build: passed; 93 routes generated.
+- ESLint: 0 errors, 455 warnings within the 478-warning budget.
+- Playwright against the corrected optimized production artifact: 99 passed in one uninterrupted run; the one configured-Google-Maps test was intentionally skipped because the local artifact was built without the production browser key.
+- The formerly intermittent estate homeowner selector and multi-workspace selection each passed 10 consecutive production-artifact runs after their loading and persistence races were corrected.
 
 ## Remaining release gates
 
-1. Run authenticated staging journeys with representative Estate Manager, Homeowner, Sales Manager, Buyer and Super Admin accounts, including negative cross-property access tests.
-2. Build production with the restricted Google Maps key, then inspect browser console/referrer behavior on the real domain.
-3. Deploy backend before frontend, record immutable hashes and rollback artifacts, and monitor authorization failures, listing inquiries, invoice reconciliation and Maps errors.
+1. Provide or configure a staging URL plus dedicated Estate Manager, Homeowner, Sales Manager, Buyer and Super Admin test credentials, then run authenticated journeys and negative cross-property access tests. The repository currently contains only a production live-test target and no staging credentials.
+2. Attach and verify a representative payee payment account in staging, then exercise the complete property/estate/sale invoice checkout and callback journey. Production currently has no linked active property payment account, so this gate cannot be inferred from unit tests.
+3. Build the deployable frontend with the restricted Google Maps key, then inspect browser console/referrer behavior on the real staging domain.
+4. Restore an authenticated canonical Git remote and merge through the protected release workflow. The current backend checkout's `origin` points to a retired local hotfix path and reports `NO_REMOTE`.
+5. Deploy backend before frontend only after the above gates pass; record immutable hashes and rollback artifacts and monitor authorization failures, listing inquiries, invoice reconciliation and Maps errors.

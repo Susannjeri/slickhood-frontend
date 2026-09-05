@@ -143,11 +143,13 @@ export interface TeamResource { id: number; name: string; description?: string }
 export interface TeamInvitation { id: number; email: string; role: string; roleName: string; scopeType: TeamScopeType; resourceIds: number[]; status: TeamMembershipStatus; expiresAt: string; resendCount: number }
 export interface TeamMember { id: number; userId: number; email: string; name: string; role: string; roleName: string; scopeType: TeamScopeType; resourceIds: number[]; status: TeamMembershipStatus; acceptedAt?: string; activatedAt?: string }
 export interface TeamWorkspace { id: number; name: string; businessArea: string; owner: boolean; seatLimit: number; seatsUsed: number; roles: TeamRoleOption[]; resources: TeamResource[]; invitations: TeamInvitation[]; members: TeamMember[] }
+export interface TeamWorkspaceOption { id: number; name: string; businessArea: string; owner: boolean }
 export type TeamBusinessArea = "LANDLORD" | "ESTATE_MANAGEMENT" | "PROPERTY_SALE_MANAGEMENT";
 export type TeamPermissionTemplate = "WORKSPACE_ADMIN" | "PROPERTY_MANAGER" | "PROPERTY_ACCOUNTANT" | "LEASING_OFFICER" | "ESTATE_OPERATIONS_MANAGER" | "SECURITY_SUPERVISOR" | "GUARD" | "SALES_COORDINATOR" | "LISTING_AGENT" | "VIEWER";
 export interface TeamRoleDefinition { id: number; code: string; displayName: string; description?: string; businessArea: TeamBusinessArea; permissionTemplate: TeamPermissionTemplate; active: boolean }
 export interface TeamRoleDefinitionPayload { code: string; displayName: string; description?: string; businessArea: TeamBusinessArea; permissionTemplate: TeamPermissionTemplate }
 export const getTeamWorkspace = () => API.get("/team-access");
+export const getTeamWorkspaces = () => API.get<{ data: TeamWorkspaceOption[] }>("/team-access/workspaces");
 export const inviteTeamMember = (payload: { email: string; roleDefinitionId: number; scopeType: TeamScopeType; resourceIds: number[] }) => API.post("/team-access/invitations", payload);
 export const resendTeamInvitation = (id: number) => API.post(`/team-access/invitations/${id}/resend`);
 export const revokeTeamInvitation = (id: number) => API.delete(`/team-access/invitations/${id}`);
@@ -189,12 +191,15 @@ export const exportReport = (code: string, from: string, to: string) =>
   API.get(`/reports/${encodeURIComponent(code)}/export`, { params: { from, to }, responseType: "blob" });
 
 API.interceptors.request.use((config) => {
-  const { token, activeRole } = useAuthStore.getState();
+  const { token, activeRole, activeWorkspaceId } = useAuthStore.getState();
   if (token && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   if (activeRole?.title) {
     config.headers["X-Slickhood-Role"] = activeRole.title;
+  }
+  if (activeWorkspaceId) {
+    config.headers["X-Slickhood-Workspace"] = String(activeWorkspaceId);
   }
   return config;
 });
@@ -307,6 +312,10 @@ export interface UserListParams {
   role?: string;
 }
 
+export interface PropertyListParams extends UserListParams {
+  managementMode?: "RENTAL" | "SALE" | "SERVICE_CHARGE";
+}
+
 export interface UnitListParams {
   // 💡 'sort' is now explicitly optional in the interface
   sort?: string; 
@@ -393,7 +402,7 @@ export const supportedPropertyTypes = () => {
 export const fetchPropertyList = (
   // 🔑 Define defaults directly in the parameter object
   
-  params: UserListParams = { 
+  params: PropertyListParams = {
     sort: 'id,desc', // Default sort is 'id,desc'
     page: 0, 
     size: 14, 
@@ -401,9 +410,10 @@ export const fetchPropertyList = (
   },config: object = {}
 ) => {
   // Destructure the parameters, which will use the defaults if not provided by the caller
-  const { sort, page, size, search, role } = params;
+  const { sort, page, size, search, role, managementMode } = params;
   const roleParam = role ? `&role=${encodeURIComponent(role)}` : "";
-  const queryString = `?sort=${sort}&page=${page}&size=${size}&search=${search}${roleParam}`;
+  const modeParam = managementMode ? `&managementMode=${encodeURIComponent(managementMode)}` : "";
+  const queryString = `?sort=${encodeURIComponent(sort ?? "id,desc")}&page=${page ?? 0}&size=${size ?? 14}&search=${encodeURIComponent(search ?? "")}${roleParam}${modeParam}`;
    return API.get(`/property/list${queryString}`, 
     config
 );
@@ -532,7 +542,7 @@ export const fetchUnitList = (
   // convention for an optional filter (unverified live, but consistent
   // with how other optional list filters in this codebase are handled).
   const propertyIdParam = propertyId ? `&propertyId=${propertyId}` : '';
-  const queryString = `?sort=${sort}&page=${page}&size=${size}${propertyIdParam}&search=${search || ''}&leaseMode=${leaseMode || ''}`;
+  const queryString = `?sort=${encodeURIComponent(sort ?? "id,desc")}&page=${page ?? 0}&size=${size ?? 14}${propertyIdParam}&search=${encodeURIComponent(search || '')}&leaseMode=${encodeURIComponent(leaseMode || '')}`;
    return API.get(`/property/unit/list${queryString}`,
     config
 );

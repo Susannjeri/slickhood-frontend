@@ -30,6 +30,9 @@ export async function authenticated(context: BrowserContext, page: Page, role: T
   const token = testToken([persisted]);
   await context.addCookies([{ name: "token", value: token, domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
   await page.addInitScript(({ persistedRole }) => {
+    // Initialize once per browser tab. Real persisted auth state survives a
+    // full-page reload, which is required when a workspace boundary changes.
+    if (sessionStorage.getItem("slickhood-e2e-auth-initialized") === "true") return;
     localStorage.setItem("auth-storage", JSON.stringify({
       state: {
         mfaEnabled: false,
@@ -45,6 +48,7 @@ export async function authenticated(context: BrowserContext, page: Page, role: T
       },
       version: 0,
     }));
+    sessionStorage.setItem("slickhood-e2e-auth-initialized", "true");
   }, { persistedRole: persisted });
   await page.route("**/kyc/current", route => route.fulfill({ json: {
     success: true,

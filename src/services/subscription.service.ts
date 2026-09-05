@@ -41,6 +41,8 @@ export interface SubscriptionOverview {
   unitsUsed: number;
   cancellationScheduled: boolean;
   scheduledPlanCode: string | null;
+  effectiveFeatures: string[];
+  activeAddOns: { productKey: string; planCode: string; endAt: string | null; features: string[] }[];
 }
 
 export interface SubscriptionBillingItem {

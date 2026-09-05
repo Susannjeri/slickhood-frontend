@@ -106,21 +106,24 @@ test("business-area registration remains usable without horizontal overflow", as
 test("business-area loading failure is recoverable without restarting registration", async ({ page }) => {
   await page.route("https://accounts.google.com/**", route => route.abort());
   let attempts = 0;
+  let recoveryRequested = false;
   await page.route("**/role/list", route => {
     attempts += 1;
-    // React development Strict Mode mounts effects twice. Keep both initial
-    // reads unavailable so the test exercises the visible retry control.
-    if (attempts <= 2) return route.fulfill({ status: 503, json: { success: false, description: "Unavailable" } });
+    // Development Strict Mode may perform more than one initial read while a
+    // production build performs one. Keep the service unavailable until the
+    // user explicitly retries so the same recovery path is tested in both.
+    if (!recoveryRequested) return route.fulfill({ status: 503, json: { success: false, description: "Unavailable" } });
     return route.fulfill({ json: envelope([{ roleId: 101, roleName: "Landlord", selfAssignable: true }]) });
   });
 
   await page.goto("/role");
   const loadError = page.getByRole("alert").filter({ hasText: "could not load" });
   await expect(loadError).toContainText("could not load");
+  recoveryRequested = true;
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(loadError).toHaveCount(0);
   await expect(page.locator("article").filter({ hasText: "Rental Management" }).getByRole("button", { name: "Choose this area" })).toBeEnabled();
-  expect(attempts).toBe(3);
+  expect(attempts).toBeGreaterThanOrEqual(2);
 });
 
 test("verified registration continues to KYC before subscription activation", async ({ context, page }) => {

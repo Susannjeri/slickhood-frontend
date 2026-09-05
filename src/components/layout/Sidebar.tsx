@@ -1,6 +1,6 @@
 "use client"
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { sidebarLinks, sidebarSections, settingsLinks, type SidebarLink } from "@/config/sidebarConfig";
 import Can, { usePermissions } from "@/components/auth/Can";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -54,6 +54,7 @@ import JobsDrawer from "@/components/JobsDrawer";
 import { cn } from "@/lib/utils";
 import { businessAreaForRoleTitle, roleDisplayName, workspaceHrefForRole } from "@/config/businessAreas";
 import { getSubscriptionOverview, subscriptionRoleForTitle } from "@/services/subscription.service";
+import { getTeamWorkspaces, TeamWorkspaceOption } from "@/lib/api";
 
 const commitHash = process.env.NEXT_PUBLIC_COMMIT_HASH || "unknown";
 const githubUrl = `https://github.com/naphtron/PMS/${commitHash}`;
@@ -99,6 +100,8 @@ export default function AppSidebar() {
   const activeRole = useAuthStore((s) => s.activeRole);
   const setActiveRole = useAuthStore((s) => s.setActiveRole);
   const setSelectedBusinessAreaId = useAuthStore((s) => s.setSelectedBusinessAreaId);
+  const activeWorkspaceId = useAuthStore((s) => s.activeWorkspaceId);
+  const setActiveWorkspaceId = useAuthStore((s) => s.setActiveWorkspaceId);
   const switching = useAuthStore((s) => s.switching);
   const setSwitching = useAuthStore((s) => s.setSwitching);
 
@@ -111,6 +114,8 @@ export default function AppSidebar() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
   const [subscriptionEntitlements, setSubscriptionEntitlements] = useState<{ scope: string; features: Set<string> } | null>(null);
+  const [workspaces, setWorkspaces] = useState<TeamWorkspaceOption[]>([]);
+  const workspaceRequestId = useRef(0);
   const activeBusinessArea = businessAreaForRoleTitle(activeRole?.title);
   const entitlementScope = activeBusinessArea ? `${activeRole?.title}:${activeBusinessArea.subscriptionProduct}` : null;
 
@@ -126,7 +131,7 @@ export default function AppSidebar() {
       .then(response => {
         if (!current) return;
         const overview = response.data.data?.[0];
-        const enabled = overview?.subscription?.planDetails?.features
+        const enabled = overview?.effectiveFeatures ?? overview?.subscription?.planDetails?.features
           ?.filter(feature => feature.enabled)
           .map(feature => feature.featureKey) ?? [];
         setSubscriptionEntitlements({ scope, features: new Set(enabled) });
@@ -136,6 +141,20 @@ export default function AppSidebar() {
       .catch(() => { /* Preserve permission navigation; backend remains authoritative. */ });
     return () => { current = false; };
   }, [activeBusinessArea, activeRole?.title, token]);
+
+  useEffect(() => {
+    if (!token || !activeRole) { workspaceRequestId.current += 1; setWorkspaces([]); return; }
+    const currentRequestId = ++workspaceRequestId.current;
+    void getTeamWorkspaces().then(response => {
+      if (workspaceRequestId.current !== currentRequestId) return;
+      const options = response.data.data ?? [];
+      setWorkspaces(options);
+      if (options.length === 1 && activeWorkspaceId !== options[0].id) setActiveWorkspaceId(options[0].id);
+      if (activeWorkspaceId && !options.some(option => option.id === activeWorkspaceId)) {
+        setActiveWorkspaceId(options.length === 1 ? options[0].id : null);
+      }
+    }).catch(() => { if (workspaceRequestId.current === currentRequestId) setWorkspaces([]); });
+  }, [activeRole?.title, activeWorkspaceId, setActiveWorkspaceId, token]);
 
   const subscriptionAllows = (link: SidebarLink) => !link.subscriptionFeatures?.length
     || entitlementScope === null
@@ -157,6 +176,7 @@ export default function AppSidebar() {
     setTimeout(() => {
       setActiveRole(role);
       setSelectedBusinessAreaId(businessAreaForRoleTitle(role.title)?.id ?? null);
+      setActiveWorkspaceId(null);
       router.push(workspaceHrefForRole(role.title));
       setTimeout(() => setSwitching(false), 500);
     }, 50);
@@ -274,6 +294,28 @@ export default function AppSidebar() {
                   {roles.length > 1 && <p className="text-xs text-muted-foreground">Click to switch role</p>}
                 </TooltipContent>
               </Tooltip>
+            </div>
+          )}
+
+          {open && workspaces.length > 1 && (
+            <div className="px-2 pb-2">
+              <label htmlFor="active-workspace" className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#08184A]/55 dark:text-white/55">
+                Workspace
+              </label>
+              <select
+                id="active-workspace"
+                value={activeWorkspaceId ?? ""}
+                onChange={event => {
+                  setActiveWorkspaceId(Number(event.target.value));
+                  // A workspace switch changes the authorization boundary for every open panel.
+                  // Reload so no data fetched for the previous workspace remains on screen.
+                  window.location.reload();
+                }}
+                className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-[#08184A]"
+              >
+                <option value="" disabled>Choose workspace</option>
+                {workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
+              </select>
             </div>
           )}
 

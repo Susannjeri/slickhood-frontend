@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -14,14 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { EstateOperationsPanel } from "@/components/estate/EstateOperationsPanel";
 import RequireRole from "@/components/auth/RequireRole";
-import { fetchPropertyList, fetchUnitList } from "@/lib/api";
 import { apiErrorMessage } from "@/lib/api-error";
+import { usePagedBusinessProperties, usePagedBusinessUnits } from "@/hooks/usePagedBusinessOptions";
 import { estateService } from "@/services/business-workflows.service";
 import { useAuthStore } from "@/store/authStore";
 import { EstateServiceCharge, PropertyOwnership } from "@/types/business-workflows";
-
-type UnitOption = { unitId: number; propertyId: number; ref: string; currency?: string };
-type PropertyOption = { id: number; name: string; managementMode?: string };
 
 export default function EstatePage() {
   const router = useRouter();
@@ -37,11 +34,8 @@ export default function EstatePage() {
     ? String(requestedPropertyId) : "all";
 
   const [propertyFilter, setPropertyFilter] = useState(initialPropertyId);
-  const [properties, setProperties] = useState<PropertyOption[]>([]);
-  const [propertiesLoading, setPropertiesLoading] = useState(canManage && Boolean(token));
   const [items, setItems] = useState<PropertyOwnership[]>([]);
   const [charges, setCharges] = useState<EstateServiceCharge[]>([]);
-  const [units, setUnits] = useState<UnitOption[]>([]);
   const [assignmentUnitId, setAssignmentUnitId] = useState("");
   const [busy, setBusy] = useState(false);
   const [endingOwnership, setEndingOwnership] = useState<PropertyOwnership | null>(null);
@@ -53,33 +47,15 @@ export default function EstatePage() {
   const [chargeDue, setChargeDue] = useState(new Date().toISOString().slice(0, 10));
   const [chargeDescription, setChargeDescription] = useState("Service charge");
   const queryScopeApplied = useRef(false);
+  const propertyOptions = usePagedBusinessProperties(canManage && Boolean(token), "SERVICE_CHARGE",
+    scopedPropertyIds.map((id, index) => ({ id, name: scopedPropertyNames[index] ?? `Estate ${id}`, managementMode: "SERVICE_CHARGE" })));
+  const properties = propertyOptions.items;
+  const propertiesLoading = propertyOptions.loading;
+  const unitOptions = usePagedBusinessUnits(canManage, propertyFilter === "all" ? null : Number(propertyFilter), "SERVICE_CHARGE");
+  const units = unitOptions.items;
 
-  const tokenProperties = useMemo(() => scopedPropertyIds.map((id, index) => ({
-    id, name: scopedPropertyNames[index] ?? `Property #${id}`,
-  })), [scopedPropertyIds, scopedPropertyNames]);
-
-  useEffect(() => {
-    if (!canManage || !token) {
-      return;
-    }
-    let current = true;
-    void fetchPropertyList({ page: 0, size: 100, sort: "name,asc" }, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(response => {
-        if (!current) return;
-        const available = ((response.data?.data ?? []) as PropertyOption[])
-          .filter(property => property.managementMode === "SERVICE_CHARGE");
-        setProperties(available);
-      })
-      .catch((error: unknown) => {
-        if (!current) return;
-        setProperties(tokenProperties);
-        toast.error(apiErrorMessage(error, "Could not load your estate properties."));
-      })
-      .finally(() => { if (current) setPropertiesLoading(false); });
-    return () => { current = false; };
-  }, [canManage, token, tokenProperties]);
+  useEffect(() => { if (propertyOptions.error) toast.error(apiErrorMessage(propertyOptions.error, "Could not load your estate properties.")); }, [propertyOptions.error]);
+  useEffect(() => { if (unitOptions.error) toast.error(apiErrorMessage(unitOptions.error, "Could not load homes for this estate.")); }, [unitOptions.error]);
 
   useEffect(() => {
     if (!queryScopeApplied.current && Number.isSafeInteger(requestedPropertyId) && properties.some(property => property.id === requestedPropertyId)) {
@@ -104,18 +80,6 @@ export default function EstatePage() {
 
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
-  useEffect(() => {
-    if (!canManage || propertyFilter === "all") {
-      return;
-    }
-    let current = true;
-    void fetchUnitList({ page: 0, size: 100, propertyId: Number(propertyFilter), leaseMode: "SERVICE_CHARGE", sort: "ref,asc" }, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(response => { if (current) setUnits((response.data.data ?? []) as UnitOption[]); })
-      .catch((error: unknown) => toast.error(apiErrorMessage(error, "Could not load homes for this estate.")));
-    return () => { current = false; };
-  }, [canManage, propertyFilter, token]);
 
   async function endOwnership(event: FormEvent) {
     event.preventDefault();
@@ -163,12 +127,12 @@ export default function EstatePage() {
   <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div><p className="text-sm font-semibold uppercase tracking-[.18em] text-[#EF4217]">SlickHood Estates</p><h1 className="mt-1 text-3xl font-bold">{canManage ? "Estate Management" : "My Home"}</h1><p className="text-muted-foreground">{canManage ? "Manage homeowner onboarding, ownership history, service charges and estate operations." : "View your homes, service charges, balances and payment documents."}</p></div>
-      {canManage && <div className="w-full sm:w-72"><Label id="estate-filter-label" htmlFor="estate-filter">Estate</Label><Select value={propertyFilter} onValueChange={value => { setPropertyFilter(value); setAssignmentUnitId(""); setUnits([]); }} disabled={propertiesLoading}><SelectTrigger id="estate-filter" aria-labelledby="estate-filter-label"><SelectValue placeholder={propertiesLoading ? "Loading estates…" : "Select an estate"} /></SelectTrigger><SelectContent><SelectItem value="all">All estates</SelectItem>{properties.map(property => <SelectItem key={property.id} value={String(property.id)}>{property.name}</SelectItem>)}</SelectContent></Select>{!propertiesLoading && properties.length === 0 && <p className="mt-2 text-sm text-amber-700">No estate properties are available. Create a property with the Estate Management business area first.</p>}</div>}
+      {canManage && <div className="w-full sm:w-80"><Label id="estate-filter-label" htmlFor="estate-filter">Estate</Label><Input className="mb-2" value={propertyOptions.search} onChange={event=>propertyOptions.setSearch(event.target.value)} placeholder="Search estates…"/><Select value={propertyFilter} onValueChange={value => { setPropertyFilter(value); setAssignmentUnitId(""); }} disabled={propertiesLoading&&properties.length===0}><SelectTrigger id="estate-filter" aria-labelledby="estate-filter-label"><SelectValue placeholder={propertiesLoading ? "Loading estates…" : "Select an estate"} /></SelectTrigger><SelectContent><SelectItem value="all">All estates</SelectItem>{properties.map(property => <SelectItem key={property.id} value={String(property.id)}>{property.name}</SelectItem>)}</SelectContent></Select>{propertyOptions.hasMore&&<Button type="button" size="sm" variant="outline" className="mt-2" onClick={propertyOptions.loadMore} disabled={propertiesLoading}>Load more estates</Button>}{!propertiesLoading && properties.length === 0 && <p className="mt-2 text-sm text-amber-700">No estate properties are available. Create a property with the Estate Management business area first.</p>}</div>}
     </div>
 
     {!canManage && <div className="grid gap-4 sm:grid-cols-3"><Card><CardHeader className="pb-2"><CardDescription>Owned units</CardDescription><CardTitle>{currentOwnerships.length}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Outstanding balance</CardDescription><CardTitle>{outstandingLabel}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Overdue charges</CardDescription><CardTitle className={overdue.length ? "text-red-600" : "text-emerald-600"}>{overdue.length}</CardTitle></CardHeader></Card></div>}
 
-    {canManage && <Card><CardHeader><CardTitle>Assign a homeowner</CardTitle><CardDescription>Select an estate and home, then use its secure, email-bound one-time invitation. Ownership activates only after the invited person accepts.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end"><div className="min-w-0 flex-1"><Label id="assignment-home-label" htmlFor="assignment-home">Home</Label><Select value={assignmentUnitId} onValueChange={setAssignmentUnitId} disabled={propertyFilter === "all"}><SelectTrigger id="assignment-home" aria-labelledby="assignment-home-label"><SelectValue placeholder={propertyFilter === "all" ? "Select an estate first" : "Select a home"} /></SelectTrigger><SelectContent>{units.map(unit => <SelectItem key={unit.unitId} value={String(unit.unitId)}>{unit.ref}</SelectItem>)}</SelectContent></Select></div><Button className="bg-[#EF4217]" disabled={!assignmentUnitId} onClick={() => router.push(`/dashboard/unit/details/${assignmentUnitId}?p=${propertyFilter}&from=homeowners`)}>Open home & invite</Button></CardContent></Card>}
+    {canManage && <Card><CardHeader><CardTitle>Assign a homeowner</CardTitle><CardDescription>Select an estate and home, then use its secure, email-bound one-time invitation. Ownership activates only after the invited person accepts.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end"><div className="min-w-0 flex-1"><Label id="assignment-home-label" htmlFor="assignment-home">Home</Label><Input className="mb-2" value={unitOptions.search} onChange={event=>unitOptions.setSearch(event.target.value)} placeholder="Search homes…" disabled={propertyFilter==="all"}/><Select value={assignmentUnitId} onValueChange={setAssignmentUnitId} disabled={propertyFilter === "all"||(unitOptions.loading&&units.length===0)}><SelectTrigger id="assignment-home" aria-labelledby="assignment-home-label"><SelectValue placeholder={propertyFilter === "all" ? "Select an estate first" : unitOptions.loading?"Loading homes…":"Select a home"} /></SelectTrigger><SelectContent>{units.map(unit => <SelectItem key={unit.unitId} value={String(unit.unitId)}>{unit.ref}</SelectItem>)}</SelectContent></Select>{unitOptions.hasMore&&<Button type="button" size="sm" variant="outline" className="mt-2" onClick={unitOptions.loadMore} disabled={unitOptions.loading}>Load more homes</Button>}</div><Button className="bg-[#EF4217]" disabled={!assignmentUnitId} onClick={() => router.push(`/dashboard/unit/details/${assignmentUnitId}?p=${propertyFilter}&from=homeowners`)}>Open home & invite</Button></CardContent></Card>}
 
     <Card><CardHeader><CardTitle>Ownership registry</CardTitle><CardDescription>Current and historical records are retained for audit and financial continuity.</CardDescription></CardHeader><CardContent className="space-y-3">{items.length === 0 && <p className="py-8 text-center text-muted-foreground">No ownership records in this scope.</p>}{items.map(item => <div key={item.id} className="flex flex-col justify-between gap-3 rounded-lg border p-4 sm:flex-row sm:items-center"><div><div className="flex flex-wrap items-center gap-2"><strong>{item.homeownerName || item.homeownerEmail}</strong><Badge variant={item.active ? "default" : "outline"}>{item.active ? "Current" : "Historical"}</Badge></div><p className="text-sm text-muted-foreground">{item.homeownerEmail} · {item.propertyName}{item.unitRef ? ` / ${item.unitRef}` : ""} · {item.ownershipStart}{item.ownershipEnd ? ` to ${item.ownershipEnd}` : " to present"}</p>{item.terminationReason && <p className="mt-1 text-sm text-muted-foreground">Reason: {item.terminationReason}</p>}</div>{canManage && item.active && <div className="flex flex-wrap gap-2"><Button size="sm" asChild><Link href={`/dashboard/documents?propertyId=${item.propertyId}&recipientUserId=${item.homeownerUserId}&type=ESTATE_RESIDENTIAL_AGREEMENT`}>Residential agreement</Link></Button><Button size="sm" variant="outline" onClick={() => { setEndingOwnership(item); setEndDate(new Date().toISOString().slice(0, 10)); }}>End ownership</Button></div>}</div>)}</CardContent></Card>
 
