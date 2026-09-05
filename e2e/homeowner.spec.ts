@@ -60,9 +60,9 @@ test("service-charge unit sends an email-bound homeowner invite rather than expo
 test("similar unit generation submits the requested number of additional units", async ({ page }) => {
   await page.route("**/property/unit/create/similar**", route => route.fulfill({ json: envelope([]) }));
   await page.goto("/dashboard/unit/details/77?p=11&from=homeowners");
-  await page.getByRole("tab", { name: "Listing" }).click();
+  await expect(page.getByRole("button", { name: "Create Similar Units" })).toBeVisible();
   await page.getByRole("button", { name: "Create Similar Units" }).click();
-  await page.getByLabel("Number of Units (1-49)").fill("12");
+  await page.getByLabel("Number of additional units (1–49)").fill("12");
   const requestPromise = page.waitForRequest(request => request.url().includes("/property/unit/create/similar") && request.method() === "PATCH");
   await page.getByRole("button", { name: "Create 12 Units" }).click();
   const request = await requestPromise;

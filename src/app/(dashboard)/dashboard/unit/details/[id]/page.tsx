@@ -1096,8 +1096,8 @@ export default function ViewUnitPage() {
               </CardContent>
             </Card>
 
-            {/* Action cards row: Tenant · Lease · Listing */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Primary unit actions: Tenant · Lease · Listing · Similar units */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
               {/* Tenant card */}
               <CanProperty propertyId={Number(propertyId)} permissions={["view_tenants"]}>
                 <Card>
@@ -1189,6 +1189,77 @@ export default function ViewUnitPage() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Similar units belongs with day-to-day unit management, not listing setup. */}
+              <CanProperty
+                propertyId={Number(propertyId)}
+                permissions={["create_similar_unit"]}
+                fallback={(
+                  <Card className="border-dashed">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base font-semibold" style={{ color: "#141130" }}>Similar Units</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-gray-500">Your current property role cannot create units from this template.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              >
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base font-semibold" style={{ color: "#141130" }}>Similar Units</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-gray-500">Create 1–49 additional units using Unit {unit.ref} as the template.</p>
+                    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="w-full text-white" style={{ backgroundColor: "#EF4217" }}>
+                          <Copy className="w-4 h-4 mr-2" />Create Similar Units
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle style={{ color: "#141130" }}>Create Similar Units</DialogTitle>
+                          <DialogDescription>Create multiple units with the same specifications as Unit {unit.ref}.</DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-6 py-4">
+                          <div className="flex gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                            <p className="text-sm text-gray-700">Each unit receives its own reference. The job runs in the background and sends an email when it finishes.</p>
+                          </div>
+                          <div className="space-y-3">
+                            <Label htmlFor="similar-units-count" className="text-sm font-medium" style={{ color: "#141130" }}>Number of additional units (1–49)</Label>
+                            <div className="flex items-center gap-3">
+                              <Button variant="outline" size="icon" onClick={decrementCount} disabled={similarUnitsCount <= 1 || isCreatingSimilar} className="h-12 w-12" aria-label="Decrease unit count">
+                                <Minus className="w-5 h-5" />
+                              </Button>
+                              <Input id="similar-units-count" type="number" min="1" max="49" value={similarUnitsCount} onChange={handleCountChange} disabled={isCreatingSimilar} className="h-12 text-center text-2xl font-bold" style={{ color: "#141130" }} />
+                              <Button variant="outline" size="icon" onClick={incrementCount} disabled={similarUnitsCount >= 49 || isCreatingSimilar} className="h-12 w-12" aria-label="Increase unit count">
+                                <Plus className="w-5 h-5" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="space-y-2 p-4 bg-gray-50 rounded-lg border">
+                            <p className="text-xs font-semibold text-gray-500 uppercase">Template unit</p>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div><span className="text-gray-600">Type:</span><span className="ml-2 font-medium" style={{ color: "#141130" }}>{resolveUnitTypeLabel(unit.unitType)}</span></div>
+                              <div><span className="text-gray-600">Size:</span><span className="ml-2 font-medium" style={{ color: "#141130" }}>{unit.size} {unit.measurementUnits.name}</span></div>
+                              <div><span className="text-gray-600">Price:</span><span className="ml-2 font-medium" style={{ color: "#EF4217" }}>{unit.currency} {formatUnitPrice(unit.price)}</span></div>
+                              <div><span className="text-gray-600">Lease:</span><span className="ml-2 font-medium capitalize" style={{ color: "#141130" }}>{unit.leaseMode}</span></div>
+                            </div>
+                          </div>
+                        </div>
+                        <DialogFooter className="flex-col sm:flex-row gap-2">
+                          <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isCreatingSimilar} className="w-full sm:w-auto">Cancel</Button>
+                          <Button type="button" onClick={handleCreateSimilar} disabled={isCreatingSimilar} className="w-full sm:w-auto text-white hover:opacity-90" style={{ backgroundColor: "#EF4217" }}>
+                            {isCreatingSimilar ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</> : <><Copy className="w-4 h-4 mr-2" />Create {similarUnitsCount} Unit{similarUnitsCount > 1 ? "s" : ""}</>}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </CardContent>
+                </Card>
+              </CanProperty>
             </div>
           </TabsContent>
 
@@ -1577,69 +1648,6 @@ export default function ViewUnitPage() {
                 </CardContent>
               </Card>
 
-              {/* Create Similar Units */}
-              <CanProperty propertyId={Number(propertyId)} permissions={["create_similar_unit"]}>
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base font-semibold" style={{ color: "#141130" }}>Similar Units</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-gray-500">Create multiple units with the same specifications as Unit {unit.ref}.</p>
-                    <div className="p-3 bg-gray-50 rounded-lg border text-sm space-y-1.5">
-                      <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Template</p>
-                      <div className="flex justify-between"><span className="text-gray-500">Type</span><span className="font-medium" style={{ color: "#141130" }}>{resolveUnitTypeLabel(unit.unitType)}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Size</span><span className="font-medium" style={{ color: "#141130" }}>{unit.size} {unit.measurementUnits.name}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Price</span><span className="font-medium" style={{ color: "#EF4217" }}>{unit.currency} {formatUnitPrice(unit.price)}</span></div>
-                    </div>
-                    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="w-full border-[#EF4217] text-[#EF4217] hover:bg-[#EF4217]/5">
-                          <Copy className="w-4 h-4 mr-2" />Create Similar Units
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle style={{ color: "#141130" }}>Create Similar Units</DialogTitle>
-                          <DialogDescription>Create multiple units with the same specifications as Unit {unit.ref}</DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-6 py-4">
-                          <div className="flex gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                            <p className="text-sm text-gray-700">Action will run in the background and a notification will be sent to your email once completed.</p>
-                          </div>
-                          <div className="space-y-3">
-                            <Label htmlFor="similar-units-count" className="text-sm font-medium" style={{ color: "#141130" }}>Number of Units (1-49)</Label>
-                            <div className="flex items-center gap-3">
-                              <Button variant="outline" size="icon" onClick={decrementCount} disabled={similarUnitsCount <= 1 || isCreatingSimilar} className="h-12 w-12">
-                                <Minus className="w-5 h-5" />
-                              </Button>
-                              <Input id="similar-units-count" type="number" min="1" max="49" value={similarUnitsCount} onChange={handleCountChange} disabled={isCreatingSimilar} className="h-12 text-center text-2xl font-bold" style={{ color: "#141130" }} />
-                              <Button variant="outline" size="icon" onClick={incrementCount} disabled={similarUnitsCount >= 49 || isCreatingSimilar} className="h-12 w-12">
-                                <Plus className="w-5 h-5" />
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="space-y-2 p-4 bg-gray-50 rounded-lg border">
-                            <p className="text-xs font-semibold text-gray-500 uppercase">Template Unit</p>
-                            <div className="grid grid-cols-2 gap-2 text-sm">
-                              <div><span className="text-gray-600">Type:</span><span className="ml-2 font-medium" style={{ color: "#141130" }}>{resolveUnitTypeLabel(unit.unitType)}</span></div>
-                              <div><span className="text-gray-600">Size:</span><span className="ml-2 font-medium" style={{ color: "#141130" }}>{unit.size} {unit.measurementUnits.name}</span></div>
-                              <div><span className="text-gray-600">Price:</span><span className="ml-2 font-medium" style={{ color: "#EF4217" }}>{unit.currency} {formatUnitPrice(unit.price)}</span></div>
-                              <div><span className="text-gray-600">Lease:</span><span className="ml-2 font-medium capitalize" style={{ color: "#141130" }}>{unit.leaseMode}</span></div>
-                            </div>
-                          </div>
-                        </div>
-                        <DialogFooter className="flex-col sm:flex-row gap-2">
-                          <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={isCreatingSimilar} className="w-full sm:w-auto">Cancel</Button>
-                          <Button type="button" onClick={handleCreateSimilar} disabled={isCreatingSimilar} className="w-full sm:w-auto text-white hover:opacity-90" style={{ backgroundColor: "#EF4217" }}>
-                            {isCreatingSimilar ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creating...</> : <><Copy className="w-4 h-4 mr-2" />Create {similarUnitsCount} Unit{similarUnitsCount > 1 ? "s" : ""}</>}
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </CardContent>
-                </Card>
-              </CanProperty>
             </div>
           </TabsContent>
         </Tabs>
