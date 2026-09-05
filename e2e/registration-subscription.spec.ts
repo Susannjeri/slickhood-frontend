@@ -108,7 +108,9 @@ test("business-area loading failure is recoverable without restarting registrati
   let attempts = 0;
   await page.route("**/role/list", route => {
     attempts += 1;
-    if (attempts === 1) return route.fulfill({ status: 503, json: { success: false, description: "Unavailable" } });
+    // React development Strict Mode mounts effects twice. Keep both initial
+    // reads unavailable so the test exercises the visible retry control.
+    if (attempts <= 2) return route.fulfill({ status: 503, json: { success: false, description: "Unavailable" } });
     return route.fulfill({ json: envelope([{ roleId: 101, roleName: "Landlord", selfAssignable: true }]) });
   });
 
@@ -118,7 +120,7 @@ test("business-area loading failure is recoverable without restarting registrati
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(loadError).toHaveCount(0);
   await expect(page.locator("article").filter({ hasText: "Rental Management" }).getByRole("button", { name: "Choose this area" })).toBeEnabled();
-  expect(attempts).toBe(2);
+  expect(attempts).toBe(3);
 });
 
 test("verified registration continues to KYC before subscription activation", async ({ context, page }) => {
@@ -267,12 +269,18 @@ test("adding a business area rechecks KYC before exposing the new workspace", as
     { roleId: 101, roleName: "Landlord", selfAssignable: true },
     { roleId: 103, roleName: "SalesAgent", selfAssignable: true },
   ]) }));
-  await page.route("**/role/self-assign?roleId=103", route => route.fulfill({ json: envelope([{ roleId: 103, kycRequired: true }]) }));
-  await page.route("**/browser-session/refresh", route => route.fulfill({ json: envelope([]) }));
-  let tokenReads = 0;
+  let assigned = false;
+  await page.route("**/role/self-assign?roleId=103", route => {
+    assigned = true;
+    return route.fulfill({ json: envelope([{ roleId: 103, kycRequired: true }]) });
+  });
+  const expandedToken = testToken([landlord, { title: "SalesAgent", permissions: [] }]);
+  await page.route("**/browser-session/refresh", route => route.fulfill({
+    json: envelope([]),
+    headers: { "Set-Cookie": `token=${expandedToken}; Path=/; HttpOnly; SameSite=Lax` },
+  }));
   await page.route("**/browser-session/get-token", route => {
-    tokenReads += 1;
-    const roles = tokenReads === 1 ? [landlord] : [landlord, { title: "SalesAgent", permissions: [] }];
+    const roles = assigned ? [landlord, { title: "SalesAgent", permissions: [] }] : [landlord];
     return route.fulfill({ json: { data: { jwt: testToken(roles) } } });
   });
   await page.route("**/kyc/current", route => route.fulfill({ json: envelope([{

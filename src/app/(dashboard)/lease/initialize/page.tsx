@@ -133,7 +133,10 @@ export default function LeaseInitializePage() {
         setUnitDetails(unit);
         await getUnitTypes(unit.propertyType);
         // Load unit images using inviteToken
-        const allImages = [unit.thumbnail, ...(unit.images || [])];
+        // Legacy invitations can contain an empty thumbnail. Skipping blank
+        // storage keys prevents the tenant journey waiting on an invalid file.
+        const allImages = [unit.thumbnail, ...(unit.images || [])]
+          .filter((imagePath): imagePath is string => Boolean(imagePath?.trim()));
         await loadUnitImages(allImages);
 
         // Load unit charges using inviteToken

@@ -159,6 +159,10 @@ function formatDate(dateString: string) {
   });
 }
 
+function formatUnitPrice(price: number | null | undefined) {
+  return Number.isFinite(Number(price)) ? Number(price).toLocaleString() : "Not set";
+}
+
 function resolveLeaseSignState(tenant: Tenant): LeaseSignState {
   const { tenantSignedDate, managerSignedDate, signedByManagerName } = tenant;
   if (!tenantSignedDate && !managerSignedDate) return { kind: "both_pending" };
@@ -1034,7 +1038,7 @@ export default function ViewUnitPage() {
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between py-1 border-b border-gray-50">
                       <span className="text-gray-500">Base Rent</span>
-                      <span className="font-semibold" style={{ color: "#141130" }}>{unit.currency} {unit.price.toLocaleString()}</span>
+                      <span className="font-semibold" style={{ color: "#141130" }}>{unit.currency} {formatUnitPrice(unit.price)}</span>
                     </div>
                     {loadingCharges ? (
                       <div className="flex items-center gap-2 py-2">
@@ -1580,7 +1584,7 @@ export default function ViewUnitPage() {
                       <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Template</p>
                       <div className="flex justify-between"><span className="text-gray-500">Type</span><span className="font-medium" style={{ color: "#141130" }}>{resolveUnitTypeLabel(unit.unitType)}</span></div>
                       <div className="flex justify-between"><span className="text-gray-500">Size</span><span className="font-medium" style={{ color: "#141130" }}>{unit.size} {unit.measurementUnits.name}</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Price</span><span className="font-medium" style={{ color: "#EF4217" }}>{unit.currency} {unit.price.toLocaleString()}</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">Price</span><span className="font-medium" style={{ color: "#EF4217" }}>{unit.currency} {formatUnitPrice(unit.price)}</span></div>
                     </div>
                     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                       <DialogTrigger asChild>
@@ -1615,7 +1619,7 @@ export default function ViewUnitPage() {
                             <div className="grid grid-cols-2 gap-2 text-sm">
                               <div><span className="text-gray-600">Type:</span><span className="ml-2 font-medium" style={{ color: "#141130" }}>{resolveUnitTypeLabel(unit.unitType)}</span></div>
                               <div><span className="text-gray-600">Size:</span><span className="ml-2 font-medium" style={{ color: "#141130" }}>{unit.size} {unit.measurementUnits.name}</span></div>
-                              <div><span className="text-gray-600">Price:</span><span className="ml-2 font-medium" style={{ color: "#EF4217" }}>{unit.currency} {unit.price.toLocaleString()}</span></div>
+                              <div><span className="text-gray-600">Price:</span><span className="ml-2 font-medium" style={{ color: "#EF4217" }}>{unit.currency} {formatUnitPrice(unit.price)}</span></div>
                               <div><span className="text-gray-600">Lease:</span><span className="ml-2 font-medium capitalize" style={{ color: "#141130" }}>{unit.leaseMode}</span></div>
                             </div>
                           </div>

@@ -79,6 +79,6 @@ test("reports stay bounded, require deliberate filters, and support forward leas
   await page.getByLabel("Report").selectOption("LEASE_EXPIRY");
   await expect(page.getByText("Forward looking")).toBeVisible();
   await expect(page.getByLabel("From")).toHaveValue(today);
-  await expect(page.getByLabel("To")).toHaveValue(plusDays(today, 90));
+  await expect(page.getByLabel("To", { exact: true })).toHaveValue(plusDays(today, 90));
   await expect.poll(() => requests.at(-1)).toMatchObject({ code: "LEASE_EXPIRY", from: today, to: plusDays(today, 90) });
 });

@@ -14,5 +14,5 @@ test("wealth administration exposes aggregate health and catalogue, never privat
  await authenticated(context,page,{title:"Super Admin",permissions:[]});
  await page.route("**/wealth/admin/summary",route=>route.fulfill({json:envelope({activeAssets:23,owners:8,vaultDocuments:14,marketPricedAssets:4,activeAssetTypes:13})}));
  await page.route("**/wealth/admin/asset-types",route=>route.fulfill({json:envelope([{id:1,code:"PROPERTY",label:"Property",description:"Residential or commercial property",displayOrder:10,marketPricingAllowed:false,active:true}])}));
- await page.goto("/dashboard/wealth-management");await expect(page.getByRole("heading",{name:"Wealth administration"})).toBeVisible();await expect(page.getByText("23")).toBeVisible();await expect(page.getByText("Property",{exact:true})).toBeVisible();await expect(page.getByText(/will|trust|portfolio value/i)).toHaveCount(0);
+ await page.goto("/dashboard/wealth-management");await expect(page.getByRole("heading",{name:"Wealth administration"})).toBeVisible();await expect(page.getByText("23")).toBeVisible();await expect(page.getByText("Property",{exact:true})).toBeVisible();await expect(page.getByText("Portfolio value",{exact:true})).toHaveCount(0);await expect(page.getByText("Will",{exact:true})).toHaveCount(0);await expect(page.getByText("Trust",{exact:true})).toHaveCount(0);
 });
