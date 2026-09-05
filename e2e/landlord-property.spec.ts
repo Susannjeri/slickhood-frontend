@@ -17,6 +17,7 @@ test.beforeEach(async ({ context, page }) => {
 });
 
 test("property creation remains usable when Google Maps is not configured", async ({ page }) => {
+  test.skip(process.env.E2E_HAS_GOOGLE_MAPS === "true", "Production artifact contains the Google Maps key");
   const mapRequests: string[] = [];
   page.on("request", request => {
     if (request.url().includes("maps.googleapis.com/maps/api/js")) mapRequests.push(request.url());
@@ -33,6 +34,42 @@ test("property creation remains usable when Google Maps is not configured", asyn
   await coordinates.fill("-1.286389, 36.817223");
   await expect(coordinates).toHaveValue("-1.286389, 36.817223");
   expect(mapRequests).toHaveLength(0);
+});
+
+test("property editing remains usable when Google Maps is not configured", async ({ page }) => {
+  test.skip(process.env.E2E_HAS_GOOGLE_MAPS === "true", "Production artifact contains the Google Maps key");
+  await page.route("**/property/list?propertyId=41", route => route.fulfill({ json: envelope([{
+    id: 41,
+    name: "Green Court",
+    type: "APARTMENT_BLOCK",
+    address: "Nairobi, Kenya",
+    mapLocation: "-1.286389,36.817223",
+    currency: "KES",
+    thumbnail: "",
+    imagePathMask: "",
+  }]) }));
+
+  await page.goto("/dashboard/property/properties/edit/41");
+
+  await expect(page.getByText(/Map search is temporarily unavailable/i)).toBeVisible();
+  const coordinates = page.getByLabel("Coordinates (Latitude, Longitude) *");
+  await expect(coordinates).toBeEditable();
+  await coordinates.fill("-1.292100,36.821900");
+  await expect(coordinates).toHaveValue("-1.292100,36.821900");
+});
+
+test("property creation loads Google Maps when the production key is configured", async ({ page }) => {
+  test.skip(process.env.E2E_HAS_GOOGLE_MAPS !== "true", "Source fallback run has no Google Maps key");
+  const mapsRequest = page.waitForRequest(
+    request => request.url().startsWith("https://maps.googleapis.com/maps/api/js"),
+    { timeout: 15_000 },
+  );
+
+  await page.goto("/dashboard/property/create");
+  await page.getByRole("button", { name: /Rental property/i }).click();
+
+  await mapsRequest;
+  await expect(page.getByText(/Map search is temporarily unavailable/i)).toHaveCount(0);
 });
 
 test("property creation preserves the selected management workflow", async ({ page }) => {

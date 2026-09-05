@@ -17,21 +17,19 @@ import {
   Loader2,
   ArrowLeft,
 } from "lucide-react";
-import {
-  GoogleMap,
-  Marker,
-  useLoadScript
-} from "@react-google-maps/api";
 import { useRouter, useParams } from "next/navigation";
 import { currencyOptions } from "@/lib/actions";
 
 import dynamic from "next/dynamic";
 import {usePropertyMetadata} from "@/app/(dashboard)/dashboard/property/propertyMetadata";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
-import PlaceAutocompleteInput from "@/components/maps/PlaceAutocompleteInput";
 
 // const CurrencySelect = dynamic(() => import("@/components/util/CurrencySelect"), { ssr: false });
 const Select = dynamic(() => import("react-select"), { ssr: false });
+const PropertyLocationPicker = dynamic(() => import("@/app/(dashboard)/dashboard/property/create/PropertyLocationPicker"), {
+  ssr: false,
+  loading: () => <div className="flex h-48 items-center justify-center rounded-lg border bg-slate-50"><Loader2 className="size-6 animate-spin text-[#EF4217]" /></div>,
+});
 
 type SelectOption = {
   value: string;
@@ -49,8 +47,6 @@ const propertySchema = z.object({
     .regex(/^-?\d+\.?\d*,-?\d+\.?\d*$/, "Invalid coordinates format (lat,lng)"),
   currency: z.string().optional(),
 });
-const GOOGLE_MAPS_LIBRARIES: ("places")[] = ["places"];
-
 type PropertyFormData = z.infer<typeof propertySchema>;
 
 export default function EditPropertyForm() {
@@ -58,11 +54,7 @@ export default function EditPropertyForm() {
   const params = useParams();
   const propertyId = params?.id as string;
   
-  // Check if Google Maps is loaded
-  const { isLoaded: isMapsLoaded } = useLoadScript({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!,
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
+  const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY?.trim() ?? "";
   
   const { 
     editPropertyDetails,
@@ -173,15 +165,6 @@ export default function EditPropertyForm() {
     }
   };
 
-  const handleMapClick = (e: google.maps.MapMouseEvent) => {
-    const lat = e.latLng?.lat();
-    const lng = e.latLng?.lng();
-    if (lat && lng) {
-      setMarker({ lat, lng });
-      setValue("mapLocation", `${lat},${lng}`, { shouldValidate: true });
-    }
-  };
-
   const handleManualLocationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setValue("mapLocation", value, { shouldValidate: true });
@@ -244,7 +227,7 @@ export default function EditPropertyForm() {
     }
   };
 
-  if (isLoadingProperty || !isMapsLoaded) {
+  if (isLoadingProperty) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -253,7 +236,7 @@ export default function EditPropertyForm() {
             style={{ color: "#EF4217" }}
           />
           <p className="text-gray-600">
-            {!isMapsLoaded ? "Loading maps..." : "Loading property data..."}
+            Loading property data...
           </p>
         </div>
       </div>
@@ -547,47 +530,22 @@ export default function EditPropertyForm() {
           </div>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Search Location</Label>
-              <PlaceAutocompleteInput
-                isLoaded={isMapsLoaded}
+            {googleMapsKey ? (
+              <PropertyLocationPicker
+                apiKey={googleMapsKey}
+                center={mapCenter}
+                marker={marker}
                 onCoordinatesSelected={({ lat, lng }) => {
                   setMarker({ lat, lng });
                   setMapCenter({ lat, lng });
-                  setValue("mapLocation", `${lat},${lng}`, {
-                    shouldValidate: true,
-                  });
+                  setValue("mapLocation", `${lat.toFixed(6)},${lng.toFixed(6)}`, { shouldValidate: true });
                 }}
               />
-              <p className="text-xs text-gray-500">
-                Search or click on the map to update location
-              </p>
-            </div>
-
-            <div
-              className="h-[400px] w-full rounded-lg overflow-hidden border-2"
-              style={{
-                borderColor: marker ? "#EF4217" : "#e5e7eb",
-              }}
-            >
-              <GoogleMap
-                mapContainerStyle={{ width: "100%", height: "100%" }}
-                center={mapCenter}
-                zoom={marker ? 15 : 10}
-                onClick={handleMapClick}
-                options={{
-                  streetViewControl: false,
-                  mapTypeControl: false,
-                }}
-              >
-                {marker && (
-                  <Marker
-                    position={marker}
-                    animation={google.maps.Animation.DROP}
-                  />
-                )}
-              </GoogleMap>
-            </div>
+            ) : (
+              <Alert className="border-amber-300 bg-amber-50">
+                <AlertDescription className="text-amber-900">Map search is temporarily unavailable. You can still update the coordinates below.</AlertDescription>
+              </Alert>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="mapLocation">
@@ -600,7 +558,6 @@ export default function EditPropertyForm() {
                 value={mapLocation || ""}
                 onChange={handleManualLocationChange}
                 className={errors.mapLocation ? "border-red-500" : ""}
-                disabled
               />
               {errors.mapLocation && (
                 <p className="text-sm text-red-600">

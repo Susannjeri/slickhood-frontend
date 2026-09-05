@@ -66,11 +66,7 @@ export default function EstatePage() {
 
   const load = useCallback(async () => {
     try {
-      const browserPropertyParam = new URLSearchParams(window.location.search).get("propertyId");
-      const browserRequestedPropertyId = browserPropertyParam ? Number(browserPropertyParam) : Number.NaN;
-      const safeBrowserPropertyId = Number.isSafeInteger(browserRequestedPropertyId) && browserRequestedPropertyId > 0
-        ? browserRequestedPropertyId : undefined;
-      const propertyId = propertyFilter === "all" ? (requestedScopedPropertyId ?? safeBrowserPropertyId) : Number(propertyFilter);
+      const propertyId = propertyFilter === "all" ? requestedScopedPropertyId : Number(propertyFilter);
       const [ownershipResponse, chargeResponse] = await Promise.all([
         estateService.listOwnership({ propertyId }),
         estateService.listServiceCharges({ propertyId }),
@@ -130,7 +126,13 @@ export default function EstatePage() {
 
   const currentOwnerships = items.filter(item => item.active);
   const overdue = charges.filter(charge => charge.status === "OVERDUE");
-  const outstanding = charges.filter(charge => !charge.paid).reduce((sum, charge) => sum + charge.pendingAmount, 0);
+  const outstandingByCurrency = Object.entries(charges.filter(charge => !charge.paid).reduce<Record<string, number>>((totals, charge) => {
+    totals[charge.currency] = (totals[charge.currency] ?? 0) + charge.pendingAmount;
+    return totals;
+  }, {}));
+  const outstandingLabel = outstandingByCurrency.length === 0 ? "KES 0.00" : outstandingByCurrency
+    .map(([currency, amount]) => `${currency} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+    .join(" · ");
   const estatePropertyIds = Array.from(new Set([...currentOwnerships.map(item => item.propertyId), ...(canManage ? scopedPropertyIds : [])]));
 
   return <RequireRole roles={["EstateManager", "EstateOperationsManager", "Homeowner", "Superadmin"]} permissions={["view_estate"]}>
@@ -140,7 +142,7 @@ export default function EstatePage() {
       {canManage && <div className="w-full sm:w-72"><Label id="estate-filter-label" htmlFor="estate-filter">Estate</Label><Select value={propertyFilter} onValueChange={value => { setPropertyFilter(value); setAssignmentUnitId(""); }}><SelectTrigger id="estate-filter" aria-labelledby="estate-filter-label"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All estates</SelectItem>{properties.map(property => <SelectItem key={property.id} value={String(property.id)}>{property.name}</SelectItem>)}</SelectContent></Select></div>}
     </div>
 
-    {!canManage && <div className="grid gap-4 sm:grid-cols-3"><Card><CardHeader className="pb-2"><CardDescription>Owned units</CardDescription><CardTitle>{currentOwnerships.length}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Outstanding balance</CardDescription><CardTitle>{charges[0]?.currency ?? "KES"} {outstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Overdue charges</CardDescription><CardTitle className={overdue.length ? "text-red-600" : "text-emerald-600"}>{overdue.length}</CardTitle></CardHeader></Card></div>}
+    {!canManage && <div className="grid gap-4 sm:grid-cols-3"><Card><CardHeader className="pb-2"><CardDescription>Owned units</CardDescription><CardTitle>{currentOwnerships.length}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Outstanding balance</CardDescription><CardTitle>{outstandingLabel}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Overdue charges</CardDescription><CardTitle className={overdue.length ? "text-red-600" : "text-emerald-600"}>{overdue.length}</CardTitle></CardHeader></Card></div>}
 
     {canManage && <Card><CardHeader><CardTitle>Assign a homeowner</CardTitle><CardDescription>Select an estate and home, then use its secure, email-bound one-time invitation. Ownership activates only after the invited person accepts.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end"><div className="min-w-0 flex-1"><Label id="assignment-home-label" htmlFor="assignment-home">Home</Label><Select value={assignmentUnitId} onValueChange={setAssignmentUnitId} disabled={propertyFilter === "all"}><SelectTrigger id="assignment-home" aria-labelledby="assignment-home-label"><SelectValue placeholder={propertyFilter === "all" ? "Select an estate first" : "Select a home"} /></SelectTrigger><SelectContent>{units.map(unit => <SelectItem key={unit.unitId} value={String(unit.unitId)}>{unit.ref}</SelectItem>)}</SelectContent></Select></div><Button className="bg-[#EF4217]" disabled={!assignmentUnitId} onClick={() => router.push(`/dashboard/unit/details/${assignmentUnitId}?p=${propertyFilter}&from=homeowners`)}>Open home & invite</Button></CardContent></Card>}
 

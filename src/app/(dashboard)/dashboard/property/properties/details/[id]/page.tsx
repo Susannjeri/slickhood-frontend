@@ -42,7 +42,7 @@ import {
     MessageSquare,
     Wallet
 } from "lucide-react";
-import {GoogleMap, Marker, useLoadScript} from "@react-google-maps/api";
+import PropertyMapDisplay from "@/components/maps/PropertyMapDisplay";
 import {
     Accordion,
     AccordionContent,
@@ -143,8 +143,6 @@ interface StaffAndInvites {
 }
 
 
-const GOOGLE_MAPS_LIBRARIES: ("places" | "geometry" | "drawing" | "visualization")[] = ["places"];
-
 export default function PropertyDetailsPage() {
     const router = useRouter();
     const params = useParams();
@@ -164,17 +162,13 @@ export default function PropertyDetailsPage() {
 
     // Permission checking hook
     const {checkPermissions, getPropertyRoles} = usePropertyPermissions(Number(propertyId));
-    const {isLoaded: isMapsLoaded} = useLoadScript({
-        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY!,
-        libraries: GOOGLE_MAPS_LIBRARIES,
-    });
+    const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY?.trim() ?? "";
 
     // Property state
     const [property, setProperty] = useState<PropertyDetails | null>(null);
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [mapCenter, setMapCenter] = useState({lat: -1.286389, lng: 36.817223});
     const [marker, setMarker] = useState<{ lat: number; lng: number } | null>(null);
 
     // Units state
@@ -269,7 +263,6 @@ export default function PropertyDetailsPage() {
                         .map((coord: string) => parseFloat(coord.trim()));
 
                     if (!isNaN(lat) && !isNaN(lng)) {
-                        setMapCenter({lat, lng});
                         setMarker({lat, lng});
                     }
                 }
@@ -865,29 +858,13 @@ export default function PropertyDetailsPage() {
                                                     Location
                                                 </h3>
                                             </div>
-                                            <div
-                                                className="h-64 w-full rounded-lg overflow-hidden border-2"
-                                                style={{borderColor: "#EF4217"}}
-                                            >
-                                                {isMapsLoaded && (
-                                                    <GoogleMap
-                                                        mapContainerStyle={{width: "100%", height: "100%"}}
-                                                        center={mapCenter}
-                                                        zoom={15}
-                                                        options={{
-                                                            streetViewControl: false,
-                                                            mapTypeControl: true,
-                                                        }}
-                                                    >
-                                                        {marker && (
-                                                            <Marker
-                                                                position={marker}
-                                                                animation={google.maps.Animation.DROP}
-                                                            />
-                                                        )}
-                                                    </GoogleMap>
-                                                )}
-                                            </div>
+                                            {googleMapsKey && marker ? (
+                                                <PropertyMapDisplay apiKey={googleMapsKey} position={marker}/>
+                                            ) : (
+                                                <div className="grid h-64 place-items-center rounded-lg border bg-slate-50 px-6 text-center text-sm text-slate-600">
+                                                    Map preview is unavailable. The saved address and coordinates are shown below.
+                                                </div>
+                                            )}
                                             <div className="mt-4 space-y-2">
                                                 <div className="flex items-start gap-2 text-gray-600">
                                                     <MapPin className="w-5 h-5 mt-0.5 flex-shrink-0"/>

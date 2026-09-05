@@ -13,9 +13,11 @@ export type SaleStatus = "LEAD"|"VIEWING"|"OFFERED"|"RESERVED"|"DUE_DILIGENCE"|"
 export interface SaleTransaction {
   id:number; propertyId:number; propertyName?:string; unitId:number; unitRef?:string; salesAgentUserId:number; salesAgentName?:string; buyerUserId?:number; buyerName?:string; buyerEmail?:string; invitedBuyerEmail?:string;
   status:SaleStatus; askingPrice:number; offerAmount?:number; currency:string; notes?:string;
+  escrowRequiredAmount?:number; escrowInvoiceId?:number;
   offerAcceptedAt?:string; completedAt?:string;
 }
 export type SaleMilestoneType="ESCROW_FUNDED"|"DUE_DILIGENCE_CHECK"|"AGREEMENT_SIGNED"|"TRANSFER_REGISTERED"|"HANDOVER_COMPLETED";
 export type SaleMilestoneStatus="PENDING"|"COMPLETED"|"FAILED";
 export interface SaleMilestone {id:number;saleId:number;milestoneType:SaleMilestoneType;status:SaleMilestoneStatus;amount?:number;currency?:string;externalReference?:string;evidenceDocumentId?:number;notes?:string;occurredAt:string}
 export interface SaleMilestoneCreate {type:SaleMilestoneType;status:SaleMilestoneStatus;amount?:number;externalReference?:string;evidenceDocumentId?:number;notes?:string}
+export interface SaleEscrowInvoice {invoiceId:number;invoiceRef:string;amount:number;currency:string;paid:boolean;pendingAmount:number;dueDate:string}

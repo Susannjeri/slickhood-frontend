@@ -15,6 +15,7 @@ export const salesService = {
   create: (data:{propertyId:number;unitId:number;buyerUserId?:number;buyerEmail?:string;askingPrice:number;currency:string;notes?:string}) => API.post("/sales",data),
   update: (id:number,data:{status:SaleStatus;offerAmount?:number;notes?:string}) => API.put(`/sales/${id}`,data),
   acceptOffer: (id:number) => API.post(`/sales/${id}/accept-offer`),
+  createEscrowInvoice: (id:number,amount:number) => API.post(`/sales/${id}/escrow-invoice`,{amount}),
   milestones: (id:number,params:{page?:number;size?:number}={}) => API.get(`/sales/${id}/milestones`,{params:{page:0,size:50,...params}}),
   addMilestone: (id:number,data:SaleMilestoneCreate) => API.post(`/sales/${id}/milestones`,data),
 };

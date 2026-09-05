@@ -123,7 +123,9 @@ export default function AppSidebar() {
   };
 
   const fetchPendingJobs = async () => {
-    if (!canAccessJobs) return 0;
+    // Permissions may hydrate before the persisted session token. Do not issue an
+    // authenticated request during that short window.
+    if (!canAccessJobs || !token) return 0;
     try {
       const response = await handleGetPendingUnits();
       if (response?.data && Array.isArray(response.data) && response.data.length > 0) {
@@ -147,11 +149,11 @@ export default function AppSidebar() {
   };
 
   useEffect(() => {
-    if (!canAccessJobs) return;
+    if (!canAccessJobs || !token) return;
     const init = async () => { const c = await fetchPendingJobs(); setupPolling(c > 0); };
     init();
     return () => { if (pollInterval) clearInterval(pollInterval); };
-  }, [canAccessJobs]);
+  }, [canAccessJobs, token]);
 
   const handleOpenDrawer = async () => {
     setIsJobsDrawerOpen(true);

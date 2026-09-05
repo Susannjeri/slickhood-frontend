@@ -926,7 +926,9 @@ export default function ViewUnitPage() {
           <Card>
             <CardContent className="p-4 space-y-2">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Rent</p>
-              <p className="text-xl font-bold" style={{ color: "#EF4217" }}>{unit.currency} {unit.price.toLocaleString()}</p>
+              <p className="text-xl font-bold" style={{ color: "#EF4217" }}>
+                {unit.price == null ? "Rent not set" : `${unit.currency ?? "KES"} ${Number(unit.price).toLocaleString()}`}
+              </p>
               <p className="text-xs text-gray-400 capitalize">{unit.leaseMode}</p>
             </CardContent>
           </Card>
@@ -1010,7 +1012,7 @@ export default function ViewUnitPage() {
                       ["Unit Reference", unit.ref],
                       ["Unit Type", resolveUnitTypeLabel(unit.unitType)],
                       ["Property Type", getPropertyTypeName(unit.propertyType)],
-                      ["Size", `${unit.size} ${unit.measurementUnits.name}`],
+                      ["Size", unit.size == null ? "Not specified" : `${unit.size} ${unit.measurementUnits?.name ?? ""}`.trim()],
                       ["Lease Mode", unit.leaseMode],
                       ["Unit ID", `#${unit.unitId}`],
                     ].map(([label, value]) => (

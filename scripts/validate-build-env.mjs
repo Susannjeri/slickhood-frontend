@@ -21,3 +21,13 @@ if (apiUrl.hostname === 'app.slickhood.com' && apiUrl.pathname.replace(/\/$/, ''
 if (apiUrl.hostname === 'app.slickhood.com' && apiUrl.protocol !== 'https:') {
   throw new Error('Production NEXT_PUBLIC_API_URL must use HTTPS.');
 }
+
+if (apiUrl.hostname === 'app.slickhood.com') {
+  const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY?.trim();
+  if (!mapsKey) {
+    throw new Error('NEXT_PUBLIC_GOOGLE_MAPS_KEY is required for SlickHood production builds.');
+  }
+  if (!/^AIza[0-9A-Za-z_-]{30,}$/.test(mapsKey)) {
+    throw new Error('NEXT_PUBLIC_GOOGLE_MAPS_KEY does not have the expected Google API key format.');
+  }
+}
