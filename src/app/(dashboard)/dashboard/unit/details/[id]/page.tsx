@@ -361,7 +361,12 @@ export default function ViewUnitPage() {
       const response = await viewUnit(Number(propertyId), Number(unitId));
       if (response.success && response.data) {
         const unitData = response.data[0];
-        setUnit(unitData);
+        setUnit({
+          ...unitData,
+          measurementUnits: unitData.measurementUnits ?? { id: 0, name: "" },
+          utilities: Array.isArray(unitData.utilities) ? unitData.utilities : [],
+          images: Array.isArray(unitData.images) ? unitData.images : [],
+        });
         setCurrentPropertyType(unitData.propertyType);
         const allImages = [unitData.thumbnail, ...(unitData.images || [])];
         loadImages(allImages);

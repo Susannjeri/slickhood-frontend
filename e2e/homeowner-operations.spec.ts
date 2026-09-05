@@ -70,4 +70,5 @@ test("manager homeowner assignment starts from an estate-scoped home", async ({ 
   await page.getByRole("button", { name: "Open home & invite" }).click();
 
   await expect(page).toHaveURL("/dashboard/unit/details/77?p=11&from=homeowners");
+  await expect(page.getByText("No utilities included in this unit.")).toBeVisible();
 });
