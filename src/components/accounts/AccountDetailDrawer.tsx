@@ -39,8 +39,6 @@ import { toast } from "sonner";
 import {
   Loader2,
   Edit,
-  Eye,
-  EyeOff,
   Check,
   X,
   Trash2,
@@ -49,7 +47,6 @@ import {
   ShieldOff,
   Info,
   BadgeCheck,
-  Copy,
   Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -64,9 +61,6 @@ interface AccountDetailDrawerProps {
 interface PropertyFieldState extends AccountProperty {
   isEditing: boolean;
   editValue: string;
-  isRevealed: boolean;
-  revealedValue: string;
-  isRevealing: boolean;
   isSaving: boolean;
   justSaved: boolean;
 }
@@ -79,7 +73,6 @@ export default function AccountDetailDrawer({
   const {
     handleListAccountDetail,
     handleCreateUpdateAccount,
-    handleDecryptEncrypt,
     handleVerifyAccount,
     handleRequestAccountVerification,
     handleDeleteAccount,
@@ -118,9 +111,6 @@ export default function AccountDetailDrawer({
             ...p,
             isEditing: false,
             editValue: "",
-            isRevealed: false,
-            revealedValue: "",
-            isRevealing: false,
             isSaving: false,
             justSaved: false,
           }))
@@ -141,47 +131,12 @@ export default function AccountDetailDrawer({
     setFields((prev) => prev.map((f) => (f.key === key ? { ...f, ...patch } : f)));
   };
 
-  // Decrypt-on-demand reveal. Re-reveal always re-fetches — toggling off
-  // discards the plaintext from state rather than just hiding it, keeping
-  // its in-memory lifetime as short as possible.
-  const handleReveal = async (field: PropertyFieldState) => {
-    if (!account) return;
-
-    if (field.isRevealed) {
-      patchField(field.key, { isRevealed: false, revealedValue: "" });
-      return;
-    }
-
-    patchField(field.key, { isRevealing: true });
-    try {
-      const res = await handleDecryptEncrypt(account.id, field.key);
-      const decrypted: string = res?.data?.[0] ?? "";
-      patchField(field.key, { isRevealed: true, revealedValue: decrypted, isRevealing: false });
-    } catch (err: any) {
-      console.error("Error decrypting property:", err);
-      patchField(field.key, { isRevealing: false });
-      toast.error("Failed to decrypt value", {
-        description: err.message || "Please try again",
-        descriptionClassName: "!text-black",
-      });
-    }
-  };
-
-  const handleCopy = async (value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      toast.success("Copied to clipboard");
-    } catch {
-      toast.error("Failed to copy");
-    }
-  };
-
   // Encrypted fields use a "replace value" interaction: editing always starts
   // from an empty input for a brand-new value rather than pre-filling the
   // current secret. Non-encrypted fields just prefill with the current value.
   const handleStartEdit = (field: PropertyFieldState) => {
     if (field.encrypted) {
-      patchField(field.key, { isEditing: true, editValue: "", isRevealed: false, revealedValue: "" });
+      patchField(field.key, { isEditing: true, editValue: "" });
     } else {
       patchField(field.key, { isEditing: true, editValue: field.value });
     }
@@ -209,8 +164,6 @@ export default function AccountDetailDrawer({
         isSaving: false,
         isEditing: false,
         editValue: "",
-        isRevealed: false,
-        revealedValue: "",
         value: field.encrypted ? "*****" : field.editValue,
         justSaved: true,
       });
@@ -355,34 +308,6 @@ export default function AccountDetailDrawer({
           </div>
           {!field.isEditing && (
             <div className="flex items-center gap-0.5 shrink-0">
-              {/* Reveal is only meaningful once a secret has actually been set */}
-              {isSetMasked && (
-                <button
-                  type="button"
-                  onClick={() => handleReveal(field)}
-                  disabled={field.isRevealing}
-                  title={field.isRevealed ? "Hide value" : "Reveal value"}
-                  className="p-1.5 text-gray-400 hover:text-gray-600 disabled:opacity-50"
-                >
-                  {field.isRevealing ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : field.isRevealed ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              )}
-              {field.isRevealed && (
-                <button
-                  type="button"
-                  onClick={() => handleCopy(field.revealedValue)}
-                  title="Copy value"
-                  className="p-1.5 text-gray-400 hover:text-gray-600"
-                >
-                  <Copy className="w-4 h-4" />
-                </button>
-              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -431,8 +356,6 @@ export default function AccountDetailDrawer({
           <div className="flex items-center gap-2">
             {isUnset ? (
               <span className="text-gray-400 text-sm italic">Not set</span>
-            ) : isSetMasked && field.isRevealed ? (
-              <span className="text-gray-900 text-sm break-all font-mono">{field.revealedValue}</span>
             ) : isSetMasked ? (
               <span className="font-mono text-gray-600 text-sm">••••••••••</span>
             ) : field.value ? (
@@ -528,8 +451,8 @@ export default function AccountDetailDrawer({
                   <div className="flex gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-gray-700">
-                      Payments will be sent to this account. Credential fields are encrypted — use{" "}
-                      <Eye className="w-3 h-3 inline" /> to reveal a set value, or Replace to enter a new one.
+                      Payments will be sent to this account. Credential fields are encrypted and write-only;
+                      use Replace to enter a new value. Changing any payment detail requires fresh verification.
                     </p>
                   </div>
 
