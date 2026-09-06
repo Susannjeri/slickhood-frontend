@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/validate-build-env.mjs && next build",
+    "build": "node scripts/clean-next.mjs && node scripts/validate-build-env.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "lint:ci": "node scripts/lint-budget.mjs",

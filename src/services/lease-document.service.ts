@@ -2,7 +2,8 @@ import { API } from "@/lib/api";
 import { GenerateLeaseDocumentRequest, LeaseDocumentTemplate } from "@/types/lease-document";
 
 export const leaseDocumentService = {
-  list: (params: { page?: number; size?: number } = {}) => API.get("/lease/documents", { params }),
+  list: (params: { page?: number; size?: number; leaseId?: number; saleId?: number; propertyId?: number } = {}) => API.get("/lease/documents", { params }),
+  cancelDraft: (id: number) => API.post(`/lease/documents/${id}/cancel-draft`),
   generate: (data: GenerateLeaseDocumentRequest) => API.post("/lease/documents", data),
   issue: (id: number) => API.post(`/lease/documents/${id}/issue`),
   acknowledge: (id: number) => API.post(`/lease/documents/${id}/acknowledge`),

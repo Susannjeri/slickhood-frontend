@@ -58,7 +58,7 @@ test("tenant can continue to the governed agreement and sees no owner catalogue 
   await expect(page.getByText("Tenant signature: completed")).toBeVisible();
   await expect(page.getByText("Landlord/manager signature: pending")).toBeVisible();
   await expect(page.getByRole("link", { name: "View and sign agreement" }))
-    .toHaveAttribute("href", "/dashboard/documents");
+    .toHaveAttribute("href", "/dashboard/documents?leaseId=51");
   await expect(page.getByText("Properties", { exact: true })).toHaveCount(0);
   await expect(page.getByText("All Properties", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Lease templates", { exact: true })).toHaveCount(0);

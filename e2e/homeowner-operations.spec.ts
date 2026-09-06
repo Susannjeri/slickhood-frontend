@@ -71,4 +71,10 @@ test("manager homeowner assignment starts from an estate-scoped home", async ({ 
 
   await expect(page).toHaveURL("/dashboard/unit/details/77?p=11&from=homeowners");
   await expect(page.getByText("No utilities included in this unit.")).toBeVisible();
+  await page.getByRole("button", { name: "Assign Homeowner", exact: true }).click();
+  await page.getByLabel("Homeowner email", { exact: true }).fill("resident@example.test");
+  await page.route("**/invite/email", route => route.fulfill({ json: envelope([]) }));
+  const sent = page.waitForRequest(request => request.url().endsWith("/invite/email") && request.method() === "POST");
+  await page.getByRole("button", { name: "Send invitation", exact: true }).click();
+  expect((await sent).postDataJSON()).toMatchObject({ inviteType: "HOMEOWNER", entityId: 77, email: "resident@example.test" });
 });

@@ -11,7 +11,7 @@ test.beforeEach(async ({ context, page }) => {
   await page.route("**/property/unit/type**", route => route.fulfill({ json: envelope([{ id: 1, name: "Apartment" }]) }));
   await page.route("**/property/measurement/units**", route => route.fulfill({ json: envelope([{ id: 1, name: "sqm" }]) }));
   await page.route("**/property/unit/list?propertyId=11&unitId=77", route => route.fulfill({
-    json: envelope([{
+    json: envelope({
       propertyId: 11,
       ref: "A-101",
       unitType: "1",
@@ -28,7 +28,7 @@ test.beforeEach(async ({ context, page }) => {
       images: [],
       unitId: 77,
       templateId: null,
-    }]),
+    }),
   }));
   await page.route("**/property/unit/charges?unitId=77", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/invite/list**", route => route.fulfill({ json: envelope([]) }));
@@ -40,6 +40,9 @@ test("service-charge unit sends an email-bound homeowner invite rather than expo
   await page.goto("/dashboard/unit/details/77?p=11&from=homeowners");
 
   await expect(page.getByRole("button", { name: "Assign Homeowner" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Tenant", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Lease", exact: true })).toHaveCount(0);
+  await expect(page.getByText("No Active Lease", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Assign Homeowner" }).click();
   await expect(page.getByRole("heading", { name: "Create Homeowner Invite" })).toBeVisible();
 
@@ -58,7 +61,10 @@ test("service-charge unit sends an email-bound homeowner invite rather than expo
 });
 
 test("similar unit generation submits the requested number of additional units", async ({ page }) => {
-  await page.route("**/property/unit/create/similar**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/property/unit/create/similar/status**", route =>
+    route.fulfill({ json: envelope({ jobId: 901, sourceUnitId: 77, count: 12, completed: true, description: "completed successfully" }) }));
+  await page.route("**/property/unit/create/similar?**", route =>
+    route.fulfill({ json: envelope({ jobId: 901, sourceUnitId: 77, count: 12, status: "QUEUED" }) }));
   await page.goto("/dashboard/unit/details/77?p=11&from=homeowners");
   await expect(page.getByRole("button", { name: "Create Similar Units" })).toBeVisible();
   await page.getByRole("button", { name: "Create Similar Units" }).click();
@@ -68,6 +74,7 @@ test("similar unit generation submits the requested number of additional units",
   const request = await requestPromise;
   expect(request.url()).toContain("unitId=77");
   expect(request.url()).toContain("count=12");
+  await expect(page.getByText("12 similar units created successfully.")).toBeVisible();
 });
 
 test("homeowner can report maintenance but cannot advance operational status", async ({ page }) => {

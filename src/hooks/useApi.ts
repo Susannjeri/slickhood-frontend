@@ -35,6 +35,7 @@ import {
    createSimilarUnits,
    getPendingUnits,
    getCreateUnitJobs,
+   getCreateUnitJobStatus,
    getAuditLogs,
    getConfigNames,
    getConfigValues,
@@ -401,6 +402,7 @@ export function useApi() {
           }
           catch (error) {
             console.error("Error getting unit: ", error)
+            throw error;
           }
         }
       
@@ -478,6 +480,18 @@ export function useApi() {
               console.error("Error getting pending units:", error);
               throw error;
             } 
+        }
+
+        const handleGetCreateUnitJobStatus = async(jobId: number) => {
+          try {
+            const { token } = useAuthStore.getState();
+            if (!token) throw new Error("No token available");
+            const res = await getCreateUnitJobStatus(jobId, token);
+            return res.data;
+          } catch (error) {
+            console.error("Error fetching create unit job status:", error);
+            throw error;
+          }
         }
         
         const handleGetCreateUnitJobs = async(params: UnitJobsParams = {}) => {
@@ -1680,6 +1694,7 @@ export function useApi() {
     handleDecryptConfigValue,
     handleCreateSimilarUnits,
     handleGetPendingUnits,
+    handleGetCreateUnitJobStatus,
     handleGetCreateUnitJobs,
     handleGetSupportedParams,
     handleCreateParam,

@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAuthStore } from "@/store/authStore";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, LoginSchema } from "@/lib/validations";
 import { Input } from "@/components/ui/input";
@@ -33,8 +33,16 @@ export default function LoginForm() {
   const googleBtnRef                    = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { inviteToken, setInviteToken, setEmail, setToken, setmfaEnabled, settotpEnabled, setStep } = useAuthStore();
   const { login, handleGoogleLogin } = useAuth();
+
+  // Keep the invitation bound to the URL as well as local storage. A reload
+  // or privacy extension must not turn a tenant/staff invitation into an
+  // unscoped registration flow.
+  const urlInviteToken = searchParams.get("token")?.trim() || null;
+  const effectiveInviteToken = urlInviteToken || inviteToken;
+  const invitationReturnTo = safeInvitationReturnTo(searchParams.toString());
 
   const form = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
@@ -52,7 +60,7 @@ export default function LoginForm() {
 
   const handleCredentialResponse = async (response: any) => {
     setLoading(true);
-    const pendingInvite = useAuthStore.getState().inviteToken;
+    const pendingInvite = effectiveInviteToken;
     const returnTo = safeInvitationReturnTo(window.location.search);
     const result = await handleGoogleLogin(response.credential);
     if (result.success) {
@@ -105,10 +113,10 @@ export default function LoginForm() {
   }, [googleReady]);
 
   const handleSignUpClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (inviteToken) {
+    if (effectiveInviteToken) {
       e.preventDefault();
       setStep("account");
-      router.push(invitationUrl("/register", inviteToken, safeInvitationReturnTo(window.location.search)));
+      router.push(invitationUrl("/register", effectiveInviteToken, invitationReturnTo));
     }
   };
 
@@ -116,7 +124,7 @@ export default function LoginForm() {
     setError(null);
     setSuccess(null);
     setLoading(true);
-    const pendingInvite = useAuthStore.getState().inviteToken;
+    const pendingInvite = effectiveInviteToken;
     const returnTo = safeInvitationReturnTo(window.location.search);
     const result = await login(values.email, values.password);
     if (!result.success) {
@@ -162,7 +170,7 @@ export default function LoginForm() {
         <p className="text-base text-gray-500 dark:text-gray-400">Welcome back! Please enter your details.</p>
       </div>
 
-      {inviteToken && (
+      {effectiveInviteToken && (
         <div data-testid="invitation-ready" role="status" className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-950">
           Invitation found. Sign in with the invited email, or choose Sign up below if you do not yet have a SlickHood account.
         </div>
@@ -266,7 +274,7 @@ export default function LoginForm() {
       <p className="text-xs text-center text-gray-500 dark:text-gray-400">
         Don&apos;t have an account?{" "}
         <Link
-          href={inviteToken ? invitationUrl("/register", inviteToken, typeof window !== "undefined" ? safeInvitationReturnTo(window.location.search) : null) : "/role"}
+          href={effectiveInviteToken ? invitationUrl("/register", effectiveInviteToken, invitationReturnTo) : "/role"}
           onClick={handleSignUpClick}
           className="font-semibold text-[#EF4217] hover:text-[#d63600] transition-colors"
         >

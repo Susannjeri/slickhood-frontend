@@ -153,8 +153,13 @@ export default function UnitTypeListPage({
       try {
         setPropertyLoading(true);
         const res = await viewPropertyDetails(selectedPropertyId);
-        if (res.success && res.data && res.data[0]) {
-          const p = res.data[0];
+        if (res.success && res.data) {
+          // The property detail form of `/property/list` returns a single
+          // object; collection requests return an array.  Accept both so a
+          // property selected in Rental/Sale/Service Charge can load its
+          // metadata and enable the Add Unit action.
+          const p = Array.isArray(res.data) ? res.data[0] : res.data;
+          if (!p) return;
           setSelectedProperty({ name: p.name, currency: p.currency, type: p.type });
           await getUnitTypes(p.type); // needed for resolveUnitTypeLabel
         }

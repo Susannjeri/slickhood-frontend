@@ -128,8 +128,16 @@ export default function LeaseInitializePage() {
       // Re-validate invite token to get fresh unit details
       const response = await handleValidateInviteToken(inviteToken);
 
-      if (response.success && response.code === "S0058" && response.data && response.data.length > 0) {
-        const unit = response.data[0];
+      if (response.success && response.code === "S0058" && response.data) {
+        // Tenant invite validation returns one UnitDTO object.  Older
+        // clients/tests represented it as a one-item array, so keep the
+        // compatibility branch without requiring a fictitious array shape.
+        const unit = Array.isArray(response.data) ? response.data[0] : response.data;
+        if (!unit) {
+          toast.error("Invalid or expired invite token");
+          router.replace("/login");
+          return;
+        }
         setUnitDetails(unit);
         await getUnitTypes(unit.propertyType);
         // Load unit images using inviteToken

@@ -104,7 +104,8 @@ export default function EditPropertyForm() {
       const response = await viewPropertyDetails(Number(propertyId));
 
       if (response.success && response.data) {
-        const property = response.data[0];
+        const property = Array.isArray(response.data) ? response.data[0] : response.data;
+        if (!property) throw new Error("Property details were not returned");
 
         // Set form values
         setValue("name", property.name);

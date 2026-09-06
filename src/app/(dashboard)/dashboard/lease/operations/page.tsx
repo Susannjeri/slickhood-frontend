@@ -68,7 +68,8 @@ export default function LeaseOperationsPage() {
           <p className={lease.ownerSignDate ? "text-emerald-700" : "text-amber-700"}>Landlord/manager signature: {lease.ownerSignDate ? `completed${lease.ownerSignName ? ` by ${lease.ownerSignName}` : ""}` : "pending"}</p>
         </div>}
         <div className="mt-4 flex flex-wrap gap-2">
-          {!lease.signed && activeRole?.title?.toLowerCase() === "tenant" && <Button size="sm" asChild><Link href="/dashboard/documents">View and sign agreement</Link></Button>}
+          {!lease.signed && activeRole?.title?.toLowerCase() === "tenant" && <Button size="sm" asChild><Link href={`/dashboard/documents?leaseId=${lease.id}`}>View and sign agreement</Link></Button>}
+          {lease.signed && <Can permissions={["view_lease_document"]}><Button size="sm" variant="outline" asChild><Link href={`/dashboard/documents?leaseId=${lease.id}`}>View signed agreement</Link></Button></Can>}
           {!lease.signed && activeRole?.title?.toLowerCase() !== "tenant" && <Can permissions={["create_lease_document"]}><Button size="sm" asChild><Link href={`/dashboard/documents?leaseId=${lease.id}&type=RESIDENTIAL_LEASE_AGREEMENT`}>Prepare or continue agreement</Link></Button></Can>}
           {lease.signed && lease.lifecycleStatus !== "NOTICE_GIVEN" && <Can permissions={["delete_lease"]}><Button size="sm" variant="outline" onClick={() => setTerminating(terminating === lease.id ? null : lease.id)}>Give termination notice</Button></Can>}
         </div>

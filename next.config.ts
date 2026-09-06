@@ -2,6 +2,14 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  // Make rolling/self-hosted deployments version-aware. Without a stable
+  // deployment identifier, an open tab can submit Server Action IDs from the
+  // previous build and Next.js renders a generic navigation failure page.
+  // The release workflow supplies the immutable source SHA, while each
+  // rollout supplies a unique DEPLOYMENT_VERSION. Keeping these separate
+  // prevents an open tab from reusing Server Action IDs after a hotfix built
+  // from the same source commit.
+  deploymentId: process.env.DEPLOYMENT_VERSION || process.env.NEXT_PUBLIC_COMMIT_HASH,
   // Standalone tracing uses symlinks that require Windows Developer Mode.
   // Production CI runs on Linux and retains the deployable standalone bundle;
   // local Windows builds use standard output without changing system policy.

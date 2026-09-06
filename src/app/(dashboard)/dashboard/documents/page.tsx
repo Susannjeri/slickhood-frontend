@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import { Download, FilePlus2, Pencil, Send, Signature } from "lucide-react";
@@ -40,6 +40,11 @@ const tenantStatusMessage = (document: LeaseDocument) => {
 };
 
 export default function DocumentsPage() {
+  const token = useAuthStore(s => s.token), role = useAuthStore(s => s.activeRole?.title), workspace = useAuthStore(s => s.activeWorkspaceId);
+  return <DocumentsWorkspace key={`${token}:${role}:${workspace}`} />;
+}
+
+function DocumentsWorkspace() {
   const searchParams = useSearchParams();
   const activeRole = useAuthStore((state) => state.activeRole);
   const permissions = useAuthStore((state) => state.permissions);
@@ -53,6 +58,13 @@ export default function DocumentsPage() {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [logoConfigured, setLogoConfigured] = useState(false);
+  const [ownershipId, setOwnershipId] = useState(searchParams.get("ownershipId") ?? "");
+  const [optionsPage, setOptionsPage] = useState(0);
+  const [optionsHasMore, setOptionsHasMore] = useState(false);
+  const [optionsError, setOptionsError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const loadSequence = useRef(0);
   const requestedType = searchParams.get("type") as LeaseDocumentType | null;
   const [type, setType] = useState<LeaseDocumentType>(activeRole?.title?.toLowerCase() === "tenant" ? "TENANT_TERMINATION_NOTICE" : requestedType && allTypes.includes(requestedType) ? requestedType : "RESIDENTIAL_LEASE_AGREEMENT");
   const [leaseId, setLeaseId] = useState(searchParams.get("leaseId") ?? "");
@@ -74,23 +86,38 @@ export default function DocumentsPage() {
   const isTenant = activeRole?.title?.toLowerCase() === "tenant";
   const isSaleDocument = saleTypes.includes(type);
   const isEstateDocument = type === "ESTATE_RESIDENTIAL_AGREEMENT";
-  const visibleTypes = useMemo(() => activeRole?.title?.toLowerCase() === "tenant" ? ["TENANT_TERMINATION_NOTICE" as LeaseDocumentType] : allTypes.filter((t) => t !== "TENANT_TERMINATION_NOTICE"), [activeRole]);
+  const visibleTypes = useMemo(() => {
+    const role = activeRole?.title;
+    if (role === "Tenant") return ["TENANT_TERMINATION_NOTICE" as LeaseDocumentType];
+    if (["SalesAgent", "SalesCoordinator", "ListingAgent"].includes(role ?? "")) return saleTypes;
+    if (["EstateManager", "EstateOperationsManager"].includes(role ?? "")) return ["ESTATE_RESIDENTIAL_AGREEMENT" as LeaseDocumentType];
+    if (["Landlord", "PropertyManager", "LeasingOfficer"].includes(role ?? "")) return rentalTypes.filter(t => t !== "TENANT_TERMINATION_NOTICE");
+    return allTypes.filter(t => t !== "TENANT_TERMINATION_NOTICE");
+  }, [activeRole]);
+
+  useEffect(() => { if (!visibleTypes.includes(type)) setType(visibleTypes[0]); }, [type, visibleTypes]);
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     try {
-      const documentResponse = await leaseDocumentService.list({ page, size: 25 });
+      setLoading(true); setLoadError("");
+      const documentResponse = await leaseDocumentService.list({ page, size: 25,
+        leaseId: Number(searchParams.get("leaseId")) || undefined, saleId: Number(searchParams.get("saleId")) || undefined,
+        propertyId: Number(searchParams.get("propertyId")) || undefined });
+      if (sequence !== loadSequence.current) return;
       setDocuments(documentResponse.data?.data ?? []);
       setTotalPages(documentResponse.data?.totalPages ?? 0);
       if (canCreate || canEditTemplates) {
         const templateResponse = await leaseDocumentService.templates();
+        if (sequence !== loadSequence.current) return;
         setTemplates(templateResponse.data?.data ?? []);
       } else {
         setTemplates([]);
       }
     } catch (error: unknown) {
-      toast.error(apiErrorMessage(error, "Could not load documents."));
-    }
-  }, [canCreate, canEditTemplates, page]);
+      if (sequence === loadSequence.current) setLoadError(apiErrorMessage(error, "Could not load documents."));
+    } finally { if (sequence === loadSequence.current) setLoading(false); }
+  }, [canCreate, canEditTemplates, page, searchParams]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -108,15 +135,36 @@ export default function DocumentsPage() {
     if (linkedSale) setSaleId(linkedSale);
     if (linkedProperty) setPropertyId(linkedProperty);
     if (linkedRecipient) setRecipientUserId(linkedRecipient);
+    const linkedOwnership = searchParams.get("ownershipId");
+    if (linkedOwnership) setOwnershipId(linkedOwnership);
   }, [searchParams]);
   useEffect(() => {
     if (!canCreate || !token) return;
-    void Promise.allSettled([
-      listActiveLeases(0, 100, token).then(response => setLeases(response.data?.data ?? [])),
-      salesService.list({ page: 0, size: 100 }).then(response => setSales(response.data?.data ?? [])),
-      estateService.listOwnership({ page: 0, size: 100, active: true }).then(response => setOwnerships(response.data?.data ?? [])),
-    ]);
-  }, [canCreate, token]);
+    let cancelled = false;
+    const request = isSaleDocument ? salesService.list({ page: optionsPage, size: 100 })
+      : isEstateDocument ? estateService.listOwnership({ page: optionsPage, size: 100, active: true })
+      : listActiveLeases(optionsPage, 100, token);
+    void request.then(response => {
+      if (cancelled) return;
+      const data = response.data?.data ?? [];
+      setOptionsError(""); setOptionsHasMore(optionsPage + 1 < (response.data?.totalPages ?? 0));
+      if (isSaleDocument) setSales(current => optionsPage ? [...current, ...data] : data);
+      else if (isEstateDocument) setOwnerships(current => optionsPage ? [...current, ...data] : data);
+      else setLeases(current => optionsPage ? [...current, ...data] : data);
+    }).catch(error => { if (!cancelled) setOptionsError(apiErrorMessage(error, "Could not load document choices.")); });
+    return () => { cancelled = true; };
+  }, [canCreate, token, isSaleDocument, isEstateDocument, optionsPage]);
+
+  useEffect(() => {
+    const lease = leases.find(item => String(item.id) === leaseId);
+    if (!isSaleDocument && !isEstateDocument && lease) {
+      setEffectiveDate(lease.moveInDate ?? ""); setAmount(lease.price == null ? "" : String(lease.price)); setCurrency(lease.currency ?? "KES");
+    }
+    const sale = sales.find(item => String(item.id) === saleId);
+    if (isSaleDocument && sale) { setAmount(sale.offerAmount == null ? "" : String(sale.offerAmount)); setCurrency(sale.currency); }
+    const ownership = ownerships.find(item => String(item.id) === ownershipId);
+    if (isEstateDocument && ownership) setEffectiveDate(ownership.ownershipStart);
+  }, [leaseId, saleId, leases, sales, isSaleDocument, isEstateDocument, ownerships, ownershipId]);
 
   async function uploadLogo(event: ChangeEvent<HTMLInputElement>) {
     const logo = event.target.files?.[0];
@@ -132,6 +180,7 @@ export default function DocumentsPage() {
     event.preventDefault();
     const payload: GenerateLeaseDocumentRequest = {
       documentType: type,
+      ownershipId: isEstateDocument && ownershipId ? Number(ownershipId) : undefined,
       leaseId: !isSaleDocument && !isEstateDocument ? Number(leaseId) : undefined,
       saleId: isSaleDocument ? Number(saleId) : undefined,
       propertyId: isEstateDocument ? Number(propertyId) : undefined,
@@ -153,11 +202,13 @@ export default function DocumentsPage() {
     } finally { setBusy(false); }
   }
 
-  async function action(id: number, name: "issue" | "acknowledge" | "sign") {
+  async function action(id: number, name: "issue" | "acknowledge" | "sign" | "cancelDraft") {
+    if (name === "sign" && !window.confirm("I have reviewed this document and agree to sign it electronically.")) return;
+    if (name === "cancelDraft" && !window.confirm("Cancel this unissued draft? Its history will be retained; you can create a replacement.")) return;
     setBusy(true);
     try {
       await leaseDocumentService[name](id);
-      toast.success(`Document ${name === "issue" ? "issued" : name === "sign" ? "signed" : "acknowledged"}.`);
+      toast.success(`Document ${name === "issue" ? "issued" : name === "sign" ? "signed" : name === "cancelDraft" ? "draft cancelled" : "acknowledged"}.`);
       await load();
     } catch (error: unknown) {
       toast.error(apiErrorMessage(error, "That action could not be completed."));
@@ -195,29 +246,37 @@ export default function DocumentsPage() {
     {canCreate && <Card><CardHeader><CardTitle className="flex items-center gap-2"><FilePlus2 className="h-5 w-5 text-[#EF4217]" />Create draft</CardTitle>
       <CardDescription>Rentals use a Residential or Commercial Lease Agreement. Property sales use a Letter of Offer. Estate managers use an Estate Residential Agreement.</CardDescription></CardHeader>
       <CardContent><form onSubmit={generate} className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-2 md:col-span-2"><Label htmlFor="document-type">Document type</Label><select id="document-type" value={type} onChange={(e) => setType(e.target.value as LeaseDocumentType)} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
+        <div className="space-y-2 md:col-span-2"><Label htmlFor="document-type">Document type</Label><select id="document-type" value={type} onChange={(e) => { setType(e.target.value as LeaseDocumentType); setOptionsPage(0); setOptionsHasMore(false); }} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
           {visibleTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></div>
-        {isSaleDocument ? <div className="space-y-2"><Label htmlFor="sale-id">Property sale</Label><select id="sale-id" required value={saleId} onChange={(e) => setSaleId(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a sale</option>{saleId && !sales.some(item => String(item.id) === saleId) && <option value={saleId}>Selected sale #{saleId}</option>}{sales.map(sale => <option key={sale.id} value={sale.id}>{sale.propertyName ?? `Property ${sale.propertyId}`} · {sale.unitRef ?? `Unit ${sale.unitId}`} · {sale.buyerName ?? sale.buyerEmail ?? sale.invitedBuyerEmail ?? "Buyer pending"}</option>)}</select>{sales.length === 0 && !saleId && <p className="text-xs text-muted-foreground">Create the sale record first, then prepare its documents.</p>}</div> : isEstateDocument ? <div className="space-y-2"><Label htmlFor="ownership-id">Homeowner and property</Label><select id="ownership-id" required value={propertyId && recipientUserId ? `${propertyId}:${recipientUserId}` : ""} onChange={(e) => { const [property, recipient] = e.target.value.split(":"); setPropertyId(property ?? ""); setRecipientUserId(recipient ?? ""); }} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a current homeowner</option>{propertyId && recipientUserId && !ownerships.some(item => String(item.propertyId) === propertyId && String(item.homeownerUserId) === recipientUserId) && <option value={`${propertyId}:${recipientUserId}`}>Selected homeowner for property #{propertyId}</option>}{ownerships.map(item => <option key={item.id} value={`${item.propertyId}:${item.homeownerUserId}`}>{item.homeownerName || item.homeownerEmail} · {item.propertyName}{item.unitRef ? ` / ${item.unitRef}` : ""}</option>)}</select>{ownerships.length === 0 && !(propertyId && recipientUserId) && <p className="text-xs text-muted-foreground">Add the homeowner in Estate Management first.</p>}</div> :
+        {isSaleDocument ? <div className="space-y-2"><Label htmlFor="sale-id">Property sale</Label><select id="sale-id" required value={saleId} onChange={(e) => setSaleId(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a sale</option>{saleId && !sales.some(item => String(item.id) === saleId) && <option value={saleId}>Selected sale #{saleId}</option>}{sales.map(sale => <option key={sale.id} value={sale.id}>{sale.propertyName ?? `Property ${sale.propertyId}`} · {sale.unitRef ?? `Unit ${sale.unitId}`} · {sale.buyerName ?? sale.buyerEmail ?? sale.invitedBuyerEmail ?? "Buyer pending"}</option>)}</select>{sales.length === 0 && !saleId && <p className="text-xs text-muted-foreground">Create the sale record first, then prepare its documents.</p>}</div> : isEstateDocument ? <div className="space-y-2"><Label htmlFor="ownership-id">Homeowner and property</Label><select id="ownership-id" required value={ownershipId} onChange={(e) => { const ownership = ownerships.find(o => String(o.id) === e.target.value); setOwnershipId(e.target.value); setPropertyId(ownership ? String(ownership.propertyId) : ""); setRecipientUserId(ownership ? String(ownership.homeownerUserId) : ""); setEffectiveDate(ownership?.ownershipStart ?? ""); }} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a current homeowner</option>{propertyId && recipientUserId && !ownerships.some(item => String(item.propertyId) === propertyId && String(item.homeownerUserId) === recipientUserId) && <option value={`${propertyId}:${recipientUserId}`}>Selected homeowner for property #{propertyId}</option>}{ownerships.map(item => <option key={item.id} value={String(item.id)}>{item.homeownerName || item.homeownerEmail} · {item.propertyName}{item.unitRef ? ` / ${item.unitRef}` : ""}</option>)}</select>{ownerships.length === 0 && !(propertyId && recipientUserId) && <p className="text-xs text-muted-foreground">Add the homeowner in Estate Management first.</p>}</div> :
           <div className="space-y-2"><Label htmlFor="lease-id">Lease</Label><select id="lease-id" required value={leaseId} onChange={(e) => setLeaseId(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a lease</option>{leaseId && !leases.some(item => String(item.id) === leaseId) && <option value={leaseId}>Selected lease #{leaseId}</option>}{leases.map(lease => <option key={lease.id} value={lease.id}>{lease.name || `Lease ${lease.id}`} · {lease.tenantName || "Tenant pending"}{lease.expiryDate ? ` · expires ${lease.expiryDate}` : ""}</option>)}</select>{leases.length === 0 && !leaseId && <p className="text-xs text-muted-foreground">Create the lease first, then prepare its agreement or notice.</p>}</div>}
-        <div className="space-y-2"><Label htmlFor="effective-date">Effective date</Label><Input id="effective-date" type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} /></div>
-        <div className="space-y-2"><Label htmlFor="response-due">Response due</Label><Input id="response-due" type="date" value={responseDueDate} onChange={(e) => setResponseDueDate(e.target.value)} /></div>
-        <div className="space-y-2"><Label htmlFor="document-amount">Amount</Label><Input id="document-amount" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+        {optionsError && <p role="alert" className="text-red-700 md:col-span-3">{optionsError}</p>}
+        {optionsHasMore && <Button type="button" variant="outline" onClick={() => setOptionsPage(p => p + 1)}>Load more choices</Button>}
+        <div className="space-y-2"><Label htmlFor="effective-date">Effective date</Label><Input id="effective-date" type="date" required={isEstateDocument || type.endsWith("AGREEMENT")} value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} /></div>
+        <div className="space-y-2"><Label htmlFor="response-due">Response due</Label><Input id="response-due" type="date" required={type === "PROPERTY_SALE_LETTER_OF_OFFER"} value={responseDueDate} onChange={(e) => setResponseDueDate(e.target.value)} /></div>
+        <div className="space-y-2"><Label htmlFor="document-amount">Amount</Label><Input id="document-amount" type="number" required={isSaleDocument || type.includes("LEASE_AGREEMENT")} min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
         <div className="space-y-2"><Label htmlFor="document-currency">Currency</Label><Input id="document-currency" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} /></div>
         <div className="space-y-2 md:col-span-3"><Label htmlFor="document-reason">Additional schedule details</Label><Textarea id="document-reason" maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional: permitted use, handover details, account period, special condition, or other transaction detail." /><p className="text-xs text-muted-foreground">Saved in this immutable document version. To change a standard legal clause, create a new controlled template version below.</p></div>
         <div className="md:col-span-3"><Button disabled={busy} className="bg-[#EF4217] hover:bg-[#d83a13]">Create draft</Button></div>
       </form></CardContent></Card>}
 
     <Card><CardHeader><CardTitle>Your documents</CardTitle></CardHeader><CardContent className="space-y-3">
-      {documents.length === 0 && <p className="py-8 text-center text-muted-foreground">No documents have been created for this active role.</p>}
+      {loading && <p role="status">Loading documents…</p>}
+      {loadError && <div role="alert">{loadError}<Button variant="outline" onClick={() => void load()}>Retry</Button></div>}
+      {!loading && !loadError && documents.length === 0 && <p className="py-8 text-center text-muted-foreground">No documents match this account and selection.</p>}
       {documents.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-center lg:justify-between">
         <div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{item.name}</p><Badge variant="outline">{label(item.status)}</Badge>
           {item.legalReviewRequired && <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Legal review</Badge>}</div>
           <p className="text-sm text-muted-foreground">#{item.id} · Template v{item.templateVersion} · {item.leaseId ? `Lease ${item.leaseId}` : item.saleId ? `Sale ${item.saleId}` : `Property ${item.propertyId}`}</p>
-          {isTenant && tenantStatusMessage(item) && <p className="mt-2 max-w-2xl text-sm font-medium text-[#14235C]">{tenantStatusMessage(item)}</p>}</div>
+          {isTenant && tenantStatusMessage(item) && <p className="mt-2 max-w-2xl text-sm font-medium text-[#14235C]">{tenantStatusMessage(item)}</p>}
+          <p className="mt-2 text-sm">Issuer: {item.issuerSignedAt ? "Signed" : "Not signed"} · Recipient: {item.recipientSignedAt ? "Signed" : "Not signed"}{item.responseDueDate ? ` · Respond by ${item.responseDueDate}` : ""}</p>
+          {item.documentType === "PROPERTY_SALE_LETTER_OF_OFFER" && <p className="text-sm text-muted-foreground">Both signatures reserve the sale automatically. No separate acceptance is needed.</p>}
+          {item.legalReviewRequired && <p className="text-sm text-amber-800">Issue is blocked pending template approval. Cancel this draft and regenerate after the approved version is available.</p>}</div>
         <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => viewPdf(item.id)}><Download className="mr-1 h-4 w-4" />PDF</Button>
-          {canIssue && item.status === "DRAFT" && <Button size="sm" onClick={() => action(item.id, "issue")} disabled={busy}><Send className="mr-1 h-4 w-4" />Issue</Button>}
-          {canAcknowledge && item.status === "ISSUED" && <Button size="sm" variant="outline" onClick={() => action(item.id, "acknowledge")} disabled={busy}>Acknowledge</Button>}
-          {canSign && ["ISSUED", "ACKNOWLEDGED", "PARTIALLY_SIGNED"].includes(item.status) && <Button size="sm" variant="outline" onClick={() => action(item.id, "sign")} disabled={busy}><Signature className="mr-1 h-4 w-4" />Sign</Button>}
+          {canIssue && item.viewerParty === "ISSUER" && item.status === "DRAFT" && <Button size="sm" onClick={() => action(item.id, "issue")} disabled={busy || item.legalReviewRequired}><Send className="mr-1 h-4 w-4" />Issue</Button>}
+          {canCreate && item.viewerParty === "ISSUER" && item.status === "DRAFT" && <Button size="sm" variant="outline" onClick={() => action(item.id, "cancelDraft")} disabled={busy}>Cancel draft</Button>}
+          {canAcknowledge && item.viewerParty === "RECIPIENT" && item.status === "ISSUED" && <Button size="sm" variant="outline" onClick={() => action(item.id, "acknowledge")} disabled={busy}>Acknowledge</Button>}
+          {canSign && ((item.viewerParty === "RECIPIENT" && !item.recipientSignedAt) || (item.viewerParty === "ISSUER" && !item.issuerSignedAt && (!item.documentType.includes("LEASE_AGREEMENT") || item.recipientSignedAt))) && ["ISSUED", "ACKNOWLEDGED", "PARTIALLY_SIGNED"].includes(item.status) && <Button size="sm" variant="outline" onClick={() => action(item.id, "sign")} disabled={busy}><Signature className="mr-1 h-4 w-4" />Sign</Button>}
         </div></div>)}
       {totalPages > 1 && <div className="flex items-center justify-between border-t pt-4"><Button type="button" variant="outline" disabled={page === 0 || busy} onClick={() => setPage(value => value - 1)}>Previous</Button><span className="text-sm text-muted-foreground">Page {page + 1} of {totalPages}</span><Button type="button" variant="outline" disabled={page >= totalPages - 1 || busy} onClick={() => setPage(value => value + 1)}>Next</Button></div>}
     </CardContent></Card>

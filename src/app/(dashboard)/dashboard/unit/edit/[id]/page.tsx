@@ -54,7 +54,7 @@ const unitSchema = z.object({
   size: z.string().min(1, "Size is required").regex(/^\d+\.?\d*$/, "Must be a valid number"),
   measurementUnits: z.string().min(1, "Measurement unit is required"),
   utilities: z.string().min(1, "At least one utility is required"),
-  leaseMode: z.enum(["Rent", "Lease"]).refine((val) => !!val, { message: "Lease mode is required" }),
+  leaseMode: z.enum(["RENT", "SALE", "SERVICE_CHARGE"]).refine((val) => !!val, { message: "Lease mode is required" }),
   price: z.string().min(1, "Price is required").regex(/^\d+\.?\d*$/, "Must be a valid number"),
   currency: z.string().optional(),
   templateId: z.string().optional(),
@@ -125,11 +125,7 @@ export default function EditUnitPage() {
 
   const selectedLeaseMode = watch("leaseMode");
 
-  const filteredLeaseTemplates = leaseTemplateOptions.filter((template: any) => {
-    if (!selectedLeaseMode) return true;
-    const templateMode = selectedLeaseMode === "Rent" ? "RENT" : "SALE";
-    return template.leaseMode === templateMode;
-  });
+  const filteredLeaseTemplates = leaseTemplateOptions.filter((template: any) => template.leaseMode === "RENT");
 
   // Load initial data
   useEffect(() => {
@@ -142,16 +138,21 @@ export default function EditUnitPage() {
     try {
       setLoading(true);
 
-      const [unitRes, utilitiesRes, measurementsRes, leaseTemplatesRes] = await Promise.all([
+      const [unitRes, utilitiesRes, measurementsRes] = await Promise.all([
         viewUnit(Number(propertyId), Number(unitId)),
         fetchSupportedUtilities(),
         fetchMeasurementUnits(),
-        handleListLeaseTemplates({ page: 0, size: 100, sort: 'name,asc'}),
       ]);
 
       // Set unit data
       if (unitRes.success && unitRes.data) {
-        const unitData = unitRes.data[0];
+        // Detail endpoints return one DTO; retain array compatibility for
+        // older deployments and fixtures.
+        const unitData = Array.isArray(unitRes.data) ? unitRes.data[0] : unitRes.data;
+        if (!unitData || typeof unitData !== "object") {
+          setError("The unit details were not returned. Please try again.");
+          return;
+        }
         
         setUnit(unitData);
         await getUnitTypes(unitData.propertyType);
@@ -161,9 +162,8 @@ export default function EditUnitPage() {
         setValue("size", unitData.size.toString());
         setValue("measurementUnits", unitData.measurementUnits.id.toString());
         setValue("utilities", unitData.utilities.map((u: any) => u.id).join(","));
-        const leaseModeVal = unitData.leaseMode.charAt(0).toUpperCase() + unitData.leaseMode.slice(1)
-        console.log("Lease Mode Value: ", leaseModeVal)
-        setValue("leaseMode", leaseModeVal);
+        const leaseModeVal = String(unitData.leaseMode || "").toUpperCase();
+        setValue("leaseMode", leaseModeVal as UnitFormData["leaseMode"]);
         setValue("price", unitData.price.toString());
         setValue("currency", unitData.currency)
 
@@ -182,6 +182,20 @@ export default function EditUnitPage() {
         
         setExistingImages(allImagePaths);
         await loadExistingImages(allImagePaths);
+
+        // Lease templates are a rental-only concern. Sale and service-charge
+        // unit edits must not call the guarded rental endpoint and turn a
+        // valid form into a generic "failed to load" state.
+        const leaseTemplatesRes = leaseModeVal === "RENT"
+          ? await handleListLeaseTemplates({ page: 0, size: 100, sort: "name,asc" })
+          : { success: false, data: [] };
+        if (leaseTemplatesRes?.success && leaseTemplatesRes.data) {
+          setLeaseTemplateOptions(leaseTemplatesRes.data.map((item: any) => ({
+            value: item.id.toString(),
+            label: item.name,
+            leaseMode: item.leaseMode,
+          })));
+        }
       }
 
       if (utilitiesRes?.success) {
@@ -198,15 +212,6 @@ export default function EditUnitPage() {
           label: item.name,
         }));
         setMeasurementOptions(measurements);
-      }
-
-      if (leaseTemplatesRes?.success && leaseTemplatesRes.data) {
-        const templates = leaseTemplatesRes.data.map((item: any) => ({
-          value: item.id.toString(),
-          label: item.name,
-          leaseMode: item.leaseMode,
-        }));
-        setLeaseTemplateOptions(templates);
       }
 
     } catch (err: any) {
@@ -759,12 +764,20 @@ export default function EditUnitPage() {
                 render={({ field }) => (
                   <Select
                     options={[
-                      { value: "Rent", label: "Rent" },
-                      { value: "Lease", label: "Lease" },
+                      { value: "RENT", label: "Rent" },
+                      { value: "SALE", label: "Sale" },
+                      { value: "SERVICE_CHARGE", label: "Service charge" },
                     ]}
                     value={
                       field.value
-                        ? { value: field.value.charAt(0).toUpperCase() + field.value.slice(1), label: field.value.charAt(0).toUpperCase() + field.value.slice(1)}
+                        ? {
+                            value: field.value,
+                            label: field.value === "RENT"
+                              ? "Rent"
+                              : field.value === "SALE"
+                                ? "Sale"
+                                : "Service charge",
+                          }
                         : null
                     }
                     onChange={(opt: any) => field.onChange(opt?.value)}
@@ -866,11 +879,11 @@ export default function EditUnitPage() {
                     isSearchable
                     classNamePrefix="rs"
                     placeholder={
-                      selectedLeaseMode
-                        ? "Select a lease template"
-                        : "Select lease mode first"
+                        selectedLeaseMode === "RENT"
+                          ? "Select a lease template"
+                          : "Not used for this unit type"
                     }
-                    isDisabled={!selectedLeaseMode}
+                    isDisabled={selectedLeaseMode !== "RENT"}
                     value={
                       filteredLeaseTemplates.find((opt) => opt.value === field.value) || null
                     }
@@ -903,9 +916,9 @@ export default function EditUnitPage() {
                 )}
               />
               <p className="text-xs text-gray-500">
-                {selectedLeaseMode
-                  ? `Showing ${selectedLeaseMode === "Rent" ? "rental" : "sale"} templates`
-                  : "Please select a lease mode to see available templates"}
+                {selectedLeaseMode === "RENT"
+                  ? "Showing rental templates"
+                  : "Lease templates are only used for rental units"}
               </p>
             </div>
           </div>

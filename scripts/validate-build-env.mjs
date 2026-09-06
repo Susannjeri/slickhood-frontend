@@ -1,10 +1,7 @@
 const value = process.env.NEXT_PUBLIC_API_URL;
 
 if (!value) {
-  if (process.env.CI || process.env.NODE_ENV === 'production') {
-    throw new Error('NEXT_PUBLIC_API_URL is required for production builds.');
-  }
-  process.exit(0);
+  throw new Error('NEXT_PUBLIC_API_URL is required for every deployable build.');
 }
 
 let apiUrl;

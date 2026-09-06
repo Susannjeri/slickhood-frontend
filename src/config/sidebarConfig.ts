@@ -297,7 +297,7 @@ export const sidebarLinks: SidebarLink[] = [
     label: "Estate Management",
     href: "/dashboard/estate",
     permissions: ["view_estate"],
-    roles: ["EstateManager", "EstateOperationsManager", "Superadmin"],
+    roles: ["EstateManager", "EstateOperationsManager", "WorkspaceAdmin", "WorkspaceViewer", "PropertyAccountant", "SecuritySupervisor", "Superadmin"],
     subscriptionFeatures: ["ESTATE_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT"],
     protected: true,
     description: "Homeowners, ownership history, service charges and estate operations.",

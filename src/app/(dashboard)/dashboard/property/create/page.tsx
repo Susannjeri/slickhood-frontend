@@ -21,6 +21,7 @@ import { useApi, ProfileGateResult } from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
 import { currencyOptions } from "@/lib/actions";
 import { usePropertyMetadata } from "@/app/(dashboard)/dashboard/property/propertyMetadata";
+import { useAuthStore } from "@/store/authStore";
 import {
   managementJourneys,
   parseCoordinates,
@@ -54,6 +55,7 @@ export default function CreatePropertyPage() {
   const router = useRouter();
   const imageInput = useRef<HTMLInputElement>(null);
   const { handleTokenRefresh } = useAuth();
+  const activeRole = useAuthStore(state => state.activeRole);
   const { createNewProperty } = useApi();
   const { isLoadingTypes, propertyTypeOptions } = usePropertyMetadata();
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY?.trim() ?? "";
@@ -80,6 +82,14 @@ export default function CreatePropertyPage() {
 
   const managementMode = watch("managementMode");
   const mapLocation = watch("mapLocation");
+  const roleTitle = activeRole?.title?.toLowerCase().replace(/[ _-]/g, "") ?? "";
+  const availableJourneys = roleTitle === "landlord"
+    ? managementJourneys.filter(item => item.value === "RENTAL")
+    : roleTitle.includes("estate")
+      ? managementJourneys.filter(item => item.value === "SERVICE_CHARGE")
+      : roleTitle.includes("sales") || roleTitle.includes("listing")
+        ? managementJourneys.filter(item => item.value === "SALE")
+        : roleTitle === "superadmin" ? managementJourneys : [];
 
   useEffect(() => () => {
     if (imagePreview) URL.revokeObjectURL(imagePreview);
@@ -179,9 +189,9 @@ export default function CreatePropertyPage() {
       {step === "journey" ? (
         <section aria-labelledby="journey-heading" className="rounded-2xl border bg-white p-5 shadow-sm sm:p-8">
           <h2 id="journey-heading" className="text-2xl font-semibold text-[#141130]">What do you want to manage?</h2>
-          <p className="mt-1 text-sm text-slate-600">This choice configures the right downstream workflow. You can still manage mixed portfolios.</p>
+          <p className="mt-1 text-sm text-slate-600">Your active business role and subscription determine which property workflow is available.</p>
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
-            {managementJourneys.map(journey => {
+            {availableJourneys.map(journey => {
               const Icon = journeyIcons[journey.value];
               return (
                 <button key={journey.value} type="button" onClick={() => selectJourney(journey.value)} className="group rounded-xl border-2 border-slate-200 p-5 text-left transition hover:border-[#EF4217] hover:bg-orange-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#EF4217] focus-visible:ring-offset-2">
@@ -193,6 +203,7 @@ export default function CreatePropertyPage() {
               );
             })}
           </div>
+          {availableJourneys.length === 0 && <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Select an active subscribed business role before creating a property.</p>}
         </section>
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>

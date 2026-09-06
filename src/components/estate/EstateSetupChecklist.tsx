@@ -20,7 +20,7 @@ const actionCopy: Record<EstateSetupNextAction, { label: string; description: st
   ADD_UNITS: { label: "Add units", description: "Create the homes, apartments or spaces that belong to this property." },
   LINK_OPERATING_ACCOUNT: { label: "Link operating account", description: "Choose where rent, sale proceeds or service charges will be received." },
   ASSIGN_HOMEOWNERS: { label: "Assign homeowners", description: "Connect every occupied or sold unit to its current homeowner." },
-  CREATE_ESTATE_BUDGET: { label: "Create annual budget", description: "Approve the current-year plan before raising estate service charges." },
+  CREATE_ESTATE_BUDGET: { label: "Create or approve annual budget", description: "Approve the current-year plan to complete estate setup." },
   INVITE_ESTATE_TEAM: { label: "Invite estate team", description: "Give managers and operational staff only the access their roles require." },
   READY: { label: "Open estate operations", description: "Core setup is complete. Continue with meetings, budgets and common-area work." },
 };
@@ -87,7 +87,11 @@ export default function EstateSetupChecklist({ propertyId, propertyName, currenc
   const requiredSteps = steps.filter(step => !step.optional);
   const completed = requiredSteps.filter(step => step.complete).length;
   const progress = requiredSteps.length === 0 ? 100 : Math.round((completed / requiredSteps.length) * 100);
-  const next = actionCopy[status.nextAction];
+  // Legacy records and partially migrated properties may not have a
+  // nextAction yet.  Treat them as ready for the normal estate workspace
+  // instead of throwing during render and blanking the whole property page.
+  const next = actionCopy[status.nextAction] ?? actionCopy.READY;
+  const nextAction = actionCopy[status.nextAction] ? status.nextAction : "READY";
 
   return (
     <Card aria-label="Estate setup" className={status.readyForHomeownerOperations ? "border-emerald-200" : "border-orange-200"}>
@@ -104,7 +108,7 @@ export default function EstateSetupChecklist({ propertyId, propertyName, currenc
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-4">
           <div><p className="font-semibold text-[#141130]">Next: {next.label}</p><p className="text-sm text-muted-foreground">{next.description}</p></div>
-          <Button type="button" onClick={() => runNextAction(status.nextAction)}>{next.label}<ArrowRight className="ml-2 h-4 w-4" /></Button>
+          <Button type="button" onClick={() => runNextAction(nextAction)}>{next.label}<ArrowRight className="ml-2 h-4 w-4" /></Button>
         </div>
       </CardContent>
     </Card>

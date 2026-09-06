@@ -46,8 +46,14 @@ export default function CreateUnitEntryPage() {
     setLoading(true);
     try {
       const res = await viewPropertyDetails(selectedPropertyId);
-      if (res.success && res.data && res.data[0]) {
-        const p = res.data[0];
+      if (res.success && res.data) {
+        // The detail endpoint returns one PropertyViewDTO object. Keep the
+        // array branch for older API envelopes used by existing clients.
+        const p = Array.isArray(res.data) ? res.data[0] : res.data;
+        if (!p || typeof p !== "object") {
+          toast.error("Could not load property details. Please try again.");
+          return;
+        }
         const nameSlug = p.name.replace(/\s+/g, "-").toLowerCase();
         const origin = originFromLeaseMode(leaseMode);
         router.push(

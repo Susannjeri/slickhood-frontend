@@ -31,6 +31,7 @@ export interface LeaseDocument {
   acknowledgedAt?: string;
   issuerSignedAt?: string;
   recipientSignedAt?: string;
+  viewerParty?: "ISSUER" | "RECIPIENT";
 }
 
 export interface LeaseDocumentTemplate {
@@ -46,6 +47,7 @@ export interface LeaseDocumentTemplate {
 }
 
 export interface GenerateLeaseDocumentRequest {
+  ownershipId?: number;
   leaseId?: number;
   saleId?: number;
   propertyId?: number;

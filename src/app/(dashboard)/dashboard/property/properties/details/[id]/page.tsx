@@ -255,7 +255,18 @@ export default function PropertyDetailsPage() {
             const response = await viewPropertyDetails(Number(propertyId));
 
             if (response.success && response.data) {
-                const propertyData = response.data[0];
+                // `/property/list?propertyId=...` is the detail variant of
+                // the endpoint and returns one object, while the collection
+                // variant returns an array.  The old `[0]` assumption turned
+                // every successful property save into a client render error
+                // because `undefined.mapLocation` was accessed below.
+                const propertyData = Array.isArray(response.data)
+                    ? response.data[0]
+                    : response.data;
+                if (!propertyData || typeof propertyData !== "object") {
+                    setError("The property was saved, but its details were not returned. Please retry.");
+                    return;
+                }
                 setProperty(propertyData);
                 if (propertyData.mapLocation) {
                     const [lat, lng] = propertyData.mapLocation
@@ -1186,7 +1197,7 @@ export default function PropertyDetailsPage() {
                                                                     variant="ghost"
                                                                     size="sm"
                                                                     className="text-sm font-medium text-gray-600 hover:text-[#141130]"
-                                                                    onClick={() => router.push(`/dashboard/unit/edit/${unit.unitId}`)}
+                                                                    onClick={() => router.push(`/dashboard/unit/edit/${unit.unitId}?p=${propertyId}&from=property`)}
                                                                 >
                                                                     Edit
                                                                 </Button>

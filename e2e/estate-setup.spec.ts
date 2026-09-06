@@ -28,6 +28,47 @@ test.beforeEach(async ({ context, page }) => {
   await page.route("**/invite/types", route => route.fulfill({ json: envelope([]) }));
 });
 
+test("property details accepts the object returned by the detail API after a save", async ({ page }) => {
+  // The collection variant returns an array, but GET /property/list?propertyId=...
+  // returns a single PropertyViewDTO.  Keep this contract test on the real
+  // detail shape so a save cannot regress into the route error boundary.
+  await page.route(url => {
+    const parsed = new URL(url);
+    return parsed.pathname.endsWith("/property/list") && parsed.searchParams.get("propertyId") === "41";
+  }, route => route.fulfill({ json: envelope({
+    id: 41,
+    name: "Green Court",
+    type: "APARTMENT",
+    managementMode: "RENTAL",
+    address: "Nairobi",
+    mapLocation: "-1.286389,36.817223",
+    currency: "KES",
+    image: "",
+    thumbnail: "",
+  }) }));
+  await page.route("**/estate/setup/properties/41", route => route.fulfill({ json: envelope({
+    propertyId: 41,
+    propertyName: "Green Court",
+    managementMode: "RENTAL",
+    activeUnits: 0,
+    activeStaff: 0,
+    operatingAccounts: 0,
+    activeHomeowners: 0,
+    currentBudgets: 0,
+    unitsConfigured: false,
+    billingConfigured: false,
+    homeownerOperationsConfigured: false,
+    readyForHomeownerOperations: false,
+    nextAction: "ADD_UNITS",
+  }) }));
+
+  await page.goto("/dashboard/property/properties/details/41");
+
+  await expect(page.getByRole("heading", { name: "Green Court" })).toBeVisible();
+  await expect(page.getByText("We couldn’t open this property")).toHaveCount(0);
+  await expect(page.getByText("Estate setup", { exact: true })).toBeVisible();
+});
+
 test("new service-charge property starts a guided estate setup journey", async ({ page }) => {
   let setupStatusRequests = 0;
   await page.route("**/estate/setup/properties/41", route => {

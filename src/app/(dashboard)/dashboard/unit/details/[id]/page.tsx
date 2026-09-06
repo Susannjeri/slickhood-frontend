@@ -42,6 +42,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api-error";
 import {
   Loader2,
   ArrowLeft,
@@ -235,6 +236,7 @@ export default function ViewUnitPage() {
     getPropertyImage,
     handleToggleAdvert,
     handleCreateSimilarUnits,
+    handleGetCreateUnitJobStatus,
     handleGetUnitCharges,
     handleCreateEmailOccupantInvite,
     handleGetStaffAndInvites,
@@ -360,7 +362,14 @@ export default function ViewUnitPage() {
       setError(null);
       const response = await viewUnit(Number(propertyId), Number(unitId));
       if (response.success && response.data) {
-        const unitData = response.data[0];
+        // Unit detail responses are object-shaped while collection responses
+        // are arrays.  Supporting both keeps the unit detail journey working
+        // against the current backend and older compatible deployments.
+        const unitData = Array.isArray(response.data) ? response.data[0] : response.data;
+        if (!unitData) {
+          setError("Unit details were not returned");
+          return;
+        }
         setUnit({
           ...unitData,
           measurementUnits: unitData.measurementUnits ?? { id: 0, name: "" },
@@ -412,6 +421,7 @@ export default function ViewUnitPage() {
   };
 
   const loadUnitInvites = async () => {
+    if (!useAuthStore.getState().permissions.includes("view_invite_list")) return;
     try {
       setInvitesLoading(true);
       const response = await handlelistUnitInvites(Number(unitId));
@@ -469,14 +479,47 @@ export default function ViewUnitPage() {
     if (!unit) return;
     setIsCreatingSimilar(true);
     try {
-      await handleCreateSimilarUnits(Number(unitId), similarUnitsCount);
-      toast.success("Similar units creation initiated!");
+      const response = await handleCreateSimilarUnits(Number(unitId), similarUnitsCount);
+      if (!response?.success) {
+        throw new Error(response?.description || "Similar units could not be queued.");
+      }
+      const job = Array.isArray(response.data) ? response.data[0] : response.data;
+      const jobId = Number(job?.jobId);
+      toast.success(jobId
+        ? `${similarUnitsCount} similar unit${similarUnitsCount === 1 ? "" : "s"} queued (job #${jobId}).`
+        : `${similarUnitsCount} similar unit${similarUnitsCount === 1 ? "" : "s"} queued.`);
       setSimilarUnitsCount(1);
       setIsModalOpen(false);
+      if (Number.isInteger(jobId) && jobId > 0) {
+        void monitorSimilarJob(jobId, similarUnitsCount);
+      }
     } catch (err: any) {
-      toast.error("Failed to create similar units");
+      toast.error(apiErrorMessage(err, err?.message || "Failed to create similar units"));
     } finally {
       setIsCreatingSimilar(false);
+    }
+  };
+
+  const monitorSimilarJob = async (jobId: number, requestedCount: number) => {
+    const deadline = Date.now() + 45_000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+      try {
+        const response = await handleGetCreateUnitJobStatus(jobId);
+        const status = Array.isArray(response?.data) ? response.data[0] : response?.data;
+        if (status?.completed) {
+          if (status.failed === true || status.status === "FAILED") {
+            toast.error(`Similar unit job #${jobId} failed. No partial units were kept.`);
+          } else {
+            toast.success(`${requestedCount} similar unit${requestedCount === 1 ? "" : "s"} created successfully.`);
+          }
+          return;
+        }
+      } catch {
+        // The queue itself remains authoritative; stop polling if the status
+        // endpoint is temporarily unavailable rather than showing a false failure.
+        return;
+      }
     }
   };
 
@@ -720,7 +763,10 @@ export default function ViewUnitPage() {
   }
 
   const totalMonthly = unit.price + unitCharges.reduce((sum, c) => sum + c.amount, 0);
-  const isHomeownerUnit = unit.leaseMode === "SERVICE_CHARGE" || origin === "homeowners";
+  const isHomeownerUnit = unit.leaseMode === "SERVICE_CHARGE";
+  const isSaleUnit = unit.leaseMode === "SALE";
+  const isRentalUnit = !isHomeownerUnit && !isSaleUnit;
+  const priceLabel = isHomeownerUnit ? "Service charge" : isSaleUnit ? "Asking price" : "Rent";
   const occupantLabel = isHomeownerUnit ? "Homeowner" : "Tenant";
 
   // ─── Main Render ──────────────────────────────────────────────────────────
@@ -900,7 +946,7 @@ export default function ViewUnitPage() {
                   </Button>
                 </CanProperty>
               )}
-              <Can permissions={["create_invite"]}>
+              <Can permissions={isHomeownerUnit ? ["manage_estate"] : ["create_invite"]}>
                 {!unit.occupied && tenants.length === 0 && (
                   <Button onClick={() => setCreateInviteOpen(true)} variant="outline">
                     <UserPlus className="w-4 h-4 mr-2" />Assign {occupantLabel}
@@ -919,7 +965,7 @@ export default function ViewUnitPage() {
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Unit</p>
               <p className="text-xl font-bold" style={{ color: "#141130" }}>{unit.ref}</p>
               <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${unit.occupied ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-700"}`}>
-                {unit.occupied ? "Occupied" : "Vacant"}
+                {isHomeownerUnit ? "Estate home" : isSaleUnit ? "Sale unit" : unit.occupied ? "Occupied" : "Vacant"}
               </span>
             </CardContent>
           </Card>
@@ -934,9 +980,9 @@ export default function ViewUnitPage() {
           {/* Rent */}
           <Card>
             <CardContent className="p-4 space-y-2">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Rent</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{priceLabel}</p>
               <p className="text-xl font-bold" style={{ color: "#EF4217" }}>
-                {unit.price == null ? "Rent not set" : `${unit.currency ?? "KES"} ${Number(unit.price).toLocaleString()}`}
+                {unit.price == null ? `${priceLabel} not set` : `${unit.currency ?? "KES"} ${Number(unit.price).toLocaleString()}`}
               </p>
               <p className="text-xs text-gray-400 capitalize">{unit.leaseMode}</p>
             </CardContent>
@@ -972,7 +1018,7 @@ export default function ViewUnitPage() {
                   </>
                 )}
                 <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: unit.occupied ? "#6B7280" : "#10B981" }}>
-                  {unit.occupied ? "Occupied" : "Available"}
+                  {isHomeownerUnit ? "Estate home" : isSaleUnit ? "Sale unit" : unit.occupied ? "Occupied" : "Available"}
                 </div>
               </>
             ) : (
@@ -998,8 +1044,8 @@ export default function ViewUnitPage() {
             <TabsList className="inline-flex w-auto h-auto p-1 gap-1">
               <TabsTrigger value="overview" className="text-sm px-4">Overview</TabsTrigger>
               <TabsTrigger value="financials" className="text-sm px-4">Financials</TabsTrigger>
-              <TabsTrigger value="tenant" className="text-sm px-4">Tenant</TabsTrigger>
-              <TabsTrigger value="lease" className="text-sm px-4">Lease</TabsTrigger>
+              {isRentalUnit && <TabsTrigger value="tenant" className="text-sm px-4">Tenant</TabsTrigger>}
+              {isRentalUnit && <TabsTrigger value="lease" className="text-sm px-4">Lease</TabsTrigger>}
               <TabsTrigger value="maintenance" className="text-sm px-4">Maintenance</TabsTrigger>
               <TabsTrigger value="documents" className="text-sm px-4">Documents</TabsTrigger>
               <TabsTrigger value="listing" className="text-sm px-4">Listing</TabsTrigger>
@@ -1042,7 +1088,7 @@ export default function ViewUnitPage() {
                 <CardContent>
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between py-1 border-b border-gray-50">
-                      <span className="text-gray-500">Base Rent</span>
+                      <span className="text-gray-500">{isRentalUnit ? "Base rent" : priceLabel}</span>
                       <span className="font-semibold" style={{ color: "#141130" }}>{unit.currency} {formatUnitPrice(unit.price)}</span>
                     </div>
                     {loadingCharges ? (
@@ -1066,7 +1112,7 @@ export default function ViewUnitPage() {
                         <span className="font-semibold" style={{ color: "#141130" }}>Total</span>
                         <span className="text-xl font-bold" style={{ color: "#EF4217" }}>{unit.currency} {totalMonthly.toLocaleString()}</span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5 capitalize">per {unit.leaseMode}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{isHomeownerUnit ? "Indicative charge; use the issued estate invoice for the amount due." : isSaleUnit ? "Asking price; the signed offer records the agreed amount." : "Per rental billing period"}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1098,8 +1144,15 @@ export default function ViewUnitPage() {
 
             {/* Primary unit actions: Tenant · Lease · Listing · Similar units */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+              {isHomeownerUnit && <Card><CardHeader className="pb-3"><CardTitle className="text-base">Homeowner & agreement</CardTitle></CardHeader><CardContent className="space-y-3">
+                <p className="text-sm text-gray-500">Invite the homeowner by email. Ownership history and agreement preparation are managed in Estate Management, not a rental lease.</p>
+                <CanProperty propertyId={Number(propertyId)} permissions={["create_invite"]}><Button size="sm" onClick={() => setCreateInviteOpen(true)}>Assign Homeowner</Button></CanProperty>
+                <CanProperty propertyId={Number(propertyId)} permissions={["view_homeowners"]}><Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/estate?propertyId=${propertyId}`)}>Ownership & agreements</Button></CanProperty>
+                <CanProperty propertyId={Number(propertyId)} permissions={["view_lease_document"]}><Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/documents?propertyId=${propertyId}&type=ESTATE_RESIDENTIAL_AGREEMENT`)}>View agreements</Button></CanProperty>
+              </CardContent></Card>}
+              {isSaleUnit && <Card><CardHeader className="pb-3"><CardTitle className="text-base">Offer & sale agreement</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-gray-500">Use the sales pipeline for the buyer invitation, letter of offer, signatures and completion evidence.</p><CanProperty propertyId={Number(propertyId)} permissions={["view_sale_pipeline"]}><Button size="sm" onClick={() => router.push(`/dashboard/sales?propertyId=${propertyId}&unitId=${unitId}`)}>Open property sale</Button></CanProperty></CardContent></Card>}
               {/* Tenant card */}
-              <CanProperty propertyId={Number(propertyId)} permissions={["view_tenants"]}>
+              {isRentalUnit && <CanProperty propertyId={Number(propertyId)} permissions={["view_tenants"]}>
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base font-semibold" style={{ color: "#141130" }}>Tenant</CardTitle>
@@ -1137,10 +1190,10 @@ export default function ViewUnitPage() {
                     )}
                   </CardContent>
                 </Card>
-              </CanProperty>
+              </CanProperty>}
 
               {/* Lease card */}
-              <Card>
+              {isRentalUnit && <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base font-semibold" style={{ color: "#141130" }}>Lease</CardTitle>
                 </CardHeader>
@@ -1162,7 +1215,7 @@ export default function ViewUnitPage() {
                     </div>
                   )}
                 </CardContent>
-              </Card>
+              </Card>}
 
               {/* Listing card */}
               <Card>

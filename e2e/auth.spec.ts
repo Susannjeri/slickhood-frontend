@@ -160,12 +160,12 @@ test("a tenant invitation survives sign-in and returns to lease initialization",
   await page.route("https://accounts.google.com/**", route => route.abort());
   await page.route("**/invite/validate**", route => route.fulfill({ json: {
     success: true, code: "S0058", description: "Tenant invite",
-    data: [{
+    data: {
       propertyId: 11, unitId: 77, ref: "A-101", propertyType: "APARTMENT",
       unitType: "APARTMENT", size: 85, measurementUnits: { id: 1, name: "sqm" },
       utilities: [], leaseMode: "RENT", price: 25000, currency: "KES",
       occupied: false, advertise: false, thumbnail: "", images: [], templateId: 9,
-    }],
+    },
   } }));
   await page.route("**/property/unit/type**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/property/unit/charges/public**", route => route.fulfill({ json: envelope([]) }));
@@ -194,9 +194,9 @@ test("a new tenant can start registration directly from the unit invitation", as
   await page.route("https://accounts.google.com/**", route => route.abort());
   await page.route("**/invite/validate**", route => route.fulfill({ json: {
     success: true, code: "S0058", description: "Tenant invite",
-    data: [{ propertyId: 11, unitId: 77, ref: "A-101", propertyType: "APARTMENT", unitType: "APARTMENT", size: 85,
+    data: { propertyId: 11, unitId: 77, ref: "A-101", propertyType: "APARTMENT", unitType: "APARTMENT", size: 85,
       measurementUnits: { id: 1, name: "sqm" }, utilities: [], leaseMode: "RENT", price: 25000, currency: "KES",
-      occupied: false, advertise: false, thumbnail: "", images: [], templateId: 9 }],
+      occupied: false, advertise: false, thumbnail: "", images: [], templateId: 9 },
   } }));
   await page.route("**/property/unit/type**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/property/unit/charges**", route => route.fulfill({ json: envelope([]) }));

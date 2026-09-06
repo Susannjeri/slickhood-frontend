@@ -674,6 +674,15 @@ export const getPendingUnits = (token:string) => {
   })
 }
 
+export const getCreateUnitJobStatus = (jobId: number, token: string) => {
+  return API.get(`/property/unit/create/similar/status?jobId=${encodeURIComponent(jobId)}`, {
+    headers: {
+      "Content-Type": 'application/json',
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
 export const getCreateUnitJobs = (
   params:UnitJobsParams={ 
     sort: 'id,desc', // Default sort is 'id,desc'
@@ -1313,6 +1322,9 @@ export const updateUnitTypeCatalog = (propertyType: string, unitTypeIds: string[
   API.put(`/property/unit/type/catalog/${encodeURIComponent(propertyType)}`, unitTypeIds);
 
 export interface ActiveLease {
+  moveInDate?: string;
+  price?: number;
+  currency?: string;
   id: number;
   name: string;
   leaseMode: "RENT" | "SALE";

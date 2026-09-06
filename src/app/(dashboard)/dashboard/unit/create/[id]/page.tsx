@@ -80,6 +80,7 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
   const {
     createNewUnit,
     handleCreateSimilarUnits,
+    handleGetCreateUnitJobStatus,
     fetchSupportedUtilities,
     fetchMeasurementUnits,
     handleListLeaseTemplates,
@@ -126,16 +127,49 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
     if (!successData?.unitId) return;
     setIsCreatingSimilar(true);
     try {
-      await handleCreateSimilarUnits(successData.unitId, similarUnitsCount);
-      toast.success(`${similarUnitsCount} similar unit${similarUnitsCount === 1 ? "" : "s"} queued. You will be notified when creation finishes.`);
+      const response = await handleCreateSimilarUnits(successData.unitId, similarUnitsCount);
+      if (!response?.success) {
+        throw new Error(response?.description || "Similar units could not be queued.");
+      }
+      const job = Array.isArray(response.data) ? response.data[0] : response.data;
+      const jobId = Number(job?.jobId);
+      toast.success(jobId
+        ? `${similarUnitsCount} similar unit${similarUnitsCount === 1 ? "" : "s"} queued (job #${jobId}).`
+        : `${similarUnitsCount} similar unit${similarUnitsCount === 1 ? "" : "s"} queued.`);
+      if (Number.isInteger(jobId) && jobId > 0) {
+        await monitorSimilarJob(jobId, similarUnitsCount);
+      }
       setSimilarUnitsCount(1);
       setShowSimilarSetup(false);
       setSuccessData(null);
       router.push(backHref);
-    } catch {
-      toast.error("Failed to create similar units");
+    } catch (error: unknown) {
+      toast.error(apiErrorMessage(error, error instanceof Error ? error.message : "Failed to create similar units"));
     } finally {
       setIsCreatingSimilar(false);
+    }
+  };
+
+  const monitorSimilarJob = async (jobId: number, requestedCount: number) => {
+    const deadline = Date.now() + 45_000;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+      try {
+        const response = await handleGetCreateUnitJobStatus(jobId);
+        const status = Array.isArray(response?.data) ? response.data[0] : response?.data;
+        if (status?.completed) {
+          if (status.failed === true || status.status === "FAILED") {
+            toast.error(`Similar unit job #${jobId} failed. No partial units were kept.`);
+          } else {
+            toast.success(`${requestedCount} similar unit${requestedCount === 1 ? "" : "s"} created successfully.`);
+          }
+          return;
+        }
+      } catch {
+        // The durable queue remains authoritative. Older backends without the
+        // status endpoint still get the original queued behaviour.
+        return;
+      }
     }
   };
   // const [submitStatus, setSubmitStatus] = useState<{
@@ -180,12 +214,22 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
       setIsLoadingOptions(true);
       setValue("currency", propertyCurrency);
       if (presetFormLeaseMode) setValue("leaseMode", presetFormLeaseMode);
-      // Load all options in parallel
+      // Load the options that apply to this journey in parallel.  Sale and
+      // service-charge workspaces do not have access to rental lease
+      // templates; requesting that endpoint here made an otherwise valid
+      // sale-unit form fail with the generic "Failed to load form options"
+      // toast (the API correctly returns 403).  Keep the template request
+      // scoped to rental, while still allowing the mode picker to be used
+      // when this page is opened without a preset.
+      const leaseTemplatePromise =
+        presetFormLeaseMode === "SALE" || presetFormLeaseMode === "SERVICE_CHARGE"
+          ? Promise.resolve(null)
+          : handleListLeaseTemplates({page: 0, size: 100, sort: 'name,asc'});
       const [, utilitiesRes, measurementsRes, leaseTemplateRes] = await Promise.all([
         getUnitTypes(propertyType),
         fetchSupportedUtilities(),
         fetchMeasurementUnits(),
-        handleListLeaseTemplates({page: 0, size: 100, sort: 'name,asc'}),
+        leaseTemplatePromise,
       ]);
 
       // Transform utilities
@@ -759,11 +803,13 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
                     isSearchable
                     classNamePrefix="rs"
                     placeholder={
-                      selectedLeaseMode
-                        ? "Select a lease template"
-                        : "Select lease mode first"
+                      !selectedLeaseMode
+                        ? "Select lease mode first"
+                        : selectedLeaseMode !== "RENT"
+                          ? "Not used for this unit type"
+                          : "Select a lease template"
                     }
-                    isDisabled={!selectedLeaseMode}
+                    isDisabled={!selectedLeaseMode || selectedLeaseMode !== "RENT"}
                     value={
                       filteredLeaseTemplates.find((opt) => opt.value === field.value) || null
                     }

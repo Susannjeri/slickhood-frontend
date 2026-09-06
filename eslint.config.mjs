@@ -21,6 +21,9 @@ export default defineConfig([
   },
   globalIgnores([
     "node_modules/**",
+    // build.sh creates this deployable standalone tree; it is generated output,
+    // not source, and must not be linted as a second application.
+    "deploy/**",
     ".next/**",
     "out/**",
     "build/**",
