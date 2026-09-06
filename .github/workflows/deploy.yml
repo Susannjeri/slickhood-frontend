@@ -40,6 +40,12 @@ jobs:
           ${{ secrets.ENV_PRODUCTION }}
           EOF
 
+      - name: Verify backend and public production prerequisites
+        env:
+          BACKEND_HEALTHCHECK_URL: ${{ secrets.BACKEND_HEALTHCHECK_URL }}
+          SLICKHOOD_PRODUCTION_URL: https://app.slickhood.com
+        run: npm run preflight:production
+
       - name: Install Chromium for authentication regression tests
         run: npx playwright install --with-deps chromium
 
@@ -134,3 +140,9 @@ jobs:
 
       - name: Verify production authentication contract
         run: bash ./scripts/verify-auth-production.sh
+
+      - name: Verify production dependency contract after cutover
+        env:
+          BACKEND_HEALTHCHECK_URL: ${{ secrets.BACKEND_HEALTHCHECK_URL }}
+          SLICKHOOD_PRODUCTION_URL: https://app.slickhood.com
+        run: npm run preflight:production

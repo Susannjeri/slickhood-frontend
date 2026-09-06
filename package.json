@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "test:e2e:build": "next build && playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "preflight:production": "node scripts/production-preflight.mjs",
     "smoke:production:public": "node scripts/verify-production-public.mjs"
   },
   "dependencies": {
