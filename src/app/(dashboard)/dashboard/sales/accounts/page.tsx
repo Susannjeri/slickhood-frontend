@@ -9,7 +9,7 @@ export default function SalesAccountsPage() {
       <AccountsListPage
         category="PROPERTY_SALES"
         title="Property Sales Payment Setup"
-        description="Configure verified destinations for deposits and completion proceeds. Credentials remain write-only."
+        description="Configure payment destinations for deposits and completion proceeds. Credentials remain write-only; SlickHood does not approve provider ownership."
         emptyCollectionsCopy="Add a payment account before issuing a payable sales invoice."
         listParams={{ byLandlord: true }}
       />

@@ -9,7 +9,7 @@ export default function EstateAccountsPage() {
       <AccountsListPage
         category="ESTATE_MANAGEMENT"
         title="Estate Payment Setup"
-        description="Configure verified destinations for service charges and estate operating collections. Credentials remain write-only."
+        description="Configure payment destinations for service charges and estate operating collections. Credentials remain write-only; SlickHood does not approve provider ownership."
         emptyCollectionsCopy="Add a payment account before issuing payable service-charge invoices."
         listParams={{ byLandlord: true }}
       />

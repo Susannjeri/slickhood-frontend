@@ -221,6 +221,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#141130]">{account.name}</p>
                       <p className="text-xs text-gray-400 truncate">{account.channelDisplayName}</p>
+                      {["PESA_LINK", "MPESA_BANK"].includes(account.channel) && <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-blue-600">Manual payment instructions</p>}
                     </div>
                   </button>
                 ))}
@@ -258,6 +259,11 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
               {selected.channel === "MPESA_BANK" && (
                 <p className="text-xs text-gray-400 text-center -mt-2">
                   You&apos;ll receive the bank Paybill and account reference. SlickHood marks the invoice paid only after the bank callback is verified.
+                </p>
+              )}
+              {selected.channel === "PESA_LINK" && (
+                <p className="text-xs text-gray-400 text-center -mt-2">
+                  You&apos;ll receive the destination bank details and exact invoice reference. The invoice remains unpaid until the transfer is reconciled.
                 </p>
               )}
               {selected.channel === PAYSTACK_ID && (

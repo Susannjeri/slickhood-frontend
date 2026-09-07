@@ -1645,12 +1645,10 @@ export const decryptEncrypt = (accountId: number, key: string, token: string) =>
     })
   }
 
-// Confirmed contract: same path, split by HTTP method.
-// GET  /account/{accountId}/verify — landlord/owner requests verification.
-// PUT  /account/{accountId}/verify?verify=&comments= — superadmin decides.
-//      comments is required by the backend when verify=false (rejecting).
+// Readiness is a state change, so use POST. The backend keeps the old GET
+// temporarily for compatibility with an older deployed frontend.
 export const requestAccountVerification = (accountId: number, token: string) => {
-  return API.get(`/account/${accountId}/verify`, {
+  return API.post(`/account/${accountId}/readiness`, null, {
     headers: {
       "Content-Type": 'application/json',
       Authorization: `Bearer ${token}`

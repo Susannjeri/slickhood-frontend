@@ -21,18 +21,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import Can from "@/components/auth/Can";
 import { toast } from "sonner";
@@ -44,10 +35,8 @@ import {
   Trash2,
   ShieldCheck,
   Shield,
-  ShieldOff,
   Info,
-  BadgeCheck,
-  Send,
+  CircleCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Account, AccountProperty } from "@/types/account";
@@ -73,7 +62,6 @@ export default function AccountDetailDrawer({
   const {
     handleListAccountDetail,
     handleCreateUpdateAccount,
-    handleVerifyAccount,
     handleRequestAccountVerification,
     handleDeleteAccount,
   } = useApi();
@@ -81,10 +69,6 @@ export default function AccountDetailDrawer({
   const [loading, setLoading] = useState(false);
   const [account, setAccount] = useState<Account | null>(null);
   const [fields, setFields] = useState<PropertyFieldState[]>([]);
-  const [verifying, setVerifying] = useState(false);
-  const [rejectOpen, setRejectOpen] = useState(false);
-  const [rejectComments, setRejectComments] = useState("");
-  const [rejecting, setRejecting] = useState(false);
   const [requestingVerification, setRequestingVerification] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -171,7 +155,7 @@ export default function AccountDetailDrawer({
       setTimeout(() => patchField(field.key, { justSaved: false }), 2000);
 
       setAccount(current => current ? { ...current, verified: false } : current);
-      toast.success("Payment detail updated — verification required");
+      toast.success("Payment detail updated — recheck the account before using it");
       onChanged();
     } catch (err: any) {
       patchField(field.key, { isSaving: false });
@@ -182,75 +166,21 @@ export default function AccountDetailDrawer({
     }
   };
 
-  const handleVerify = async () => {
-    if (!account) return;
-    try {
-      setVerifying(true);
-      const res = await handleVerifyAccount(account.id, true);
-      if (res?.success === false) {
-        throw new Error(res?.description || "Failed to verify account");
-      }
-      // Update-style endpoints on this API return empty data — reload
-      // from the server rather than trust/guess the response body.
-      await loadDetail(account.id);
-      toast.success("Account verified");
-      onChanged();
-    } catch (err: any) {
-      toast.error("Failed to verify account", {
-        description: err.message || "Please try again",
-        descriptionClassName: "!text-black",
-      });
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  // Reject IS the confirmation step here — the comments dialog replaces the
-  // plain confirm, don't stack a second one on top.
-  const handleRejectConfirm = async () => {
-    if (!account) return;
-    const comments = rejectComments.trim();
-    if (!comments) return;
-    try {
-      setRejecting(true);
-      const res = await handleVerifyAccount(account.id, false, comments);
-      if (res?.success === false) {
-        throw new Error(res?.description || "Failed to reject verification");
-      }
-      // Update-style endpoints on this API return empty data — reload from
-      // the server rather than trust/guess the response body. Also checks
-      // whether the detail payload echoes the rejection comments back (it
-      // may not — only surface them elsewhere in the UI if it does).
-      await loadDetail(account.id);
-      setRejectOpen(false);
-      setRejectComments("");
-      toast.success("Verification rejected");
-      onChanged();
-    } catch (err: any) {
-      toast.error("Failed to reject verification", {
-        description: err.message || "Please try again",
-        descriptionClassName: "!text-black",
-      });
-    } finally {
-      setRejecting(false);
-    }
-  };
-
   const handleSendVerificationRequest = async () => {
     if (!account) return;
     try {
       setRequestingVerification(true);
       const res = await handleRequestAccountVerification(account.id);
       if (res?.success === false) {
-        throw new Error(res?.description || "Failed to send verification request");
+        throw new Error(res?.description || "Failed to check account readiness");
       }
       await loadDetail(account.id);
-      toast.success("Verification requested", {
-        description: "The superadmin has been notified to review this account.",
+      toast.success("Account is ready for test payments", {
+        description: "No SlickHood administrator approval is required.",
         descriptionClassName: "!text-black",
       });
     } catch (err: any) {
-      toast.error("Failed to send verification request", {
+      toast.error("Account could not be enabled", {
         description: err.message || "Please try again",
         descriptionClassName: "!text-black",
       });
@@ -284,7 +214,7 @@ export default function AccountDetailDrawer({
   const displayFields = fields.filter((f) => f.displayField);
   const configFields = fields.filter((f) => !f.displayField);
   // Best-effort "is this account actually configured" guard for the
-  // verification-request button — the API doesn't mark individual
+  // readiness button — the API doesn't mark individual
   // properties as required, so "every property has a value" is a proxy.
   const hasUnsetProperties = fields.some((f) => f.value === "");
 
@@ -431,7 +361,7 @@ export default function AccountDetailDrawer({
                         ) : (
                           <Shield className="w-3 h-3" />
                         )}
-                        {account.verified ? "Verified" : "Unverified"}
+                        {account.verified ? "Ready for payments" : "Setup incomplete"}
                       </span>
                       <span
                         className={cn(
@@ -449,65 +379,10 @@ export default function AccountDetailDrawer({
                     <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                     <p className="text-sm text-gray-700">
                       Payments will be sent to this account. Credential fields are encrypted and write-only;
-                      use Replace to enter a new value. Changing any payment detail requires fresh verification.
+                      use Replace to enter a new value. Changing a payment detail pauses this route until the
+                      complete setup is checked again. SlickHood does not certify account ownership.
                     </p>
                   </div>
-
-                  {/* Verify action */}
-                  {!account.verified && (
-                    <Can roles={["Superadmin"]}>
-                      <div className="flex items-center justify-between p-4 rounded-lg border border-dashed">
-                        <div>
-                          <p className="text-sm font-medium" style={{ color: "#141130" }}>
-                            This account isn&apos;t verified yet
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Verify it once you&apos;ve confirmed the settings are correct.
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          onClick={handleVerify}
-                          disabled={verifying}
-                          className="text-white shrink-0"
-                          style={{ backgroundColor: "#EF4217" }}
-                        >
-                          {verifying ? (
-                            <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                          ) : (
-                            <BadgeCheck className="w-4 h-4 mr-1.5" />
-                          )}
-                          Verify
-                        </Button>
-                      </div>
-                    </Can>
-                  )}
-
-                  {/* Reject action — the comments dialog IS the confirmation
-                      step for this, no separate plain confirm on top. */}
-                  {account.verified && (
-                    <Can roles={["Superadmin"]}>
-                      <div className="flex items-center justify-between p-4 rounded-lg border border-dashed">
-                        <div>
-                          <p className="text-sm font-medium" style={{ color: "#141130" }}>
-                            This account is verified
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Reject it if the settings need to be re-checked.
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setRejectOpen(true)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 shrink-0"
-                        >
-                          <ShieldOff className="w-4 h-4 mr-1.5" />
-                          Reject request
-                        </Button>
-                      </div>
-                    </Can>
-                  )}
 
                   {/* Summary display fields */}
                   {displayFields.length > 0 && (
@@ -556,16 +431,16 @@ export default function AccountDetailDrawer({
                         {requestingVerification ? (
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                         ) : (
-                          <Send className="w-4 h-4 mr-2" />
+                          <CircleCheck className="w-4 h-4 mr-2" />
                         )}
-                        Send verification request
+                        Check setup and enable
                       </Button>
                     </span>
                   </TooltipTrigger>
                   <TooltipContent>
                     {hasUnsetProperties
-                      ? "Fill in all account properties before requesting verification"
-                      : "Ask the superadmin to review and verify this account"}
+                      ? "Fill in all account properties before enabling this route"
+                      : "Validate the complete setup and enable this route for testing"}
                   </TooltipContent>
                 </Tooltip>
               )}
@@ -621,54 +496,6 @@ export default function AccountDetailDrawer({
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog
-        open={rejectOpen}
-        onOpenChange={(o) => {
-          setRejectOpen(o);
-          if (!o) setRejectComments("");
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject verification request</DialogTitle>
-            <DialogDescription>
-              &quot;{account?.name}&quot; will go back to unverified. Let the account owner know why
-              so they can fix it and re-request.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label htmlFor="reject-comments">Reason for rejection</Label>
-            <Textarea
-              id="reject-comments"
-              placeholder="e.g. Incorrect account details"
-              value={rejectComments}
-              onChange={(e) => setRejectComments(e.target.value)}
-              maxLength={500}
-              disabled={rejecting}
-              autoFocus
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectOpen(false)} disabled={rejecting}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleRejectConfirm}
-              disabled={rejecting || !rejectComments.trim()}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              {rejecting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Rejecting...
-                </>
-              ) : (
-                "Reject request"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

@@ -1394,7 +1394,8 @@ export function useApi() {
           }
         };
 
-        // Send Account Verification Request (owner -> superadmin)
+        // Validate the complete setup and make it eligible for routing.
+        // There is no SlickHood admin approval in this owner flow.
         const handleRequestAccountVerification = async (accountId: number) => {
           try {
             const { token } = useAuthStore.getState();

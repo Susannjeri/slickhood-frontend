@@ -178,7 +178,7 @@ export default function CreateAccountDialog({
             {isSuperadmin
               ? "Create a platform-level SlickHood payment account"
               : forceCategory === "AFFILIATE"
-              ? "Create a verified destination for your affiliate payouts"
+              ? "Create a destination for your affiliate payouts"
               : "Create a payment account to receive your collections"}
           </DialogDescription>
         </DialogHeader>
@@ -244,6 +244,11 @@ export default function CreateAccountDialog({
                     <div className="min-w-0">
                       <p className="font-medium text-sm" style={{ color: "#141130" }}>
                         {channel.name}
+                        {(["MPESA_BANK", "PESA_LINK"].includes(channel.id)) && (
+                          <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                            Manual instructions
+                          </span>
+                        )}
                       </p>
                       {channel.description && (
                         <p className="text-xs text-gray-500 line-clamp-2">{channel.description}</p>

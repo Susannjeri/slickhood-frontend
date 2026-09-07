@@ -119,10 +119,10 @@ export default function AccountsListPage({
         <h2 className="font-semibold text-slate-900">Set up where your business receives payments</h2>
         <ol className="mt-2 list-inside list-decimal space-y-1">
           <li>Add your receiving account and payment details.</li>
-          <li>Request verification before accepting payments.</li>
-          <li>{category === "SLICKHOOD" ? "Use the verified platform account for SlickHood subscriptions only." : "Attach the verified account to the relevant property, store or service."}</li>
+          <li>Check the completed setup to make the route available for test payments.</li>
+          <li>{category === "SLICKHOOD" ? "Use the platform account for SlickHood subscriptions only." : "Attach the ready account to the relevant property, store or service."}</li>
         </ol>
-        <p className="mt-3">SlickHood subscription payments are separate from your business collections. Changes to payment details require fresh verification. Never enter a customer&apos;s M-Pesa PIN or card security code.</p>
+        <p className="mt-3">SlickHood subscription payments are separate from your business collections. Manual PesaLink and bank-Paybill routes provide instructions and remain unpaid until reconciled. Direct M-Pesa and Paystack completion depends on their provider callback. Changing payment details pauses the route until it is checked again. Never enter a customer&apos;s M-Pesa PIN or card security code.</p>
       </section>
 
       {/* Error */}
@@ -184,7 +184,7 @@ export default function AccountsListPage({
                   )}
                 >
                   {account.verified ? <ShieldCheck className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
-                  {account.verified ? "Verified" : "Unverified"}
+                  {account.verified ? "Ready for payments" : "Setup incomplete"}
                 </span>
                 <span
                   className={cn(
