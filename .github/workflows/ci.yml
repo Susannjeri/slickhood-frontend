@@ -25,7 +25,9 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: npm ci
       - name: Static analysis
-        run: npm run lint:ci
+        run: |
+          node --test scripts/validate-build-env.test.mjs
+          npm run lint:ci
       - name: Production build
         run: npm run build
       - name: Install browser runtime

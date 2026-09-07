@@ -1741,7 +1741,7 @@ export const createMaintenance = (payload:{unitId:number;title:string;descriptio
 export const updateMaintenance = (id:number,payload:{status:string;assignedProviderServiceId?:number;scheduledAt?:string;estimatedCost?:number;actualCost?:number;currency?:string;resolutionNotes?:string},token:string) => API.put(`/maintenance/${id}`,payload,{headers:{Authorization:`Bearer ${token}`}});
 
 export type LeaseDocumentView = {id:number;leaseId?:number;propertyId:number;unitId?:number;documentType:string;status:string;name:string;templateVersion:number;effectiveDate?:string;responseDueDate?:string;issuedAt?:string;acknowledgedAt?:string;createdOn:string};
-export const listLeaseDocuments = (token:string) => API.get("/lease/documents",{headers:{Authorization:`Bearer ${token}`}});
+export const listLeaseDocuments = (token:string, params: {unitId?: number; page?: number; size?: number} = {}) => API.get("/lease/documents",{params,headers:{Authorization:`Bearer ${token}`}});
 export const downloadLeaseDocumentPdf = (id:number,token:string) => API.get(`/lease/documents/${id}/pdf`,{responseType:"blob",headers:{Authorization:`Bearer ${token}`}});
 
 /* local APIs */  

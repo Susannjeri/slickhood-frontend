@@ -1,3 +1,8 @@
+import nextEnv from '@next/env';
+
+// This guard runs before Next.js, so load the same production env files first.
+// Explicit workflow values (especially the immutable SHA) retain precedence.
+nextEnv.loadEnvConfig(process.cwd(), false);
 const value = process.env.NEXT_PUBLIC_API_URL;
 
 if (!value) {

@@ -29,7 +29,9 @@ jobs:
         run: npm ci
 
       - name: Static analysis
-        run: npm run lint:ci
+        run: |
+          node --test scripts/validate-build-env.test.mjs
+          npm run lint:ci
 
       - name: Install browser runtime
         run: npx playwright install --with-deps chromium

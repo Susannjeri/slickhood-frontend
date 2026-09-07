@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useApi } from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,7 @@ import ManageChargesDrawer from "@/components/unit/ManageChargesDrawer";
 import { usePropertyMetadata } from "@/app/(dashboard)/dashboard/property/propertyMetadata";
 import { parseUnitOrigin, unitListHref, unitOriginLabel } from "@/lib/unitNavigation";
 import { createMaintenance, downloadLeaseDocumentPdf, LeaseDocumentView, listLeaseDocuments, listUnitMaintenance, MaintenanceWorkOrder, updateMaintenance } from "@/lib/api";
+import { ProtectedPdfButton } from "@/components/documents/ProtectedPdfButton";
 
 interface UnitDetail {
   propertyId: number;
@@ -307,6 +308,10 @@ export default function ViewUnitPage() {
   const [maintenanceForm, setMaintenanceForm] = useState({title:"",description:"",category:"OTHER",priority:"MEDIUM"});
   const [documents, setDocuments] = useState<LeaseDocumentView[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [documentsError, setDocumentsError] = useState("");
+  const [documentPage, setDocumentPage] = useState(0);
+  const [documentPages, setDocumentPages] = useState(0);
+  const documentRequest = useRef(0);
 
   const loadMaintenance = async () => {
     if (!token || !unitId) return;
@@ -318,13 +323,19 @@ export default function ViewUnitPage() {
 
   const loadDocuments = async () => {
     if (!token || !unitId) return;
-    setDocumentsLoading(true);
-    try { const response=await listLeaseDocuments(token); setDocuments((response.data?.data ?? []).filter((d:LeaseDocumentView)=>d.unitId===Number(unitId))); }
-    catch { toast.error("Unit documents could not be loaded."); }
-    finally { setDocumentsLoading(false); }
+    const request = ++documentRequest.current;
+    setDocumentsLoading(true); setDocumentsError(""); setDocuments([]);
+    try {
+      const response=await listLeaseDocuments(token, {unitId:Number(unitId), page:documentPage, size:25});
+      if(request !== documentRequest.current) return;
+      setDocuments(response.data?.data ?? []); setDocumentPages(response.data?.totalPages ?? 0);
+    }
+    catch { if(request === documentRequest.current) setDocumentsError("Unit documents could not be loaded. Please retry."); }
+    finally { if(request === documentRequest.current) setDocumentsLoading(false); }
   };
 
-  useEffect(()=>{loadMaintenance();loadDocuments();},[token,unitId]);
+  useEffect(()=>{loadMaintenance();},[token,unitId]);
+  useEffect(()=>{loadDocuments(); return () => { documentRequest.current++; };},[token,unitId,documentPage,activeRole]);
 
   const submitMaintenance = async () => {
     if(!token||!maintenanceForm.title.trim()||!maintenanceForm.description.trim())return;
@@ -336,8 +347,6 @@ export default function ViewUnitPage() {
     if(!token)return;const next:{[key:string]:string}={OPEN:"ACKNOWLEDGED",ACKNOWLEDGED:"IN_PROGRESS",IN_PROGRESS:"COMPLETED"};if(!next[order.status])return;
     try{await updateMaintenance(order.id,{status:next[order.status],currency:order.currency},token);toast.success("Work order updated.");await loadMaintenance();}catch{toast.error("Work order could not be updated.");}
   };
-
-  const openDocument = async (id:number) => {if(!token)return;try{const response=await downloadLeaseDocumentPdf(id,token);const url=URL.createObjectURL(response.data);window.open(url,"_blank","noopener,noreferrer");setTimeout(()=>URL.revokeObjectURL(url),60000);}catch{toast.error("Document could not be opened.");}};
 
   useEffect(() => {
     if (unitId && propertyId) {
@@ -1579,9 +1588,14 @@ export default function ViewUnitPage() {
                   <CardTitle className="text-base font-semibold" style={{ color: "#141130" }}>Lease Agreement</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  <Can permissions={["view_lease_document"]}>
+                    <Button onClick={() => router.push(`/dashboard/documents?${unit.leaseId ? `leaseId=${unit.leaseId}` : `unitId=${unit.unitId}`}`)} variant="outline" className="w-full">
+                      <Eye className="w-4 h-4 mr-2" />View lease drafts and signed agreements
+                    </Button>
+                  </Can>
                   <CanProperty propertyId={Number(propertyId)} permissions={["view_lease_template"]}>
                     <Button onClick={() => handleViewPdf(unit.unitId)} variant="outline" className="w-full border-[#EF4217] text-[#EF4217] hover:bg-[#EF4217]/5">
-                      <Eye className="w-4 h-4 mr-2" />View Lease Agreement (PDF)
+                      <Eye className="w-4 h-4 mr-2" />Preview lease template (not a signed agreement)
                     </Button>
                   </CanProperty>
                   {/* Tenant-perspective signing */}
@@ -1662,7 +1676,9 @@ export default function ViewUnitPage() {
             <Card>
               <CardHeader><CardTitle>Lease and property documents</CardTitle><p className="text-sm text-gray-500">Documents generated for this unit, including agreements and notices.</p></CardHeader>
               <CardContent>
-                {documentsLoading?<div className="py-10 text-center text-sm text-gray-500"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin"/>Loading documents…</div>:documents.length===0?<div className="flex flex-col items-center py-12 text-center"><FileText className="mb-3 h-10 w-10 text-gray-300"/><p className="font-medium text-gray-600">No documents for this unit</p><p className="mt-1 text-sm text-gray-400">Generated agreements and notices will appear here.</p></div>:<div className="divide-y rounded-xl border">{documents.map(document=><div key={document.id} className="flex flex-wrap items-center justify-between gap-3 p-4"><div><b>{document.name}</b><p className="mt-1 text-xs text-gray-500">{document.documentType.replaceAll("_"," ")} · Version {document.templateVersion} · {document.status}</p></div><Button variant="outline" size="sm" onClick={()=>openDocument(document.id)}><Eye className="mr-2 h-4 w-4"/>Open PDF</Button></div>)}</div>}
+                {documentsError && <div role="alert">{documentsError}<Button variant="outline" onClick={() => void loadDocuments()}>Retry documents</Button></div>}
+                {documentsLoading?<div className="py-10 text-center text-sm text-gray-500"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin"/>Loading documents…</div>:!documentsError && (documents.length===0?<div className="flex flex-col items-center py-12 text-center"><FileText className="mb-3 h-10 w-10 text-gray-300"/><p className="font-medium text-gray-600">No documents for this unit</p><p className="mt-1 text-sm text-gray-400">Generated agreements and notices will appear here.</p></div>:<div className="divide-y rounded-xl border">{documents.map(document=><div key={document.id} className="flex flex-wrap items-center justify-between gap-3 p-4"><div><b>{document.name}</b><p className="mt-1 text-xs text-gray-500">{document.documentType.replaceAll("_"," ")} · Version {document.templateVersion} · {document.status}</p></div><ProtectedPdfButton label="Open PDF" name={`${document.name} - ${document.status} - ${document.id}`} load={() => downloadLeaseDocumentPdf(document.id, token!)} /></div>)}</div>)}
+                {documentPages > 1 && <div className="mt-4 flex items-center justify-between"><Button disabled={documentsLoading || documentPage === 0} onClick={() => setDocumentPage(p => p - 1)}>Previous documents</Button><span>Page {documentPage + 1} of {documentPages}</span><Button disabled={documentsLoading || documentPage + 1 >= documentPages} onClick={() => setDocumentPage(p => p + 1)}>Next documents</Button></div>}
               </CardContent>
             </Card>
           </TabsContent>

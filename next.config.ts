@@ -41,7 +41,8 @@ const nextConfig: NextConfig = {
       "font-src 'self' data: https://fonts.gstatic.com",
       "img-src 'self' data: blob: https:",
       `connect-src 'self' ${apiOrigin} https://api.ipify.org https://accounts.google.com https://*.googleapis.com https://*.gstatic.com`,
-      "frame-src https://accounts.google.com",
+      // Only authenticated, locally created PDF blobs and Google sign-in may be framed.
+      "frame-src blob: https://accounts.google.com",
       "worker-src 'self' blob:",
       ...(process.env.NEXT_PUBLIC_API_URL?.startsWith('https://')
         ? ["upgrade-insecure-requests"]

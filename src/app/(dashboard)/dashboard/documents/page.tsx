@@ -3,7 +3,8 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
-import { Download, FilePlus2, Pencil, Send, Signature } from "lucide-react";
+import { FilePlus2, Pencil, Send, Signature } from "lucide-react";
+import { ProtectedPdfButton } from "@/components/documents/ProtectedPdfButton";
 import { leaseDocumentService } from "@/services/lease-document.service";
 import { GenerateLeaseDocumentRequest, LeaseDocument, LeaseDocumentTemplate, LeaseDocumentType } from "@/types/lease-document";
 import { useAuthStore } from "@/store/authStore";
@@ -39,6 +40,25 @@ const tenantStatusMessage = (document: LeaseDocument) => {
   return null;
 };
 
+const estateStatusMessage = (document: LeaseDocument) => {
+  if (document.status === "DRAFT") return "Draft estate agreement for review. The issuing estate manager must issue it before signing.";
+  if (document.status === "SIGNED") return "The estate manager and homeowner have signed. This agreement covers estate services; it does not create a tenancy, transfer ownership or confirm payment.";
+  if (["CANCELLED", "EXPIRED"].includes(document.status)) return "Historical estate agreement: available to view, but no longer available for signing.";
+  if (document.status === "PARTIALLY_SIGNED") return document.recipientSignedAt
+    ? "Homeowner signed. Waiting for the issuing estate manager."
+    : "Estate manager signed. Waiting for the homeowner.";
+  return "Review the estate agreement PDF before signing. Both signatures are required; signing does not create a rental lease.";
+};
+
+const saleStatusMessage = (document: LeaseDocument) => {
+  if (document.status === "EXPIRED") return "This offer has expired. It remains available to view, but the sales manager must prepare a new offer before signing.";
+  if (document.status === "CANCELLED") return "This document was cancelled. It remains available for your records and cannot be signed.";
+  if (document.status === "DRAFT") return "Draft for review only. The sales manager must issue it before either party can sign.";
+  if (document.status === "SIGNED") return "Both parties have signed. This document does not by itself confirm payment, title transfer or completion.";
+  if (document.status === "PARTIALLY_SIGNED") return "One party has signed. The other party must review and sign to complete this document.";
+  return "Review the letter or agreement PDF carefully before acknowledging or signing.";
+};
+
 export default function DocumentsPage() {
   const token = useAuthStore(s => s.token), role = useAuthStore(s => s.activeRole?.title), workspace = useAuthStore(s => s.activeWorkspaceId);
   return <DocumentsWorkspace key={`${token}:${role}:${workspace}`} />;
@@ -62,6 +82,7 @@ function DocumentsWorkspace() {
   const [optionsPage, setOptionsPage] = useState(0);
   const [optionsHasMore, setOptionsHasMore] = useState(false);
   const [optionsError, setOptionsError] = useState("");
+  const [templateError, setTemplateError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
   const loadSequence = useRef(0);
@@ -71,7 +92,7 @@ function DocumentsWorkspace() {
   const [saleId, setSaleId] = useState(searchParams.get("saleId") ?? "");
   const [propertyId, setPropertyId] = useState(searchParams.get("propertyId") ?? "");
   const [recipientUserId, setRecipientUserId] = useState(searchParams.get("recipientUserId") ?? "");
-  const [effectiveDate, setEffectiveDate] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState(searchParams.get("effectiveDate") ?? "");
   const [responseDueDate, setResponseDueDate] = useState("");
   const [amount, setAmount] = useState(searchParams.get("amount") ?? "");
   const [currency, setCurrency] = useState(searchParams.get("currency") ?? "KES");
@@ -100,17 +121,20 @@ function DocumentsWorkspace() {
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current;
     try {
-      setLoading(true); setLoadError("");
+      setLoading(true); setLoadError(""); setTemplateError(""); setDocuments([]); setTemplates([]);
       const documentResponse = await leaseDocumentService.list({ page, size: 25,
         leaseId: Number(searchParams.get("leaseId")) || undefined, saleId: Number(searchParams.get("saleId")) || undefined,
-        propertyId: Number(searchParams.get("propertyId")) || undefined });
+        propertyId: Number(searchParams.get("propertyId")) || undefined, unitId: Number(searchParams.get("unitId")) || undefined });
       if (sequence !== loadSequence.current) return;
       setDocuments(documentResponse.data?.data ?? []);
       setTotalPages(documentResponse.data?.totalPages ?? 0);
       if (canCreate || canEditTemplates) {
-        const templateResponse = await leaseDocumentService.templates();
+        const templateResponse = await leaseDocumentService.templates().catch(error => {
+          if (sequence === loadSequence.current) setTemplateError(apiErrorMessage(error, "Could not load templates. Existing documents remain available."));
+          return null;
+        });
         if (sequence !== loadSequence.current) return;
-        setTemplates(templateResponse.data?.data ?? []);
+        setTemplates(templateResponse?.data?.data ?? []);
       } else {
         setTemplates([]);
       }
@@ -119,7 +143,7 @@ function DocumentsWorkspace() {
     } finally { if (sequence === loadSequence.current) setLoading(false); }
   }, [canCreate, canEditTemplates, page, searchParams]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); return () => { loadSequence.current++; }; }, [load]);
   useEffect(() => {
     if (!canCreate) return;
     void leaseDocumentService.branding().then(response => setLogoConfigured(Boolean(response.data?.data?.configured))).catch(() => undefined);
@@ -142,7 +166,7 @@ function DocumentsWorkspace() {
     if (!canCreate || !token) return;
     let cancelled = false;
     const request = isSaleDocument ? salesService.list({ page: optionsPage, size: 100 })
-      : isEstateDocument ? estateService.listOwnership({ page: optionsPage, size: 100, active: true })
+      : isEstateDocument ? estateService.listOwnership({ page: optionsPage, size: 100, active: true, propertyId: Number(searchParams.get("propertyId")) || undefined })
       : listActiveLeases(optionsPage, 100, token);
     void request.then(response => {
       if (cancelled) return;
@@ -153,7 +177,7 @@ function DocumentsWorkspace() {
       else setLeases(current => optionsPage ? [...current, ...data] : data);
     }).catch(error => { if (!cancelled) setOptionsError(apiErrorMessage(error, "Could not load document choices.")); });
     return () => { cancelled = true; };
-  }, [canCreate, token, isSaleDocument, isEstateDocument, optionsPage]);
+  }, [canCreate, token, isSaleDocument, isEstateDocument, optionsPage, searchParams]);
 
   useEffect(() => {
     const lease = leases.find(item => String(item.id) === leaseId);
@@ -178,6 +202,9 @@ function DocumentsWorkspace() {
 
   async function generate(event: FormEvent) {
     event.preventDefault();
+    if (isEstateDocument && (!ownershipId || !propertyId || !recipientUserId || !effectiveDate)) {
+      toast.error("Select the current homeowner and agreement start date."); return;
+    }
     const payload: GenerateLeaseDocumentRequest = {
       documentType: type,
       ownershipId: isEstateDocument && ownershipId ? Number(ownershipId) : undefined,
@@ -215,15 +242,6 @@ function DocumentsWorkspace() {
     } finally { setBusy(false); }
   }
 
-  async function viewPdf(id: number) {
-    try {
-      const response = await leaseDocumentService.pdf(id);
-      const url = URL.createObjectURL(response.data);
-      const anchor = document.createElement("a"); anchor.href = url; anchor.target = "_blank"; anchor.click();
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch { toast.error("Could not open the PDF."); }
-  }
-
   async function saveTemplate(event: FormEvent) {
     event.preventDefault();
     if (!editing) return;
@@ -248,9 +266,11 @@ function DocumentsWorkspace() {
       <CardContent><form onSubmit={generate} className="grid gap-4 md:grid-cols-3">
         <div className="space-y-2 md:col-span-2"><Label htmlFor="document-type">Document type</Label><select id="document-type" value={type} onChange={(e) => { setType(e.target.value as LeaseDocumentType); setOptionsPage(0); setOptionsHasMore(false); }} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
           {visibleTypes.map((item) => <option key={item} value={item}>{label(item)}</option>)}</select></div>
-        {isSaleDocument ? <div className="space-y-2"><Label htmlFor="sale-id">Property sale</Label><select id="sale-id" required value={saleId} onChange={(e) => setSaleId(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a sale</option>{saleId && !sales.some(item => String(item.id) === saleId) && <option value={saleId}>Selected sale #{saleId}</option>}{sales.map(sale => <option key={sale.id} value={sale.id}>{sale.propertyName ?? `Property ${sale.propertyId}`} · {sale.unitRef ?? `Unit ${sale.unitId}`} · {sale.buyerName ?? sale.buyerEmail ?? sale.invitedBuyerEmail ?? "Buyer pending"}</option>)}</select>{sales.length === 0 && !saleId && <p className="text-xs text-muted-foreground">Create the sale record first, then prepare its documents.</p>}</div> : isEstateDocument ? <div className="space-y-2"><Label htmlFor="ownership-id">Homeowner and property</Label><select id="ownership-id" required value={ownershipId} onChange={(e) => { const ownership = ownerships.find(o => String(o.id) === e.target.value); setOwnershipId(e.target.value); setPropertyId(ownership ? String(ownership.propertyId) : ""); setRecipientUserId(ownership ? String(ownership.homeownerUserId) : ""); setEffectiveDate(ownership?.ownershipStart ?? ""); }} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a current homeowner</option>{propertyId && recipientUserId && !ownerships.some(item => String(item.propertyId) === propertyId && String(item.homeownerUserId) === recipientUserId) && <option value={`${propertyId}:${recipientUserId}`}>Selected homeowner for property #{propertyId}</option>}{ownerships.map(item => <option key={item.id} value={String(item.id)}>{item.homeownerName || item.homeownerEmail} · {item.propertyName}{item.unitRef ? ` / ${item.unitRef}` : ""}</option>)}</select>{ownerships.length === 0 && !(propertyId && recipientUserId) && <p className="text-xs text-muted-foreground">Add the homeowner in Estate Management first.</p>}</div> :
+        {isSaleDocument ? <div className="space-y-2"><Label htmlFor="sale-id">Property sale</Label><select id="sale-id" required value={saleId} onChange={(e) => setSaleId(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a sale</option>{saleId && !sales.some(item => String(item.id) === saleId) && <option value={saleId}>Selected sale #{saleId}</option>}{sales.map(sale => <option key={sale.id} value={sale.id}>{sale.propertyName ?? `Property ${sale.propertyId}`} · {sale.unitRef ?? `Unit ${sale.unitId}`} · {sale.buyerName ?? sale.buyerEmail ?? sale.invitedBuyerEmail ?? "Buyer pending"}</option>)}</select>{sales.length === 0 && !saleId && <p className="text-xs text-muted-foreground">Create the sale record first, then prepare its documents.</p>}</div> : isEstateDocument ? <div className="space-y-2"><Label htmlFor="ownership-id">Homeowner and property</Label><select id="ownership-id" required disabled={Boolean(searchParams.get("ownershipId"))} value={ownershipId} onChange={(e) => { const ownership = ownerships.find(o => String(o.id) === e.target.value); setOwnershipId(e.target.value); setPropertyId(ownership ? String(ownership.propertyId) : ""); setRecipientUserId(ownership ? String(ownership.homeownerUserId) : ""); setEffectiveDate(ownership?.ownershipStart ?? ""); }} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a current homeowner</option>{ownershipId && !ownerships.some(item => String(item.id) === ownershipId) && <option value={ownershipId}>Selected ownership #{ownershipId} · property #{propertyId}</option>}{ownerships.map(item => <option key={item.id} value={String(item.id)}>{item.homeownerName || item.homeownerEmail} · {item.propertyName}{item.unitRef ? ` / ${item.unitRef}` : ""}</option>)}</select>{ownerships.length === 0 && !(propertyId && recipientUserId) && <p className="text-xs text-muted-foreground">Add the homeowner in Estate Management first.</p>}</div> :
           <div className="space-y-2"><Label htmlFor="lease-id">Lease</Label><select id="lease-id" required value={leaseId} onChange={(e) => setLeaseId(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3 text-sm"><option value="">Select a lease</option>{leaseId && !leases.some(item => String(item.id) === leaseId) && <option value={leaseId}>Selected lease #{leaseId}</option>}{leases.map(lease => <option key={lease.id} value={lease.id}>{lease.name || `Lease ${lease.id}`} · {lease.tenantName || "Tenant pending"}{lease.expiryDate ? ` · expires ${lease.expiryDate}` : ""}</option>)}</select>{leases.length === 0 && !leaseId && <p className="text-xs text-muted-foreground">Create the lease first, then prepare its agreement or notice.</p>}</div>}
+        {templateError && <div role="alert" className="text-red-700 md:col-span-3">{templateError}<Button type="button" variant="outline" onClick={() => void load()}>Retry templates</Button></div>}
         {optionsError && <p role="alert" className="text-red-700 md:col-span-3">{optionsError}</p>}
+        {isEstateDocument && searchParams.get("ownershipId") && <p className="text-sm text-muted-foreground md:col-span-3">This agreement is linked to the selected ownership. To choose another home, return to the ownership registry.</p>}
         {optionsHasMore && <Button type="button" variant="outline" onClick={() => setOptionsPage(p => p + 1)}>Load more choices</Button>}
         <div className="space-y-2"><Label htmlFor="effective-date">Effective date</Label><Input id="effective-date" type="date" required={isEstateDocument || type.endsWith("AGREEMENT")} value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} /></div>
         <div className="space-y-2"><Label htmlFor="response-due">Response due</Label><Input id="response-due" type="date" required={type === "PROPERTY_SALE_LETTER_OF_OFFER"} value={responseDueDate} onChange={(e) => setResponseDueDate(e.target.value)} /></div>
@@ -264,15 +284,17 @@ function DocumentsWorkspace() {
       {loading && <p role="status">Loading documents…</p>}
       {loadError && <div role="alert">{loadError}<Button variant="outline" onClick={() => void load()}>Retry</Button></div>}
       {!loading && !loadError && documents.length === 0 && <p className="py-8 text-center text-muted-foreground">No documents match this account and selection.</p>}
-      {documents.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-center lg:justify-between">
+      {!loading && !loadError && documents.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-center lg:justify-between">
         <div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{item.name}</p><Badge variant="outline">{label(item.status)}</Badge>
           {item.legalReviewRequired && <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Legal review</Badge>}</div>
           <p className="text-sm text-muted-foreground">#{item.id} · Template v{item.templateVersion} · {item.leaseId ? `Lease ${item.leaseId}` : item.saleId ? `Sale ${item.saleId}` : `Property ${item.propertyId}`}</p>
+          {item.documentType === "ESTATE_RESIDENTIAL_AGREEMENT" && <p className="mt-2 max-w-2xl text-sm font-medium text-[#14235C]">{estateStatusMessage(item)}{item.unitId ? ` Home / unit #${item.unitId}.` : ""}</p>}
+          {saleTypes.includes(item.documentType) && <p className="mt-2 max-w-2xl text-sm font-medium text-[#14235C]">{saleStatusMessage(item)}</p>}
           {isTenant && tenantStatusMessage(item) && <p className="mt-2 max-w-2xl text-sm font-medium text-[#14235C]">{tenantStatusMessage(item)}</p>}
           <p className="mt-2 text-sm">Issuer: {item.issuerSignedAt ? "Signed" : "Not signed"} · Recipient: {item.recipientSignedAt ? "Signed" : "Not signed"}{item.responseDueDate ? ` · Respond by ${item.responseDueDate}` : ""}</p>
-          {item.documentType === "PROPERTY_SALE_LETTER_OF_OFFER" && <p className="text-sm text-muted-foreground">Both signatures reserve the sale automatically. No separate acceptance is needed.</p>}
+          {item.documentType === "PROPERTY_SALE_LETTER_OF_OFFER" && !["EXPIRED","CANCELLED"].includes(item.status) && <p className="text-sm text-muted-foreground">Both signatures reserve the sale automatically. No separate acceptance is needed.</p>}
           {item.legalReviewRequired && <p className="text-sm text-amber-800">Issue is blocked pending template approval. Cancel this draft and regenerate after the approved version is available.</p>}</div>
-        <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => viewPdf(item.id)}><Download className="mr-1 h-4 w-4" />PDF</Button>
+        <div className="flex flex-wrap gap-2"><ProtectedPdfButton load={() => leaseDocumentService.pdf(item.id)} name={`${item.name} - ${item.status} - ${item.id}`} />
           {canIssue && item.viewerParty === "ISSUER" && item.status === "DRAFT" && <Button size="sm" onClick={() => action(item.id, "issue")} disabled={busy || item.legalReviewRequired}><Send className="mr-1 h-4 w-4" />Issue</Button>}
           {canCreate && item.viewerParty === "ISSUER" && item.status === "DRAFT" && <Button size="sm" variant="outline" onClick={() => action(item.id, "cancelDraft")} disabled={busy}>Cancel draft</Button>}
           {canAcknowledge && item.viewerParty === "RECIPIENT" && item.status === "ISSUED" && <Button size="sm" variant="outline" onClick={() => action(item.id, "acknowledge")} disabled={busy}>Acknowledge</Button>}

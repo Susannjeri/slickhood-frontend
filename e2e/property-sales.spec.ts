@@ -55,7 +55,7 @@ test("sales escrow is backed by a buyer invoice and never a typed payment refere
   if(path.endsWith("/escrow-invoice")&&route.request().method()==="POST"){
    expect(route.request().postDataJSON()).toEqual({amount:250000,paymentAccountId:81});
    invoiced=true;
-   await route.fulfill({json:{success:true,code:"S00297",description:"Escrow invoice created.",data:{invoiceId:301,invoiceRef:"INV-SALE-301",amount:250000,currency:"KES",paid:false,pendingAmount:250000,dueDate:"2026-09-11"}}});return;
+   await route.fulfill({json:{success:true,code:"S00297",description:"Escrow invoice created.",data:[{invoiceId:301,invoiceRef:"INV-SALE-301",amount:250000,currency:"KES",paid:false,pendingAmount:250000,dueDate:"2026-09-11"}]}});return;
   }
   if(path.endsWith("/milestones")&&route.request().method()==="POST"){
    const body=route.request().postDataJSON();
