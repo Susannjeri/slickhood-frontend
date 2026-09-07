@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { authenticated, envelope } from "./support";
 
-test("admin totals use the server enum and object envelope; every directory destination exists", async ({ context, page }) => {
+test("admin dashboard keeps metrics and sidebar functions without a duplicate directory", async ({ context, page }) => {
   await authenticated(context, page, { title: "Superadmin", permissions: ["list_users", "view_config", "edit_config", "view_subscription_plan", "view_payments", "view_invoice_list", "view_account", "manage_sp_categories", "view_audit_logs", "view_gate_events", "view_notifications", "review_insurance_applications", "view_community_funds", "view_estate", "view_sale_pipeline", "view_visitor_list", "update_visitor_status", "view_lease_document", "view_all_params", "manage_property_listings"] });
   let requestedRole: string | null = null;
   await page.route("**/dash/totals**", route => { requestedRole = new URL(route.request().url()).searchParams.get("role"); return route.fulfill({ json: envelope({ inActiveUserPercent: 20, userLoggedInWithinCurrentMonth: 12, totalActiveProperties: 42, totalSubscriptionPaidWithinCurrentMonth: 1500 }) }); });
@@ -11,18 +11,19 @@ test("admin totals use the server enum and object envelope; every directory dest
   await page.goto("/dashboard");
   await expect(page.getByText("42", { exact: true })).toBeVisible();
   expect(requestedRole).toBe("SUPER_ADMIN");
-  const directory = page.locator("#admin-functions");
-  await expect(directory.getByRole("link", { name: "Subscription catalogue", exact: true })).toHaveAttribute("href", "/dashboard/subscriptions");
-  await expect(directory.getByRole("link", { name: /Insurance Operations/ })).toHaveAttribute("href", "/dashboard/insurance/operations");
-  await expect(directory.getByRole("link", { name: "Global Config", exact: true })).toHaveAttribute("href", "/dashboard/configs");
-  const hrefs = await directory.getByRole("link").evaluateAll(nodes => nodes.map(node => node.getAttribute("href")!));
-  expect(hrefs.length).toBeGreaterThan(24);
-  expect(new Set(hrefs).size).toBe(hrefs.length);
-  for (const href of hrefs) expect(existsSync(path.join(process.cwd(), "src/app/(dashboard)", href, "page.tsx")), href).toBe(true);
-  await expect(page.getByRole("link", { name: "Admin Panel", exact: true })).toHaveAttribute("href", "/dashboard#admin-functions");
+  await expect(page.locator("#admin-functions")).toHaveCount(0);
+  await expect(page.getByLabel("Find an admin function")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Admin Panel", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Operational pulse", { exact: true })).toBeVisible();
+  for (const [name, href] of [
+    ["Users & Staff", "/dashboard/users"],
+    ["Subscriptions", "/dashboard/subscriptions"],
+    ["Insurance Operations", "/dashboard/insurance/operations"],
+  ]) {
+    await expect(page.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
+    expect(existsSync(path.join(process.cwd(), "src/app/(dashboard)", href, "page.tsx")), href).toBe(true);
+  }
   await expect(page.getByText("Upcoming lease actions", { exact: true })).toHaveCount(0);
-  await page.getByLabel("Find an admin function").fill("insurance");
-  await expect(directory.getByRole("link")).toHaveCount(1);
 });
 
 test("ordinary roles cannot see the admin directory or request global configuration", async ({ context, page }) => {

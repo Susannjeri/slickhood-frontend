@@ -163,15 +163,6 @@ export const sidebarLinks: SidebarLink[] = [
     description: "Transparent welfare, project, reserve and emergency funds.",
   },
   {
-    icon: Crown,
-    label: "Admin Panel",
-    href: "/dashboard#admin-functions",
-    description: "Manage administrative settings, controls, and system operations.",
-    protected: true,
-    permissions: [],
-    roles: ["Superadmin"],
-  },
-  {
     icon: Calculator,
     label: "Tax Administration",
     href: "/dashboard/tax-assist/admin",
@@ -520,7 +511,7 @@ const sectionDefinitions = [
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "My Services", "Merchant Accounts", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre", "Subscriptions", "Upgrade Plan"] },
-  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Recipient Payment Accounts", "SlickHood Accounts", "Admin Panel", "Tax Administration", "Audit Logs", "Insurance Operations", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
+  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Recipient Payment Accounts", "SlickHood Accounts", "Tax Administration", "Audit Logs", "Insurance Operations", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
 ] as const
 
 const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))
