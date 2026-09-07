@@ -57,9 +57,13 @@ jobs:
         run: npm run build
 
       - name: Browser regression suite
+        env:
+          E2E_USE_STANDALONE: 'true'
         run: npm run test:e2e
 
       - name: Run mandatory authentication and onboarding regression gate
+        env:
+          E2E_USE_STANDALONE: 'true'
         run: npx playwright test e2e/auth.spec.ts e2e/auth-layout.spec.ts e2e/registration-subscription.spec.ts
 
       - name: Build and package deployment binaries
