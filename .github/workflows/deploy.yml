@@ -59,11 +59,15 @@ jobs:
       - name: Browser regression suite
         env:
           E2E_USE_STANDALONE: 'true'
+          # The build guard requires a valid production Maps key. Exercise its
+          # configured-key test; missing-key cases belong to the no-key CI build.
+          E2E_HAS_GOOGLE_MAPS: 'true'
         run: npm run test:e2e
 
       - name: Run mandatory authentication and onboarding regression gate
         env:
           E2E_USE_STANDALONE: 'true'
+          E2E_HAS_GOOGLE_MAPS: 'true'
         run: npx playwright test e2e/auth.spec.ts e2e/auth-layout.spec.ts e2e/registration-subscription.spec.ts
 
       - name: Build and package deployment binaries
