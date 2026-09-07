@@ -56,7 +56,7 @@ test("checkout hides unverified receiving accounts", async ({ context, page }) =
   await expect(page.getByRole("button", { name: "Unverified destination" })).toHaveCount(0);
 });
 
-test("replacing a receiving credential clears verification without exposing the secret", async ({ context, page }) => {
+test("replacing a receiving credential clears readiness without exposing the secret", async ({ context, page }) => {
   await authenticated(context, page, { title: "Landlord", permissions: ["view_account", "edit_account", "create_account", "view_invoice_list", "view_payment_list"] });
   let verified = true;
   const account = () => ({ id: 91, name: "Test collections", category: "LANDLORD", channel: "MPESA", active: true, verified,
@@ -81,7 +81,7 @@ test("replacing a receiving credential clears verification without exposing the 
   await input.fill("synthetic-replacement-only");
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => replacement).toBeTruthy();
-  await expect(page.getByText("Payment detail updated — verification required", { exact: true })).toBeVisible();
-  await expect(page.getByText("Unverified", { exact: true }).last()).toBeVisible();
+  await expect(page.getByText("Payment detail updated — recheck the account before using it", { exact: true })).toBeVisible();
+  await expect(page.getByText("Setup incomplete", { exact: true }).last()).toBeVisible();
   expect(consoleMessages.join("\n")).not.toContain("synthetic-replacement-only");
 });
