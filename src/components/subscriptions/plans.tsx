@@ -151,7 +151,7 @@ export default function Plans() {
                 <option value="">All business areas</option>
                 {CATEGORIES.map(value => <option key={value} value={value}>{productLabel(value)}</option>)}
             </select>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showRetired} onChange={event => setShowRetired(event.target.checked)} />Include retired records</label>
+            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showRetired} onChange={event => setShowRetired(event.target.checked)} />Include retired plans</label>
             <button onClick={() => setRevision(value => value + 1)} className="rounded-lg border px-3 py-2">Refresh</button>
             {canCreate && <button onClick={() => setModal({ plan: null, readOnly: false })} className="rounded-lg bg-[#FF4B12] px-4 py-2 text-white">Add plan</button>}
         </div>
