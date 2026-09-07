@@ -248,7 +248,11 @@ export const initSubscriptionPayment = (
   accountId: number,
   paymentChannel: string,
   phoneNumber?: string
-) => API.get("/payment/init", {
+) => API.post("/payment/init", {
+  invoiceRef,
+  accountId,
+  paymentChannel,
+  ...(phoneNumber ? { phoneNumber } : {}),
+}, {
   headers: { Authorization: `Bearer ${token}` },
-  params: { invoiceRef, accountId, paymentChannel, ...(phoneNumber ? { phoneNumber } : {}) },
 });

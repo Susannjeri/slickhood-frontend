@@ -198,8 +198,8 @@ export default function SubscriptionCheckoutModal({ open, plan, role, product, t
               </div>
               {selected?.channel === "MPESA" && (
                 <div className="mx-auto mt-4 max-w-lg">
-                  <label className="mb-2 block text-sm font-semibold text-[#0b1b5c]">M-Pesa phone number</label>
-                  <input value={phone} onChange={event => setPhone(event.target.value)} placeholder="+254 712 345 678"
+                  <label htmlFor="subscription-mpesa-phone" className="mb-2 block text-sm font-semibold text-[#0b1b5c]">M-Pesa phone number</label>
+                  <input id="subscription-mpesa-phone" inputMode="tel" autoComplete="tel" value={phone} onChange={event => setPhone(event.target.value)} placeholder="+254 712 345 678"
                     className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-[#ff5b15]" />
                 </div>
               )}

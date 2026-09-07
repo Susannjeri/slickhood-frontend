@@ -290,5 +290,5 @@ export const startServiceBooking = (token:string,id:number) => API.put(`/sp/book
 export const completeServiceBooking = (token:string,id:number,evidenceReference:string) => API.put(`/sp/booking/${id}/complete`,{evidenceReference}, {headers:{Authorization:`Bearer ${token}`}});
 export const cancelServiceBooking = (token:string,id:number,reason?:string) => API.put(`/sp/booking/${id}/cancel`,{}, {params:{reason},headers:{Authorization:`Bearer ${token}`}});
 export const setServiceProviderPaymentAccount = (token:string,paymentAccountId:number) => API.put("/sp/profile/payment-account",{paymentAccountId},{headers:{Authorization:`Bearer ${token}`}});
-export const initiateServiceBookingPayment = (invoiceRef:string,accountId:number,paymentChannel:string,phoneNumber?:string) => API.get("/payment/init",{params:{invoiceRef,accountId,paymentChannel,phoneNumber}});
+export const initiateServiceBookingPayment = (invoiceRef:string,accountId:number,paymentChannel:string,phoneNumber?:string) => API.post("/payment/init",{invoiceRef,accountId,paymentChannel,...(phoneNumber?{phoneNumber}:{})});
 export const rateMarketplaceService = (token:string,payload:{bookingId:number;serviceId:number;stars:number;comment?:string}) => API.post("/sp/rating/submit",payload,{headers:{Authorization:`Bearer ${token}`}});

@@ -93,7 +93,12 @@ test("unpaid order can retry payment and cancel without creating another checkou
       invoiceRef:"INV-42",deliveryMethod:"PICKUP",customerPhone:"0700000000",total:500,currency:"KES"},
     storeName:"Fresh Corner",paymentAccountId:9,paymentChannel:"MPESA",items:[]
   }])}));
-  await page.route("**/payment/init**",r=>{payments++;expect(r.request().url()).toContain("INV-42");return r.fulfill({json:envelope([])});});
+  await page.route("**/payment/init",r=>{
+    payments++;
+    expect(r.request().method()).toBe("POST");
+    expect(r.request().postDataJSON()).toMatchObject({invoiceRef:"INV-42",accountId:9,paymentChannel:"MPESA"});
+    return r.fulfill({json:envelope([])});
+  });
   await page.route("**/soko/order/42/cancel",r=>{expect(r.request().postDataJSON().reason).toBe("Wrong quantity");cancelled=true;return r.fulfill({json:envelope([])});});
   await page.goto("/dashboard/soko");await page.getByRole("button",{name:"My orders"}).click();
   await page.getByRole("button",{name:"Pay now",exact:true}).click();

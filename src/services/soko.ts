@@ -41,4 +41,4 @@ export const sokoAdminProducts=()=>API.get("/soko/admin/products",{params:{page:
 export const sokoAdminOrders=()=>API.get("/soko/admin/orders",{params:{page:0,size:100,sort:"createdOn,desc"}});
 export const moderateSokoStore=(id:number,decision:"APPROVE"|"REJECT"|"SUSPEND"|"REACTIVATE",reason?:string)=>API.put(`/soko/admin/stores/${id}/moderation`,{decision,reason});
 export const moderateSokoProduct=(id:number,decision:"SUSPEND"|"REACTIVATE",reason?:string)=>API.put(`/soko/admin/products/${id}/moderation`,{decision,reason});
-export const initiateSokoPayment=(invoiceRef:string,accountId:number,paymentChannel:string,phoneNumber?:string)=>API.get("/payment/init",{params:{invoiceRef,accountId,paymentChannel,phoneNumber}});
+export const initiateSokoPayment=(invoiceRef:string,accountId:number,paymentChannel:string,phoneNumber?:string)=>API.post("/payment/init",{invoiceRef,accountId,paymentChannel,...(phoneNumber?{phoneNumber}:{})});
