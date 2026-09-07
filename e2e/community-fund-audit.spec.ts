@@ -8,6 +8,7 @@ test("failed community fund creation retains the complete draft", async ({ conte
   await page.route(url => /^\/(?:api\/)?community-funds$/.test(url.pathname), route => {
     if (route.request().method() === "POST") {
       createRequests++;
+      expect(route.request().postDataJSON().contributorScope).toBe("ALL_OCCUPANTS");
       return route.fulfill({ status: 400, json: { success: false, description: "Check the property assignment" } });
     }
     return route.fulfill({ json: envelope([]) });
@@ -16,6 +17,11 @@ test("failed community fund creation retains the complete draft", async ({ conte
   await page.goto("/dashboard/community-funds");
   await page.getByRole("button", { name: "New fund", exact: true }).click();
   const form = page.locator("form");
+  const contributors = form.locator("select").nth(1);
+  await expect(contributors).toHaveValue("ALL_OCCUPANTS");
+  await contributors.selectOption("HOMEOWNERS");
+  await contributors.selectOption("ALL_OCCUPANTS");
+  await expect(contributors).toHaveValue("ALL_OCCUPANTS");
   await form.locator('input[type="number"]').nth(0).fill("10");
   await form.locator('input[type="number"]').nth(1).fill("10000");
   await form.locator('input[type="number"]').nth(2).fill("100");
