@@ -223,6 +223,11 @@ export default function KycPage() {
   );
   const waiting =
     kyc?.status === "SUBMITTED" || kyc?.status === "REVIEW_REQUIRED";
+  const legacyProfileUpdate =
+    profileRemediation &&
+    kyc?.status === "APPROVED" &&
+    kyc.accountStatus === "ACTIVE" &&
+    missing.size > 0;
 
   const begin = async () => {
     if (!kyc || !consent) return;
@@ -353,7 +358,11 @@ export default function KycPage() {
   };
 
   if (loading || !kyc) return <Loading />;
-  if (kyc.status === "APPROVED" && kyc.accountStatus === "ACTIVE") {
+  if (
+    kyc.status === "APPROVED" &&
+    kyc.accountStatus === "ACTIVE" &&
+    !legacyProfileUpdate
+  ) {
     if (profileRemediation)
       return (
         <StateCard
@@ -387,7 +396,8 @@ export default function KycPage() {
 
   const needsStart =
     kyc.status === "NOT_STARTED" ||
-    kyc.status === "EXPIRED";
+    kyc.status === "EXPIRED" ||
+    legacyProfileUpdate;
   const missingRequirements = kyc.requirements.filter((requirement) =>
     missing.has(requirement.code),
   );
@@ -415,12 +425,14 @@ export default function KycPage() {
                   Customer KYC
                 </p>
                 <h1 className="mt-1 text-3xl font-bold">
-                  Verify your identity
+                  {legacyProfileUpdate
+                    ? "Complete your identity profile"
+                    : "Verify your identity"}
                 </h1>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
-                  Upload clear original documents, then confirm the key details
-                  that the system reads. Your confirmation and the original OCR
-                  result are retained separately for a secure audit trail.
+                  {legacyProfileUpdate
+                    ? "Your account remains active while you securely add the missing identity detail. Upload the original document, then confirm the key information read by OCR."
+                    : "Upload clear original documents, then confirm the key details that the system reads. Your confirmation and the original OCR result are retained separately for a secure audit trail."}
                 </p>
               </div>
             </div>
@@ -438,12 +450,15 @@ export default function KycPage() {
             )}
             {needsStart ? (
               <div className="rounded-2xl border border-slate-200 p-6">
-                <h2 className="text-lg font-bold">Consent and privacy</h2>
+                <h2 className="text-lg font-bold">
+                  {legacyProfileUpdate
+                    ? "Add the missing identity detail"
+                    : "Consent and privacy"}
+                </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  I consent to SlickHood processing the identity documents I
-                  provide for account verification, fraud prevention, regulatory
-                  compliance and service security. Access is restricted to
-                  authorised reviewers and recorded in the audit log.
+                  {legacyProfileUpdate
+                    ? "This secure update does not suspend your existing account. SlickHood will process only the identity evidence needed to complete your profile, retain the OCR result and your confirmation separately, and record access in the audit log."
+                    : "I consent to SlickHood processing the identity documents I provide for account verification, fraud prevention, regulatory compliance and service security. Access is restricted to authorised reviewers and recorded in the audit log."}
                 </p>
                 <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-4 text-sm">
                   <input
@@ -463,7 +478,9 @@ export default function KycPage() {
                   onClick={begin}
                 >
                   {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Start verification
+                  {legacyProfileUpdate
+                    ? "Start secure profile update"
+                    : "Start verification"}
                 </Button>
               </div>
             ) : (

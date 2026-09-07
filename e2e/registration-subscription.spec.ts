@@ -351,6 +351,61 @@ test("participant roles are invitation-only and never appear as self-service bus
   await expect(page.locator("article").filter({ hasText: "Rental Management" }).getByRole("button", { name: "Choose this area" })).toBeEnabled();
 });
 
+test("an approved legacy tenant can securely add a newly required KRA PIN without losing account access", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: [] });
+  await page.unroute("**/kyc/current");
+
+  const requirement = {
+    code: "TAX",
+    label: "KRA PIN certificate",
+    required: true,
+    acceptedTypes: ["KRA_PIN_CERTIFICATE"],
+  };
+  await page.route("**/kyc/current", route => route.fulfill({ json: envelope([{
+    id: 185,
+    status: "APPROVED",
+    accountStatus: "ACTIVE",
+    consentVersion: "2026-08",
+    phoneVerified: true,
+    verifiedPhoneNumber: "+254700000000",
+    registryStatus: "NOT_CHECKED",
+    ocrEnabled: true,
+    requirements: [requirement],
+    missingRequirementCodes: ["TAX"],
+    documents: [],
+  }]) }));
+
+  let startRequest: Record<string, unknown> | undefined;
+  await page.route("**/kyc/start", async route => {
+    startRequest = route.request().postDataJSON();
+    await route.fulfill({ json: envelope([{
+      id: 185,
+      status: "IN_PROGRESS",
+      accountStatus: "ACTIVE",
+      consentVersion: "2026-08",
+      phoneVerified: true,
+      verifiedPhoneNumber: "+254700000000",
+      registryStatus: "NOT_CHECKED",
+      ocrEnabled: true,
+      requirements: [requirement],
+      missingRequirementCodes: ["TAX"],
+      documents: [],
+    }]) });
+  });
+
+  await page.goto("/kyc?remediate=profile&returnTo=/lease/initialize");
+
+  await expect(page.getByRole("heading", { name: "Complete your identity profile" })).toBeVisible();
+  await expect(page.getByText("This secure update does not suspend your existing account.")).toBeVisible();
+  await page.getByRole("checkbox", { name: /identity-verification privacy notice/ }).check();
+  await page.getByRole("button", { name: "Start secure profile update" }).click();
+
+  expect(startRequest).toEqual({ consent: true, consentVersion: "2026-08" });
+  await expect(page.getByRole("heading", { name: "KRA PIN certificate" })).toBeVisible();
+  await expect(page.getByText("Replace or upload: KRA PIN certificate.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Recheck stored documents" })).toHaveCount(0);
+});
+
 test("KYC phone verification accepts Kenyan 01 ranges and offers a protected resend flow", async ({ context, page }) => {
   await authenticated(context, page, { title: "Landlord", permissions: [] });
   await page.unroute("**/kyc/current");
