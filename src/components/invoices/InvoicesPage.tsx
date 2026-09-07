@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { Invoice } from "@/types/invoice";
 import { InvoiceList } from "./InvoiceList";
 import { InvoiceDetail } from "./InvoiceDetail";
+import { BillingNavigation } from "./BillingNavigation";
 import { FileText, Loader2 } from "lucide-react";
 import { useIsInvoiceMobile } from "@/hooks/use-invoice-mobile";
 import {
@@ -43,7 +44,9 @@ export function InvoicesPage() {
   }
 
   return (
-    <div className="flex gap-6 p-4 lg:p-6 h-[calc(100vh-80px)]">
+    <div className="flex flex-col gap-4 p-4 lg:p-6 h-[calc(100vh-80px)]">
+      <BillingNavigation />
+      <div className="flex min-h-0 flex-1 gap-6">
 
       {/* Left panel */}
       <div className="w-full lg:w-[380px] lg:shrink-0 bg-white rounded-xl border border-gray-200 p-4 lg:p-5 overflow-hidden flex flex-col">
@@ -77,7 +80,7 @@ export function InvoicesPage() {
           </div>
         </SheetContent>
       </Sheet>
-
+      </div>
     </div>
   );
 }

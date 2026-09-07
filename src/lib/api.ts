@@ -103,8 +103,9 @@ export interface HelpDeskArticle {
   published: boolean;
 }
 
-export const listHelpConversations = (admin = false) =>
-  API.get(admin ? "/helpdesk/admin/conversations?size=50" : "/helpdesk/conversations?size=50");
+export const listHelpConversations = (admin = false, page = 0) =>
+  API.get(`${admin ? "/helpdesk/admin/conversations" : "/helpdesk/conversations"}?size=50&page=${page}`);
+export const importHelpManualDrafts = () => API.post("/helpdesk/admin/articles/manual-drafts");
 export const getHelpConversation = (conversationId: number, admin = false) =>
   API.get(admin ? `/helpdesk/admin/conversations/${conversationId}` : `/helpdesk/conversations/${conversationId}`);
 export const getHelpDeskSupportSummary = () => API.get("/helpdesk/admin/summary");

@@ -97,7 +97,6 @@ export default function CreateAccountDialog({
         setChannels(res.data);
       }
     } catch (err: unknown) {
-      console.error("Error loading payment channels:", err);
       toast.error("Failed to load payment channels", {
         description: err instanceof Error ? err.message : "Please try again",
         descriptionClassName: "!text-black",
@@ -149,7 +148,6 @@ export default function CreateAccountDialog({
         throw new Error(res?.description || "Failed to create account");
       }
     } catch (err: unknown) {
-      console.error("Error creating account:", err);
       toast.error("Failed to create account", {
         description: err instanceof Error ? err.message : "Please try again",
         descriptionClassName: "!text-black",

@@ -22,7 +22,7 @@ interface Props {
   onPaymentSuccess: () => void;
 }
 
-type ModalStep = "accounts" | "confirm";
+type ModalStep = "accounts" | "confirm" | "instructions";
 
 const MPESA_CODE     = "S0091";
 const HOSTED_CHECKOUT_CODE = "S00115";
@@ -69,30 +69,39 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
   const [step, setStep]         = useState<ModalStep>("accounts");
   const [selected, setSelected] = useState<Account | null>(null);
   const [paying, setPaying]     = useState(false);
+  const [instructions, setInstructions] = useState("");
 
   // ── Fetch the property's attached payment accounts when the modal opens ──
   useEffect(() => {
     if (!open) return;
     setStep("accounts");
     setSelected(null);
+    setAccounts([]);
+    setInstructions("");
+    let cancelled = false;
 
     const fetch = async () => {
       setAccountsLoading(true);
       try {
-        const active = invoice.paymentAccountId
-          ? [((await API.get("/payment/invoice/payment-account",{params:{invoiceId:invoice.id}})).data?.data as Account)].filter(a=>a?.active&&a.verified)
-          : ((await handleListAccounts({ propertyId: invoice.propertyId ?? undefined })).data ?? []).filter((a: Account) => a.active === true);
-        setAccounts(active.filter((account: Account) => account.channel !== "FLUTTER_WAVE"));
+        const data = invoice.paymentAccountId
+          ? (await API.get("/payment/invoice/payment-account", { params: { invoiceId: invoice.id } })).data?.data
+          : (await handleListAccounts({ propertyId: invoice.propertyId ?? undefined })).data;
+        // ResponseDTO wraps a single account in an array; tolerate older object envelopes.
+        const candidates: Account[] = Array.isArray(data) ? data : data ? [data] : [];
+        if (!cancelled) setAccounts(candidates.filter(account =>
+          account?.active === true && account.verified === true && account.channel !== "FLUTTER_WAVE"));
       } catch {
+        if (cancelled) return;
         toast.error("Could not load payment accounts. Please try again.");
         onClose();
       } finally {
-        setAccountsLoading(false);
+        if (!cancelled) setAccountsLoading(false);
       }
     };
     fetch();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, invoice.propertyId]);
+  }, [open, invoice.id, invoice.paymentAccountId, invoice.propertyId]);
 
   const handleSelectAccount = (account: Account) => {
     setSelected(account);
@@ -116,11 +125,8 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
 
       } else if (code === PESALINK_CODE || code === MPESA_BANK_CODE) {
         const instructions = Array.isArray(res.data) ? res.data[0] : res.data;
-        toast.message(code === PESALINK_CODE ? "PesaLink payment instructions" : "Bank Paybill instructions", {
-          description: typeof instructions === "string" ? instructions : desc,
-          duration: 12000,
-        });
-        onClose();
+        setInstructions(typeof instructions === "string" ? instructions : desc);
+        setStep("instructions");
 
       } else if (code === HOSTED_CHECKOUT_CODE) {
         // Hosted checkout channels (FlutterWave and Paystack) return their
@@ -170,7 +176,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
             )}
             <div>
               <DialogTitle className="text-base text-[#141130]">
-                {step === "accounts" ? "Choose Payment Account" : "Confirm Payment"}
+                {step === "accounts" ? "Choose Payment Account" : step === "instructions" ? "Payment instructions" : "Confirm Payment"}
               </DialogTitle>
               <p className="text-xs text-gray-400 mt-0.5">
                 Invoice <span className="font-semibold text-[#EF4217]">{invoice.ref}</span>
@@ -198,7 +204,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
                   <Wallet className="w-6 h-6 text-gray-400" />
                 </div>
                 <p className="text-sm text-gray-500 max-w-[280px]">
-                  No payment accounts have been set up for this property. Contact your landlord.
+                  No verified receiving account is available for this invoice. Contact the business that issued it. No payment has been taken.
                 </p>
               </div>
             ) : (
@@ -256,7 +262,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
               )}
               {selected.channel === PAYSTACK_ID && (
                 <p className="text-xs text-gray-400 text-center -mt-2">
-                  You&apos;ll be redirected to Paystack to complete this payment. Funds are routed to this property&apos;s landlord account after verification.
+                  You&apos;ll be redirected to Paystack. Check the recipient and amount before paying. A redirect alone does not mean the invoice is paid.
                 </p>
               )}
 
@@ -283,6 +289,15 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
                   }
                 </Button>
               </div>
+            </div>
+          )}
+
+          {step === "instructions" && (
+            <div className="space-y-4">
+              <p className="text-sm font-semibold">Receiving account: {selected?.name}</p>
+              <p className="whitespace-pre-wrap break-words rounded-lg bg-gray-50 p-4 text-sm">{instructions}</p>
+              <p className="text-xs text-gray-500">Use the exact reference shown. The invoice remains unpaid until the payment is verified. Never share your payment PIN here.</p>
+              <Button onClick={onClose} className="w-full">Done</Button>
             </div>
           )}
 

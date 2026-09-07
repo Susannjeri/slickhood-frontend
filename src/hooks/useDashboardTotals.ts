@@ -14,6 +14,9 @@ import { envelopeItem } from "@/lib/api-envelope";
 export function useDashboardTotals(refetchKey = 0) {
   const { handleGetDashboardTotals } = useApi();
   const activeRole = useAuthStore((s) => s.activeRole);
+  const token = useAuthStore(s => s.token);
+  const workspaceId = useAuthStore(s => s.activeWorkspaceId);
+  const businessArea = useAuthStore(s => s.selectedBusinessAreaId);
 
   const [totals, setTotals]   = useState<DashboardTotals | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,7 +24,9 @@ export function useDashboardTotals(refetchKey = 0) {
 
   useEffect(() => {
     const role = activeRole?.title;
-    if (!role) return; // no active role yet (not logged in / still resolving)
+    setTotals(null);
+    setError(null);
+    if (!role || !token) { setLoading(false); return; }
 
     let cancelled = false;
 
@@ -29,7 +34,8 @@ export function useDashboardTotals(refetchKey = 0) {
       setLoading(true);
       setError(null);
       try {
-        const apiRole = role.replace(/([a-z])([A-Z])/g, "$1_$2").replace(/[\s-]+/g, "_").toUpperCase();
+        const apiRole = role.replace(/[\s_-]/g, "").toLowerCase() === "superadmin" ? "SUPER_ADMIN"
+          : role.replace(/([a-z])([A-Z])/g, "$1_$2").replace(/[\s-]+/g, "_").toUpperCase();
         if (apiRole === "AFFILIATE") {
           const value = envelopeItem<AffiliateDashboard | null>(await affiliateDashboard(), null);
           if (!cancelled && value) setTotals({role: apiRole, primaryCount: value.totalReferrals, secondaryCount: value.conversions, pendingActions: value.availableBalance, completedCount: value.lifetimeEarnings, primaryLabel: "Referrals", secondaryLabel: "Conversions", pendingLabel: `Available earnings (${value.profile.currency})`, completedLabel: `Lifetime earnings (${value.profile.currency})`});
@@ -54,8 +60,11 @@ export function useDashboardTotals(refetchKey = 0) {
           return;
         }
 
-        const data = Array.isArray(res.data) ? res.data[0] ?? null : null;
-        setTotals(data);
+        const data = Array.isArray(res.data) ? res.data[0] ?? null : res.data;
+        if (!data || typeof data !== "object") {
+          setError("Dashboard totals are unavailable.");
+          setTotals(null);
+        } else setTotals(data);
       } catch (err: unknown) {
         if (cancelled) return;
         setTotals(null);
@@ -68,7 +77,7 @@ export function useDashboardTotals(refetchKey = 0) {
     fetchTotals();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRole?.title, refetchKey]);
+  }, [activeRole?.title, token, workspaceId, businessArea, refetchKey]);
 
   return { totals, loading, error };
 }

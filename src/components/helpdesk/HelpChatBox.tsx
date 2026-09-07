@@ -14,13 +14,23 @@ import {
 } from "@/lib/api";
 
 const STORAGE_KEY = "slickhood-help-guest-session";
-type ApiEnvelope<T> = { data?: T[]; description?: string };
-const unwrapOne = <T,>(response: AxiosResponse<ApiEnvelope<T>>): T | undefined => response.data.data?.[0];
-const unwrapMany = <T,>(response: AxiosResponse<ApiEnvelope<T>>): T[] => response.data.data ?? [];
+type ApiEnvelope<T> = { data?: T[] | T; success?: boolean; description?: string };
+const unwrapMany = <T,>(response: AxiosResponse<ApiEnvelope<T>>): T[] => {
+  if (response.data.success === false) throw new Error(response.data.description || "Help request failed.");
+  const data = response.data.data;
+  return data == null ? [] : Array.isArray(data) ? data : [data];
+};
+const unwrapOne = <T,>(response: AxiosResponse<ApiEnvelope<T>>): T | undefined => unwrapMany(response)[0];
 
 type StoredGuest = { ticketNumber: string; accessToken: string; expiresAt: string };
 
 export default function HelpChatBox() {
+  const token = useAuthStore((state) => state.token);
+  const role = useAuthStore((state) => state.activeRole?.title);
+  return <HelpChatSession key={`${token ?? "guest"}:${role}`} />;
+}
+
+function HelpChatSession() {
   const pathname = usePathname();
   const token = useAuthStore((state) => state.token);
   const sessionReady = useAuthStore((state) => state.sessionReady);
@@ -31,6 +41,7 @@ export default function HelpChatBox() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>();
   const endRef = useRef<HTMLDivElement>(null);
+  const busy = useRef(false);
   const context = useMemo(() => helpContext(pathname), [pathname]);
   const hidden = pathname === "/dashboard/helpdesk";
 
@@ -45,7 +56,13 @@ export default function HelpChatBox() {
         const response = await getGuestHelpConversation(guest.ticketNumber, guest.accessToken);
         setConversation(unwrapOne<HelpDeskConversation>(response));
       }
-    } catch { /* polling must not disrupt the current conversation */ }
+    } catch (caught) {
+      const status = (caught as { response?: { status?: number } })?.response?.status;
+      if (!token && (status === 404 || status === 410)) {
+        sessionStorage.removeItem(STORAGE_KEY); setGuest(undefined); setConversation(undefined);
+        setError("This guest session has ended. Start a new conversation; keep the old ticket number if you have it.");
+      }
+    }
   }, [conversationId, guest, open, token]);
 
   useEffect(() => {
@@ -78,7 +95,8 @@ export default function HelpChatBox() {
 
   const send = async (preset?: string) => {
     const text = (preset ?? message).trim();
-    if (!text || sending) return;
+    if (!text || busy.current || conversation?.status === "RESOLVED") return;
+    busy.current = true;
     setSending(true); setError(undefined);
     try {
       let active = conversation;
@@ -98,25 +116,40 @@ export default function HelpChatBox() {
         }
       }
       if (!active) throw new Error("Could not start a help conversation.");
+      setConversation(active); // retain the case if sending fails, so retry cannot create duplicates
       const response = token
         ? await sendHelpMessage(active.id, text)
         : await sendGuestHelpMessage(active.ticketNumber, activeGuest!.accessToken, text);
       setConversation(unwrapOne<HelpDeskConversation>(response)); setMessage("");
     } catch (caught: unknown) {
       setError(helpError(caught));
-    } finally { setSending(false); }
+    } finally { busy.current = false; setSending(false); }
   };
 
   const humanSupport = async () => {
-    if (!conversation) { await send("I would like help from a human support agent."); return; }
+    if (busy.current) return;
+    busy.current = true;
     setSending(true);
     try {
+      let active = conversation;
+      let activeGuest = guest;
+      if (!active && token) active = unwrapOne<HelpDeskConversation>(await createHelpConversation("Human support request", context.category, pathname));
+      if (!active && !token) {
+        const session = unwrapOne<HelpDeskGuestSession>(await createGuestHelpConversation("Human support request", context.category, pathname));
+        if (session) {
+          active = session.conversation;
+          activeGuest = { ticketNumber: active.ticketNumber, accessToken: session.accessToken, expiresAt: session.expiresAt };
+          sessionStorage.setItem(STORAGE_KEY, JSON.stringify(activeGuest)); setGuest(activeGuest);
+        }
+      }
+      if (!active) throw new Error("Could not create case");
+      setConversation(active);
       const response = token
-        ? await escalateHelpConversation(conversation.id, "Please transfer this conversation to human support.")
-        : await escalateGuestHelpConversation(conversation.ticketNumber, guest!.accessToken);
+        ? await escalateHelpConversation(active.id, "Please transfer this conversation to human support.")
+        : await escalateGuestHelpConversation(active.ticketNumber, activeGuest!.accessToken);
       setConversation(unwrapOne<HelpDeskConversation>(response));
     } catch { setError("Human support could not be requested. Please try again."); }
-    finally { setSending(false); }
+    finally { busy.current = false; setSending(false); }
   };
 
   if (hidden) return null;
@@ -137,8 +170,8 @@ export default function HelpChatBox() {
       </div>
       {error && <p role="alert" className="border-t bg-red-50 px-4 py-2 text-xs text-red-700">{error}</p>}
       <footer className="border-t bg-white p-3">
-        {conversation && <div className="mb-2 flex items-center justify-between text-xs text-slate-500"><span>{conversation.ticketNumber} · {statusLabel(conversation.status)}</span><button onClick={humanSupport} disabled={sending || ["ESCALATED","WAITING_FOR_SUPPORT","ASSIGNED"].includes(conversation.status)} className="flex items-center gap-1 font-medium text-[#EF4217] disabled:text-slate-400"><Headphones className="h-3.5 w-3.5" />Talk to a person</button></div>}
-        <div className="flex items-end gap-2"><Textarea aria-label="Message Slickhood Help" value={message} onChange={(event) => setMessage(event.target.value)} maxLength={4000} placeholder="Type your question…" className="min-h-12 max-h-28 resize-none" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} /><Button size="icon" className="h-11 w-11 shrink-0 bg-[#EF4217] hover:bg-[#d93a13]" onClick={() => send()} disabled={!message.trim() || sending}>{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button></div>
+        {<div className="mb-2 flex items-center justify-between text-xs text-slate-500"><span>{conversation ? `${conversation.ticketNumber} · ${statusLabel(conversation.status)}` : "Private support"}</span><button onClick={humanSupport} disabled={sending || ["ESCALATED","WAITING_FOR_SUPPORT","ASSIGNED"].includes(conversation?.status ?? "")} className="flex items-center gap-1 font-medium text-[#EF4217] disabled:text-slate-400"><Headphones className="h-3.5 w-3.5" />Talk to a person</button></div>}
+        <div className="flex items-end gap-2"><Textarea aria-label="Message Slickhood Help" value={message} onChange={(event) => setMessage(event.target.value)} disabled={conversation?.status === "RESOLVED"} maxLength={4000} placeholder="Type your question…" className="min-h-12 max-h-28 resize-none" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} /><Button size="icon" className="h-11 w-11 shrink-0 bg-[#EF4217] hover:bg-[#d93a13]" onClick={() => send()} disabled={!message.trim() || sending || conversation?.status === "RESOLVED"}>{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button></div>
         <p className="mt-2 text-center text-[11px] text-slate-400">AI guidance may be inaccurate. Important decisions are transferred to authorised staff.</p>
       </footer>
     </section>}

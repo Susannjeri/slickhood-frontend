@@ -70,7 +70,8 @@ export const getSubscriptionPlans = (
   token: string,
   page = 0,
   size = 10,
-  category = ""
+  category = "",
+  filters?: { active?: boolean; search?: string }
 ) => {
   const params = new URLSearchParams({
     page: String(page),
@@ -81,6 +82,8 @@ export const getSubscriptionPlans = (
   if (category.trim()) {
     params.append("category", category.trim().toUpperCase());
   }
+  if (filters?.active !== undefined) params.set("active", String(filters.active));
+  if (filters?.search?.trim()) params.set("search", filters.search.trim());
 
   return API.get(`/plans?${params.toString()}`, {
     headers: {

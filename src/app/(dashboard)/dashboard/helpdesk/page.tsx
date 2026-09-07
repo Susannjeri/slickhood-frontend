@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Bot, BookOpen, CheckCircle2, CircleHelp, Headphones, Loader2, MessageSquarePlus, Search, Send, ShieldAlert, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -12,24 +12,35 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthStore } from "@/store/authStore";
-import { normalizedRoleTitle } from "@/config/businessAreas";
 import {
   addHelpInternalNote, createHelpConversation, escalateHelpConversation, getHelpConversation, getHelpDeskSupportSummary,
   HelpDeskArticle, HelpDeskConversation, HelpDeskMessage, HelpDeskSupportSummary,
   listHelpArticles, listHelpConversations, replyToHelpConversation, resolveHelpConversation,
-  saveHelpArticle, sendHelpMessage,
+  saveHelpArticle, sendHelpMessage, claimHelpConversation, reopenHelpConversation, importHelpManualDrafts,
 } from "@/lib/api";
 
 type Mode = "mine" | "queue" | "knowledge";
-const unwrap = <T,>(response: { data?: { data?: T[] } }): T[] => response.data?.data ?? [];
+const unwrap = <T,>(response: { data?: { data?: T[] | T; success?: boolean; description?: string } }): T[] => {
+  if (response.data?.success === false) throw new Error(response.data.description || "The request was not completed.");
+  const data = response.data?.data;
+  return data == null ? [] : Array.isArray(data) ? data : [data];
+};
 const errorMessage = (error: unknown, fallback: string) =>
   axios.isAxiosError<{ description?: string }>(error) ? error.response?.data?.description ?? fallback : fallback;
 
 export default function HelpDeskPage() {
-  const activeRole = useAuthStore((s) => s.activeRole?.title);
-  const permissions = useAuthStore((s) => s.permissions);
-  const isAdmin = permissions.includes("view_helpdesk_queue") || ["superadmin", "support"].includes(normalizedRoleTitle(activeRole));
-  const canManageArticles = permissions.includes("manage_helpdesk_articles") || normalizedRoleTitle(activeRole) === "superadmin";
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.activeRole);
+  const workspace = useAuthStore((s) => s.activeWorkspaceId);
+  return <HelpDeskWorkspace key={`${token}:${role?.title}:${workspace}:${role?.permissions.join(",")}`} />;
+}
+
+function HelpDeskWorkspace() {
+  const role = useAuthStore((s) => s.activeRole);
+  const permissions = role?.permissions ?? [];
+  const isAdmin = permissions.includes("view_helpdesk_queue");
+  const canManageCases = permissions.includes("manage_helpdesk_cases");
+  const canManageArticles = permissions.includes("manage_helpdesk_articles");
   const [mode, setMode] = useState<Mode>("mine");
   const [conversations, setConversations] = useState<HelpDeskConversation[]>([]);
   const [articles, setArticles] = useState<HelpDeskArticle[]>([]);
@@ -42,6 +53,10 @@ export default function HelpDeskPage() {
   const [internalNote, setInternalNote] = useState(false);
   const [articleEditor, setArticleEditor] = useState<HelpDeskArticle | null>();
   const [supportSummary, setSupportSummary] = useState<HelpDeskSupportSummary>();
+  const [pageNumber, setPageNumber] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const requestGeneration = useRef(0);
+  const mutationLock = useRef(false);
 
   const selected = conversations.find((c) => c.id === selectedId);
   const filteredArticles = useMemo(() => {
@@ -50,40 +65,48 @@ export default function HelpDeskPage() {
   }, [articles, search]);
 
   const load = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     setLoading(true);
     try {
       if (mode === "knowledge") {
         const res = await listHelpArticles(canManageArticles);
+        if (generation !== requestGeneration.current) return;
         setArticles(unwrap<HelpDeskArticle>(res));
       } else {
-        const res = await listHelpConversations(mode === "queue");
+        const res = await listHelpConversations(mode === "queue", pageNumber);
+        if (generation !== requestGeneration.current) return;
         const rows = unwrap<HelpDeskConversation>(res);
+        setTotalPages(res.data.totalPages ?? (rows.length === 50 ? pageNumber + 2 : pageNumber + 1));
         setConversations(rows);
         setSelectedId((current) => rows.some((x) => x.id === current) ? current : rows[0]?.id);
         if (mode === "queue") {
           const summaryResponse = await getHelpDeskSupportSummary();
+          if (generation !== requestGeneration.current) return;
           setSupportSummary(unwrap<HelpDeskSupportSummary>(summaryResponse)[0]);
         }
       }
     } catch (error: unknown) {
       toast.error(errorMessage(error, "Unable to load the Help Desk."));
-    } finally { setLoading(false); }
-  }, [mode, canManageArticles]);
+    } finally { if (generation === requestGeneration.current) setLoading(false); }
+  }, [mode, canManageArticles, pageNumber]);
 
   // Loading is the external synchronization performed by this effect.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => { listHelpArticles(false).then((r) => setArticles(unwrap<HelpDeskArticle>(r))).catch(() => undefined); }, []);
+  useEffect(() => { void load(); return () => { requestGeneration.current++; }; }, [load]);
+  useEffect(() => { let cancelled = false; listHelpArticles(false).then((r) => { if (!cancelled) setArticles(unwrap<HelpDeskArticle>(r)); }).catch(() => undefined); return () => { cancelled = true; }; }, []);
   useEffect(() => {
     if (!selectedId || mode === "knowledge") return;
+    let cancelled = false;
     getHelpConversation(selectedId, mode === "queue").then((response) => {
       const detail = unwrap<HelpDeskConversation>(response)[0];
-      if (detail) setConversations((current) => current.map((item) => item.id === detail.id ? detail : item));
+      if (detail && !cancelled) setConversations((current) => current.map((item) => item.id === detail.id ? detail : item));
     }).catch(() => toast.error("Could not load this help conversation."));
-  }, [selectedId, mode]);
+    return () => { cancelled = true; };
+  }, [selectedId, mode, loading]);
 
   const startConversation = async () => {
-    if (!subject.trim()) return;
+    if (!subject.trim() || mutationLock.current) return;
+    mutationLock.current = true;
     setSending(true);
     try {
       const res = await createHelpConversation(subject.trim());
@@ -91,11 +114,12 @@ export default function HelpDeskPage() {
       setSubject(""); setMode("mine");
       if (created) { setConversations((old) => [created, ...old]); setSelectedId(created.id); }
     } catch (error: unknown) { toast.error(errorMessage(error, "Could not start the conversation.")); }
-    finally { setSending(false); }
+    finally { mutationLock.current = false; setSending(false); }
   };
 
   const submitMessage = async () => {
-    if (!selected || !message.trim()) return;
+    if (!selected || !message.trim() || mutationLock.current || (mode === "queue" && !canManageCases)) return;
+    mutationLock.current = true;
     setSending(true);
     try {
       const action = mode === "queue" && internalNote ? addHelpInternalNote : mode === "queue" ? replyToHelpConversation : sendHelpMessage;
@@ -104,7 +128,7 @@ export default function HelpDeskPage() {
       setMessage(""); setInternalNote(false);
       if (updated) setConversations((old) => old.map((c) => c.id === updated.id ? updated : c));
     } catch (error: unknown) { toast.error(errorMessage(error, "Message could not be sent.")); }
-    finally { setSending(false); }
+    finally { mutationLock.current = false; setSending(false); }
   };
 
   const escalate = async () => {
@@ -118,10 +142,27 @@ export default function HelpDeskPage() {
   };
 
   const resolve = async () => {
-    if (!selected) return;
-    const res = await resolveHelpConversation(selected.id);
-    const updated = unwrap<HelpDeskConversation>(res)[0];
-    if (updated) setConversations((old) => old.map((c) => c.id === updated.id ? updated : c));
+    await ticketAction(resolveHelpConversation);
+  };
+  const ticketAction = async (action: typeof resolveHelpConversation) => {
+    if (!selected || mutationLock.current) return;
+    mutationLock.current = true; setSending(true);
+    try {
+      const updated = unwrap<HelpDeskConversation>(await action(selected.id))[0];
+      if (updated) setConversations(old => old.map(c => c.id === updated.id ? updated : c));
+    } catch (error) { toast.error(errorMessage(error, "The case was not updated. Please retry.")); }
+    finally { mutationLock.current = false; setSending(false); }
+  };
+  const importManual = async () => {
+    if (mutationLock.current) return;
+    mutationLock.current = true; setSending(true);
+    try {
+      const result = unwrap<{ created: number; retained: number }>(await importHelpManualDrafts())[0];
+      if (!result) throw new Error("Missing import result");
+      toast.success(`${result.created} manual drafts added; ${result.retained} existing articles retained. Review before publishing.`);
+      await load();
+    } catch { toast.error("Manual drafts could not be imported. Existing articles were not replaced."); }
+    finally { mutationLock.current = false; setSending(false); }
   };
 
   return (
@@ -132,14 +173,21 @@ export default function HelpDeskPage() {
           <div><h1 className="text-2xl font-bold"><span className="text-white">Slick</span><span className="text-[#EF4217]">Hood</span> Help Desk</h1><p className="text-sm text-white/70">Fast guidance, grounded answers, and a clear path to human support.</p></div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button className={mode === "mine" ? "bg-[#EF4217] text-white hover:bg-[#d93a13]" : "bg-white/10 text-white hover:bg-white/20"} onClick={() => setMode("mine")}>My help</Button>
-          {isAdmin && <Button className={mode === "queue" ? "bg-[#EF4217] text-white hover:bg-[#d93a13]" : "bg-white/10 text-white hover:bg-white/20"} onClick={() => setMode("queue")}><Headphones className="mr-2 h-4 w-4" />Support queue</Button>}
+          <Button className={mode === "mine" ? "bg-[#EF4217] text-white hover:bg-[#d93a13]" : "bg-white/10 text-white hover:bg-white/20"} onClick={() => { setMode("mine"); setPageNumber(0); setConversations([]); setMessage(""); setInternalNote(false); }}>My help</Button>
+          {isAdmin && <Button className={mode === "queue" ? "bg-[#EF4217] text-white hover:bg-[#d93a13]" : "bg-white/10 text-white hover:bg-white/20"} onClick={() => { setMode("queue"); setPageNumber(0); setConversations([]); setMessage(""); setInternalNote(false); }}><Headphones className="mr-2 h-4 w-4" />Support queue</Button>}
           <Button className={mode === "knowledge" ? "bg-[#EF4217] text-white hover:bg-[#d93a13]" : "bg-white/10 text-white hover:bg-white/20"} onClick={() => setMode("knowledge")}><BookOpen className="mr-2 h-4 w-4" />Knowledge</Button>
         </div>
       </header>
 
       <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
         <ShieldAlert className="mr-2 inline h-4 w-4" />Never share passwords, OTPs, PINs, API keys, identity-document numbers, or full card details here.
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" disabled={loading || sending} onClick={() => void load()}>Refresh Help Desk</Button>
+        {mode === "knowledge" && canManageArticles && <Button disabled={sending} onClick={importManual}>Import user manual drafts</Button>}
+        {mode !== "knowledge" && <><Button variant="outline" disabled={pageNumber === 0 || loading} onClick={() => setPageNumber(p => p - 1)}>Previous cases</Button><span className="self-center text-sm">Page {pageNumber + 1}</span><Button variant="outline" disabled={pageNumber + 1 >= totalPages || loading} onClick={() => setPageNumber(p => p + 1)}>Next cases</Button></>}
+        {selected && mode === "queue" && canManageCases && selected.status !== "RESOLVED" && <Button disabled={sending} onClick={() => ticketAction(claimHelpConversation)}>Claim case</Button>}
+        {selected && mode === "mine" && selected.status === "RESOLVED" && <Button disabled={sending} onClick={() => ticketAction(reopenHelpConversation)}>Reopen case</Button>}
       </div>
 
       {mode === "knowledge" ? (
@@ -172,10 +220,10 @@ export default function HelpDeskPage() {
             {selected ? <>
               <CardHeader className="flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div><CardTitle className="text-lg">{selected.subject}</CardTitle><p className="mt-1 text-xs text-slate-500">Private conversation · {selected.activeRole}</p></div>
-                <div className="flex gap-2">{mode === "mine" && !["ESCALATED","ASSIGNED","RESOLVED"].includes(selected.status) && <Button variant="outline" size="sm" onClick={escalate}><UserRound className="mr-2 h-4 w-4" />Human support</Button>}{mode === "queue" && selected.status !== "RESOLVED" && <Button variant="outline" size="sm" onClick={resolve}><CheckCircle2 className="mr-2 h-4 w-4" />Resolve</Button>}</div>
+                <div className="flex gap-2">{mode === "mine" && !["ESCALATED","ASSIGNED","RESOLVED"].includes(selected.status) && <Button variant="outline" size="sm" onClick={escalate}><UserRound className="mr-2 h-4 w-4" />Human support</Button>}{mode === "queue" && canManageCases && selected.status !== "RESOLVED" && <Button variant="outline" size="sm" onClick={resolve} disabled={sending}><CheckCircle2 className="mr-2 h-4 w-4" />Resolve</Button>}</div>
               </CardHeader>
               <ScrollArea className="flex-1 p-4"><div className="space-y-4 pr-3">{selected.messages.length === 0 && <Empty text="Describe the issue below. Slickhood Help will answer or transfer it safely." />}{selected.messages.map((m) => <MessageBubble key={m.id} message={m} />)}</div></ScrollArea>
-              <div className="border-t bg-white p-4">{mode === "queue" && <label className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={internalNote} onChange={(e) => setInternalNote(e.target.checked)} />Internal note — hidden from the customer</label>}<div className="flex items-end gap-2"><Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder={selected.status === "RESOLVED" ? "This conversation is resolved" : mode === "queue" ? internalNote ? "Add a private support note…" : "Reply as a support agent…" : "Ask Slickhood Help…"} disabled={selected.status === "RESOLVED" || sending} className="min-h-20 resize-none" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitMessage(); } }} /><Button size="icon" className="h-11 w-11 bg-[#EF4217] hover:bg-[#d93a13]" onClick={submitMessage} disabled={sending || !message.trim() || selected.status === "RESOLVED"}>{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button></div><p className="mt-2 text-xs text-slate-500">AI guidance can be inaccurate. Verify financial, legal, KYC, and safety decisions with an authorised person.</p></div>
+              <div className="border-t bg-white p-4">{mode === "queue" && canManageCases && <label className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={internalNote} onChange={(e) => setInternalNote(e.target.checked)} />Internal note — hidden from the customer</label>}<div className="flex items-end gap-2"><Textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder={selected.status === "RESOLVED" ? "This conversation is resolved" : mode === "queue" ? internalNote ? "Add a private support note…" : "Reply as a support agent…" : "Ask Slickhood Help…"} maxLength={4000} disabled={selected.status === "RESOLVED" || sending || (mode === "queue" && !canManageCases)} className="min-h-20 resize-none" onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitMessage(); } }} /><Button size="icon" className="h-11 w-11 bg-[#EF4217] hover:bg-[#d93a13]" onClick={submitMessage} aria-label="Send help message" disabled={sending || !message.trim() || selected.status === "RESOLVED" || (mode === "queue" && !canManageCases)}>{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button></div><p className="mt-2 text-xs text-slate-500">AI guidance can be inaccurate. Verify financial, legal, KYC, and safety decisions with an authorised person.</p></div>
             </> : <Empty text="Select a conversation or start a new one." />}
           </Card>
 
@@ -199,12 +247,12 @@ function Loader(){return <div className="flex h-40 items-center justify-center">
 function Empty({text}:{text:string}){return <div className="flex h-full min-h-40 flex-col items-center justify-center p-8 text-center text-sm text-slate-500"><CircleHelp className="mb-3 h-9 w-9 text-slate-300" />{text}</div>}
 
 function KnowledgeView({articles,search,setSearch,loading,isAdmin,onNew,onEdit}:{articles:HelpDeskArticle[];search:string;setSearch:(v:string)=>void;loading:boolean;isAdmin:boolean;onNew:()=>void;onEdit:(a:HelpDeskArticle)=>void}) {
-  return <Card><CardHeader className="flex-col gap-3 border-b md:flex-row md:items-center md:justify-between"><div><CardTitle>Help knowledge</CardTitle><p className="mt-1 text-sm text-slate-500">Approved guidance used by customers, agents, and Slickhood Help.</p></div><div className="flex gap-2"><div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><Input className="pl-9" value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search articles" /></div>{isAdmin&&<Button onClick={onNew}>New article</Button>}</div></CardHeader><CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">{loading?<Loader/>:articles.map((a)=><article key={a.id} className="rounded-2xl border bg-white p-5"><div className="mb-3 flex items-center justify-between"><Badge variant="secondary">{a.category}</Badge>{isAdmin&&<Badge variant={a.published?"default":"outline"}>{a.published?"Published":"Draft"}</Badge>}</div><h2 className="font-semibold text-[#141130]">{a.title}</h2><p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{a.body}</p>{isAdmin&&<Button className="mt-4" variant="outline" size="sm" onClick={()=>onEdit(a)}>Edit</Button>}</article>)}</CardContent></Card>;
+  return <Card><CardHeader className="flex-col gap-3 border-b md:flex-row md:items-center md:justify-between"><div><CardTitle>Help knowledge</CardTitle><p className="mt-1 text-sm text-slate-500">Approved guidance used by customers, agents, and Slickhood Help.</p></div><div className="flex gap-2"><div className="relative"><Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><Input className="pl-9" value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search articles" /></div>{isAdmin&&<Button onClick={onNew}>New article</Button>}</div></CardHeader><CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">{loading?<Loader/>:articles.map((a)=><article key={a.id} className="rounded-2xl border bg-white p-5"><div className="mb-3 flex items-center justify-between"><Badge variant="secondary">{a.category}</Badge>{isAdmin&&<Badge variant={a.published?"default":"outline"}>{a.published?"Published":"Draft"}</Badge>}</div><p className="mb-1 text-xs text-slate-500">Article {a.id}</p><h2 className="font-semibold text-[#141130]">{a.title}</h2><p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{a.body}</p>{isAdmin&&<Button className="mt-4" variant="outline" size="sm" onClick={()=>onEdit(a)}>Edit</Button>}</article>)}</CardContent></Card>;
 }
 const emptyArticle=():HelpDeskArticle=>({id:0,slug:"",title:"",category:"General",body:"",keywords:"",audienceRoles:"",published:false});
 function ArticleDialog({article,onClose,onSaved}:{article:HelpDeskArticle;onClose:()=>void;onSaved:()=>void}){
   const [draft,setDraft]=useState<HelpDeskArticle>(article); const [saving,setSaving]=useState(false);
   const update=<K extends keyof HelpDeskArticle>(key:K,value:HelpDeskArticle[K])=>setDraft((d)=>({...d,[key]:value}));
-  const save=async()=>{setSaving(true);try{const{id,...payload}=draft;await saveHelpArticle(payload,id||undefined);toast.success("Help article saved.");onSaved()}catch(error:unknown){toast.error(errorMessage(error,"Article could not be saved."))}finally{setSaving(false)}};
+  const save=async()=>{setSaving(true);try{const{id,...payload}=draft;unwrap<HelpDeskArticle>(await saveHelpArticle(payload,id||undefined));toast.success("Help article saved.");onSaved()}catch(error:unknown){toast.error(errorMessage(error,"Article could not be saved."))}finally{setSaving(false)}};
   return <Dialog open onOpenChange={(open)=>!open&&onClose()}><DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>{draft.id?"Edit help article":"New help article"}</DialogTitle><DialogDescription>Published content is available to the AI assistant. Keep it factual, current, and free of secrets.</DialogDescription></DialogHeader><div className="grid gap-3"><Input value={draft.title} onChange={(e)=>update("title",e.target.value)} placeholder="Title"/><div className="grid gap-3 md:grid-cols-2"><Input value={draft.slug} onChange={(e)=>update("slug",e.target.value)} placeholder="article-slug"/><Input value={draft.category} onChange={(e)=>update("category",e.target.value)} placeholder="Category"/></div><Textarea className="min-h-48" value={draft.body} onChange={(e)=>update("body",e.target.value)} placeholder="Approved guidance"/><Input value={draft.keywords??""} onChange={(e)=>update("keywords",e.target.value)} placeholder="Keywords"/><Input value={draft.audienceRoles??""} onChange={(e)=>update("audienceRoles",e.target.value)} placeholder="Optional roles, comma-separated"/><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={draft.published} onChange={(e)=>update("published",e.target.checked)}/>Publish for customers and AI grounding</label><Button onClick={save} disabled={saving||!draft.title||!draft.slug||!draft.body}>{saving&&<Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Save article</Button></div></DialogContent></Dialog>;
 }

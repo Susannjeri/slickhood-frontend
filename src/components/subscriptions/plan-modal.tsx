@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SubscriptionPlan } from "@/types/subscription";
 import SuccessModal from "../common/successmodal";
+import { apiErrorMessage } from "@/lib/api-error";
 
 const PLAN_CATEGORIES = [
     "LANDLORD",
@@ -66,8 +67,8 @@ const EMPTY_FORM: PlanPayload = {
     currency: "KES",
     features: [],
     quotas: [
-        { metricKey: "MAX_PROPERTIES", limitValue: 0 },
-        { metricKey: "MAX_UNITS", limitValue: 0 },
+        { metricKey: "TEAM_SEATS", limitValue: 2 },
+        { metricKey: "UNITS", limitValue: 10 },
     ],
 };
 
@@ -78,6 +79,8 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
     const [errors, setErrors] = useState<FormErrors>({});
     const [submitting, setSubmitting] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [saveError, setSaveError] = useState("");
+    const submitLock = useRef(false);
 
     // Populate form when editing
     useEffect(() => {
@@ -91,12 +94,7 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
                 price: plan.price,
                 currency: plan.currency,
                 features: plan.features?.length ? plan.features : [],
-                quotas: plan.quotas?.length
-                    ? plan.quotas
-                    : [
-                        { metricKey: "MAX_PROPERTIES", limitValue: 0 },
-                        { metricKey: "MAX_UNITS", limitValue: 0 },
-                    ],
+                quotas: plan.quotas ?? [],
             });
         } else {
             setForm(EMPTY_FORM);
@@ -116,22 +114,12 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
 
         // Pricing & Billing
         if (!form.billingCycle) e.billingCycle = "Billing cycle is required.";
-        if (form.price === 0 || form.price === null || form.price === undefined) {
-            e.price = "Price is required.";
-        } else if (form.price < 0) {
-            e.price = "Price cannot be negative.";
-        }
+        if (!Number.isFinite(form.price) || form.price < 0) e.price = "Enter a non-negative price. Zero is valid for free or sales-managed plans.";
         if (!form.currency) e.currency = "Currency is required.";
 
         // Usage Limits
-        const maxProps = form.quotas.find((q) => q.metricKey === "MAX_PROPERTIES");
-        const maxUnits = form.quotas.find((q) => q.metricKey === "MAX_UNITS");
-        if (!maxProps || maxProps.limitValue === 0) {
-            e.quotas = "Max Properties is required.";
-        } else if (!maxUnits || maxUnits.limitValue === 0) {
-            e.quotas = "Max Units is required.";
-        } else if (form.quotas.some((q) => q.limitValue < 0)) {
-            e.quotas = "Quota values cannot be negative.";
+        if (form.quotas.some(q => !Number.isInteger(q.limitValue) || q.limitValue < -1 || !q.metricKey.trim())) {
+            e.quotas = "Use whole-number quotas; -1 means unlimited and 0 means no allowance.";
         }
 
         // Features
@@ -160,7 +148,9 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
 
 
     const handleSubmit = async () => {
-        if (!validate()) return;
+        if (readOnly || submitLock.current || !validate()) return;
+        submitLock.current = true;
+        setSaveError("");
 
         setSubmitting(true);
 
@@ -169,8 +159,9 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
 
             setShowSuccess(true);
         } catch (error) {
-            console.error(error);
+            setSaveError(apiErrorMessage(error, "Could not save this plan. Your edits have been retained."));
         } finally {
+            submitLock.current = false;
             setSubmitting(false);
         }
     };
@@ -205,7 +196,7 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
             <SuccessModal
                 open={true}
                 title="Success"
-                message="Subscription plan created successfully."
+                message={isEdit ? "Subscription plan updated successfully." : "Subscription plan created successfully."}
                 onClose={() => {
                     setShowSuccess(false);
                     onClose();
@@ -244,7 +235,9 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
                 </div>
 
                 {/* Body */}
-                <div className="overflow-y-auto p-6 space-y-6 flex-1">
+                <fieldset disabled={readOnly || submitting} className="overflow-y-auto p-6 space-y-6 flex-1 min-w-0">
+                    {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
+                    <p className="text-sm text-slate-600">Product identity, currency and billing cycle are fixed after creation. Retire an old plan and create a new code for a different product or term. Quota -1 means unlimited. Editing features affects existing subscribers.</p>
 
                     {/* BASIC INFORMATION */}
                     <section className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -300,6 +293,7 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
                                 </label>
                                 <select
                                     value={form.planCategory}
+                                    disabled={isEdit}
                                     onChange={(e) => set("planCategory", e.target.value)}
                                     className={cn(
                                         "w-full px-4 py-3 text-sm rounded-xl border bg-white text-[#08184A]",
@@ -323,6 +317,7 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
                                 </label>
                                 <select
                                     value={form.roleFamily}
+                                    disabled={isEdit}
                                     onChange={(e) => set("roleFamily", e.target.value)}
                                     className={cn(
                                         "w-full px-4 py-3 text-sm rounded-xl border bg-white text-[#08184A]",
@@ -361,6 +356,7 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
 
                                 <select
                                     value={form.billingCycle}
+                                    disabled={isEdit}
                                     onChange={(e) => set("billingCycle", e.target.value)}
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm"
                                 >
@@ -379,7 +375,7 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
                                 <input
                                     type="text"
                                     inputMode="decimal"
-                                    value={form.price === 0 ? "" : form.price}
+                                    value={form.price}
                                     onChange={(e) => set("price", parseFloat(e.target.value.replace(/[^0-9.]/g, "")) || 0)}
                                     placeholder="0.00"
                                     className={cn(
@@ -399,6 +395,7 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
 
                                 <select
                                     value={form.currency}
+                                    disabled={isEdit}
                                     onChange={(e) => set("currency", e.target.value)}
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm"
                                 >
@@ -431,11 +428,11 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
                                     </label>
 
                                     <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        pattern="[0-9]*"
-                                        value={q.limitValue === 0 ? "" : q.limitValue}
-                                        onChange={(e) => updateQuota(q.metricKey, parseInt(e.target.value.replace(/\D/g, "")) || 0)}
+                                        type="number"
+                                        min={-1}
+                                        step={1}
+                                        value={q.limitValue}
+                                        onChange={(e) => updateQuota(q.metricKey, Number(e.target.value))}
                                         placeholder="0"
                                         className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white"
                                     />
@@ -514,7 +511,7 @@ export default function PlanModal({ open, onClose, onSubmit, plan, readOnly = fa
                         )}
                     </section>
 
-                </div>
+                </fieldset>
                 {/* Footer */}
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-4 px-8 py-5 border-t border-gray-200 bg-white">

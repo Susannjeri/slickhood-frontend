@@ -161,7 +161,6 @@ export function useApi() {
               return res.data; // directly return the response payload
           }
           catch (error) {
-                console.error("Error fetching user list:", error);
                 throw error; // rethrow the error after logging it
           }
         };
@@ -169,7 +168,6 @@ export function useApi() {
       const deleteUser = async (email: string) => 
         {
           if (!token) throw new Error("No token");
-          console.log("Deleting user with email:", email);
         }
 
       const createNewProperty = async (data: {image: File, name: string, type: string, managementMode: "RENTAL" | "SALE" | "SERVICE_CHARGE", address: string,mapLocation: string, currency:string}) => {
@@ -187,7 +185,6 @@ export function useApi() {
           if (apiError.response?.data?.code === "S0174") {
                 return {profileGate: true, fields: apiError.response.data.data?.[0] ?? {}} satisfies ProfileGateResult;
               }
-          console.error("Error creating property:", error);
           throw error;
         }
       }
@@ -217,20 +214,16 @@ export function useApi() {
               );
 
               if (res.data?.code === "S0174") {
-                console.log("Gated: ", res.data.code)
                 return {profileGate: true, fields: res.data.data[0]} satisfies ProfileGateResult;
               }
-              console.log("Response from getProperties:", res);
               return res.data; // directly return the response payload
           }
           catch (error: any) {
                 if (error?.response?.data?.code === "S0174") {
-                  console.log("Gated: ", error.response.data.code)
                 return {profileGate: true, fields: error?.response?.data.data[0]} satisfies ProfileGateResult;
               }
 
               else{
-                console.error("Error fetching Properties:", error.response);
                 // rethrow the error after logging it
               }
           }
@@ -243,11 +236,9 @@ export function useApi() {
               const res = await viewProperty(propertyId, {
                 headers: { Authorization: `Bearer ${token}` }, // 👈 injected here
               });
-              console.log("Response from viewPropertyDetails:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
-                console.error("Error fetching Property Details:", error);
                 throw error; // rethrow the error after logging it
           }
         };
@@ -256,13 +247,10 @@ export function useApi() {
         try {
           const { token } = useAuthStore.getState();
           if (!token) throw new Error("No token available");
-          console.log("Creating property with data:", data);
           const res = await editProperty(data, token);
-          console.log("Response from createProperty:", res);
           return res.data;
         }
         catch (error) {
-          console.error("Error creating property:", error);
           throw error;
         }
       }
@@ -278,15 +266,12 @@ export function useApi() {
           const { token } = useAuthStore.getState();
           if (!token) throw new Error("No token available");
 
-          console.log("Fetching image with path:", imagePath);
           const res = await getImage(imagePath, {
             headers: { Authorization: `Bearer ${token}`}, // 👈 injected here
           });
-          console.log("Response from getImage:", res);
           return res.data;
         }
         catch (error) {
-          console.error("Error fetching image:", error);
           throw error;
         }
       }
@@ -294,7 +279,6 @@ export function useApi() {
       const getSupportedPropertyTypes = async(): Promise<PropertyTypeResponse> => {
         try {
           const res = await supportedPropertyTypes();
-          console.log("Response from supportedPropertyTypes:", res);
           const success = res.data.success
           const code = res.data.code
           const message = res.data.description
@@ -303,7 +287,6 @@ export function useApi() {
           return {success, code, message, data};
         }
         catch(error: any){
-          console.error("Error fetching supported property types:", error);
           return error
         }
       }
@@ -316,7 +299,6 @@ export function useApi() {
           return res.data;
         }
         catch (error) {
-          console.error("Error creating unit:", error);
           throw error;
         }
       }
@@ -326,11 +308,9 @@ export function useApi() {
           const { token } = useAuthStore.getState();  
           if (!token) throw new Error("No token available");
           const res = await getSupportedUtilities(token);
-          console.log("Response from getSupportedUtilities:", res);
           return res.data;
         }
         catch (error) {
-          console.error("Error fetching supported utilities:", error);
           throw error;
         }
       }
@@ -338,11 +318,9 @@ export function useApi() {
       const fetchSupportedUnitTypes = async(propertyType: string) => {
         try {
           const res = await getSupportedUnitTypes(propertyType);
-          console.log("Response from getSupportedUnitTypes:", res);
           return res.data;
         } 
         catch (error) {
-          console.error("Error fetching supported unit types:", error);
           throw error;
         }
       }
@@ -352,11 +330,9 @@ export function useApi() {
           const { token } = useAuthStore.getState();  
           if (!token) throw new Error("No token available");
           const res = await getMeasurentUnits(token);
-          console.log("Response from getSupportedUnitTypes:", res);
           return res.data;
         }
         catch(error){
-          console.error("Error fetching supported unit types:", error);
           throw error;
         }
       }
@@ -368,11 +344,9 @@ export function useApi() {
               const res = await fetchUnitList(params, {
                 headers: { Authorization: `Bearer ${token}` }, // 👈 injected here
               });
-              console.log("Response from fetchUserList:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
-                console.error("Error fetching user list:", error);
                 throw error; // rethrow the error after logging it
           }
         };
@@ -383,10 +357,8 @@ export function useApi() {
             if (!token) throw new Error("No token available");
 
             const res = await uploadUnitImages(params, token); // ✅ pass token string only
-            console.log("Response from image upload:", res.data);
             return res.data;
           } catch (error) {
-              console.error("Error uploading images:", error);
               throw error;
             }
         };
@@ -397,11 +369,9 @@ export function useApi() {
             if (!token) throw new Error("No token available");
             
             const res = await getUnit(propertyId, unitId, token);
-            console.log("Response from getUnit: ", res.data)
             return res.data
           }
           catch (error) {
-            console.error("Error getting unit: ", error)
             throw error;
           }
         }
@@ -426,10 +396,8 @@ export function useApi() {
               // ✅ Call the API function with correct parameters
               const res = await editUnit(params, token);
 
-              console.log("Response from editUnit:", res);
               return res.data;
             } catch (error) {
-              console.error("Error editing unit:", error);
               throw error;
             }
           };
@@ -443,10 +411,8 @@ export function useApi() {
               // ✅ Call the API function with correct parameters
               const res = await toggleAdvert(unitId, published, token);
 
-              console.log("Response from ToggleAdvertState:", res);
               return res.data;
             } catch (error) {
-              console.error("Error editing unit:", error);
               throw error;
             }
         }
@@ -458,10 +424,8 @@ export function useApi() {
               if (!token) throw new Error("No token available");
               // ✅ Call the API function with correct parameters
               const res = await createSimilarUnits(unitId, count, token);
-              console.log("Response from createSimilarUnits:", res);
               return res.data;
             } catch (error) {
-              console.error("Error creating similar units:", error);
               throw error;
             }
         }
@@ -473,11 +437,9 @@ export function useApi() {
               if (!token) throw new Error("No token available");
               // ✅ Call the API function with correct parameters
               const res = await getPendingUnits(token);
-              console.log("Response from getPendingUnits:", res);
               return res.data;
             } 
              catch (error) {
-              console.error("Error getting pending units:", error);
               throw error;
             } 
         }
@@ -489,7 +451,6 @@ export function useApi() {
             const res = await getCreateUnitJobStatus(jobId, token);
             return res.data;
           } catch (error) {
-            console.error("Error fetching create unit job status:", error);
             throw error;
           }
         }
@@ -499,11 +460,9 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await getCreateUnitJobs(params, token)
-              console.log("Response from handleGetCreateUnitJobs:", res);
               return res.data; // directly return the response payload      
           }
           catch (error) {
-                console.error("Error fetching create unit jobs:", error);
                 throw error; // rethrow the error after logging it
           }
         }
@@ -514,12 +473,10 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await getAuditLogs(params, token)
-            console.log("Response from fetchAuditLogs:", res);
             return res.data; // directly return the response payload
 
           }
           catch (error) {
-                console.error("Error fetching audit logs:", error);
                 throw error; // rethrow the error after logging it
           }
         }
@@ -529,11 +486,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await getConfigNames(token);
-            console.log("Response from fetchConfigNames:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error fetching config names:", error);
             throw error;
           }
         }
@@ -543,11 +498,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await getConfigValues(configName, token);
-            console.log("Response from fetchConfigValues:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error fetching config values:", error);
             throw error;
           }
         }
@@ -557,13 +510,10 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const payload = {config: configName, value: configValue};
-            console.log("Editing config with payload:", payload);
             const res = await editConfigValue(payload, token);
-            console.log("Response from handleEditConfigValue:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error editing config value:", error);
             throw error;
           }
         }
@@ -573,11 +523,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await decryptConfigValue(encryptedValue, token);
-            console.log("Response from handleDecryptConfigValue:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error decrypting config value:", error);
             throw error;
           }
         }
@@ -588,11 +536,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await getSupportedParams(token);
-            console.log("Response from handleGetSupportedParams:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error fetching supported params:", error);
             throw error;
           }
         }
@@ -601,13 +547,10 @@ export function useApi() {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-            console.log("Creating param with name:", name, "type:", type, "params:", params);
             const res = await createParam(name, type, params, token);
-            console.log("Response from handleCreateParam:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error creating param:", error);
             throw error;
           }
         }
@@ -617,11 +560,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await listUserParams(token);
-            console.log("Response from handleListUserParams:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error listing user params:", error);
             throw error;
           }
         }
@@ -630,13 +571,10 @@ export function useApi() {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-            console.log("Editing param with name:", name, "type:", type, "params:", params);
             const res = await editParam(name, type, params, token);
-            console.log("Response from handleEditParam:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error editing param:", error);
             throw error;
           }
         }
@@ -645,13 +583,10 @@ export function useApi() {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-            console.log("Deleting params with names:", name);
             const res = await deleteParams(name, token);
-            console.log("Response from handleDeleteParams:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error deleting params:", error);
             throw error;
           }
         }
@@ -661,11 +596,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await decryptParams(encryptedValue, token);
-            console.log("Response from handleDecryptParams:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error decrypting params:", error);
             throw error;
           }
         }
@@ -675,11 +608,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await verifyParams(groupName, verify, token);
-            console.log("Response from handleVerifyParams:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error verifying params:", error);
             throw error;
           }
         }
@@ -688,13 +619,10 @@ export function useApi() {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-            console.log("Fetching all params with options:", options);
             const res = await getAllParams(options, token);
-            console.log("Response from handleGetAllParams:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error fetching all params:", error);
             throw error;
           }
         }
@@ -704,11 +632,9 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await getFeeTypes(token);
-              console.log("Response from handleGetFeeTypes:", res);
               return res.data;
             }
           catch (error) {
-              console.error("Error getting fee types:", error);
               throw error;
             }
         }
@@ -718,11 +644,9 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await getperiodTypes(token);
-              console.log("Response from handleGetPeriodTypes:", res);
               return res.data;
             } 
           catch (error) {
-              console.error("Error getting period types:", error);
               throw error;
             }
         }
@@ -731,17 +655,14 @@ export function useApi() {
           try {
               if (inviteToken){
                 const res = await getUnitChargesPublic(unitId, inviteToken);
-                console.log("Response from getUnitChargesPublic:", res);
                 return res.data;
               }
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await getUnitCharges(unitId, token);
-              console.log("Response from handleGetUnitCharges:", res);
               return res.data;
             } 
           catch (error) {
-              console.error("Error getting unit charges:", error);
               throw error;
             }
         }
@@ -751,11 +672,9 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await updateUnitCharges(data, token);
-              console.log("Response from handleUpdateUnitCharges:", res);
               return res.data;
             }
           catch (error) {
-              console.error("Error updating unit charges:", error);
               throw error;
             }
         }
@@ -765,11 +684,9 @@ export function useApi() {
               const { token } = useAuthStore.getState();  
               if (!token) throw new Error("No token available");
               const res = await listNotifications(params,token)
-              console.log("Response from listNotifications:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
-                console.error("Error fetching notification list:", error);
                 throw error; // rethrow the error after logging it
           }
         };
@@ -782,7 +699,6 @@ export function useApi() {
               return res.data; // directly return the response payload
           }
           catch (error) {
-                console.error("Error creating invite:", error);
                 throw error; // rethrow the error after logging it
           }
         };
@@ -807,7 +723,6 @@ export function useApi() {
           }
 
           catch (error) {
-                console.error("Error fetching invites list:", error);
                 throw error; // rethrow the error after logging it
           } 
         };
@@ -820,7 +735,6 @@ export function useApi() {
               return res.data; // directly return the response payload
           }
           catch (error) {
-                console.error("Error fetching unit invites list:", error);
                 throw error; // rethrow the error after logging it
           }
         };
@@ -834,7 +748,6 @@ export function useApi() {
               return res.data; // directly return the response payload
           }
           catch (error) { 
-                console.error("Error sharing invite:", error);
                 throw error; // rethrow the error after logging it
           }
         };
@@ -854,7 +767,6 @@ export function useApi() {
               // directly return the response payload
           }
           catch (error) {
-                console.error("Error validating invite token:", error);
                 throw error; // rethrow the error after logging it
           }
         };
@@ -867,7 +779,6 @@ export function useApi() {
               return res.data; // directly return the response payload
           }
           catch (error) {
-                console.error("Error viewing invite unit:", error);
                 throw error; // rethrow the error after logging it
           }
         };
@@ -880,7 +791,6 @@ export function useApi() {
               return res.data; // directly return the response payload
           }
           catch (error) {
-              console.error("Error fetching supported invites:", error);
               throw error; // rethrow the error after logging it
           }
         };
@@ -893,7 +803,6 @@ export function useApi() {
               return res.data; // directly return the response payload
           }
           catch (error) {
-              console.error("Error updating invite:", error);
               throw error; // rethrow the error after logging it
           }
         };
@@ -906,7 +815,6 @@ export function useApi() {
               return res.data; // directly return the response payload
           }
           catch (error) {
-              console.error("Error fetching staff and invites:", error);
               throw error; // rethrow the error after logging it
           }
         };
@@ -916,11 +824,9 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await deleteStaff(staffId, token)
-              console.log("Response from deleteStaff:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
-              console.error("Error deleting staff:", error);
               throw error; // rethrow the error after logging it
           }
         };
@@ -930,11 +836,9 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await userDetails(token);
-              console.log("Response from userDetails:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
-                console.error("Error fetching user details:", error);
                 throw error; // rethrow the error after logging it
           }
         }
@@ -944,11 +848,9 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await verifyContact({contact, channel, token});
-              console.log("Response from verifyContact:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
-                console.error("Error verifying contact:", error);
                 throw error; // rethrow the error after logging it
           }
         }
@@ -958,11 +860,9 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await updateContact(otp, token);
-              console.log("Response from updateContact:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
-                console.error("Error updating contact:", error);
                 throw error; // rethrow the error after logging it
           }
         }
@@ -972,11 +872,9 @@ export function useApi() {
               const { token } = useAuthStore.getState();
               if (!token) throw new Error("No token available");
               const res = await registerQRCode(token);
-              console.log("Response from registerQRCode:", res);
               return res.data; // directly return the response payload
           }
           catch (error) {
-              console.error("Error registering QR code:", error);
               throw error; // rethrow the error after logging it
           }
         }
@@ -986,13 +884,10 @@ export function useApi() {
               const { token } = useAuthStore.getState();  
               if (!token) throw new Error("No token available");
               const payload = { ...data, token };
-              console.log("Updating user details with data:", payload);
               const res = await updateUserDetails(payload);
-              console.log("Response from updateUserDetails:", res);
               return res.data;
           }
           catch (error) {
-              console.error("Error updating user details:", error);
               throw error;
           }
         }
@@ -1005,14 +900,11 @@ export function useApi() {
             if(res.data?.code === "S0174"){
               return {profileGate: true, fields: res.data.data[0]} satisfies ProfileGateResult
             }
-            console.log("Response from createLeaseTemplate:", res);
             return res.data;
           } catch (error: any) {
             if (error?.response?.data?.code === "S0174") {
-                  console.log("Gated: ", error.response.data.code)
                 return {profileGate: true, fields: error?.response?.data.data[0]} satisfies ProfileGateResult;
             }
-            console.error("Error creating lease template:", error);
             throw error;
           }
         };
@@ -1022,10 +914,8 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await viewLeaseTemplate(templateId, token);
-            console.log("Response from viewLeaseTemplate:", res);
             return res.data;
           } catch (error) {
-            console.error("Error viewing lease template:", error);
             throw error;
           }
         };
@@ -1035,10 +925,8 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await viewLeaseTemplateUnit(unitId, token);
-            console.log("Response from viewLeaseTemplate:", res);
             return res.data;
           } catch (error) {
-            console.error("Error viewing lease template:", error);
             throw error;
           }
         };
@@ -1046,10 +934,8 @@ export function useApi() {
         const handleViewLeaseTemplatePublic = async (inviteToken: string) => {
           try {
             const res = await viewLeaseTemplatePublic(inviteToken);
-            console.log("Response from viewLeaseTemplatePublic:", res);
             return res.data;
           } catch (error) {
-            console.error("Error viewing lease template publicly:", error);
             throw error;
           }
         }
@@ -1063,14 +949,11 @@ export function useApi() {
             if(res.data.code == "S0174") {
               return {profileGate: true, fields: res.data.data[0]} satisfies ProfileGateResult;
             }
-            console.log("Response from listLeaseTemplates:", res);
             return res.data;
           } catch (error: any) {
             if (error?.response?.data?.code === "S0174") {
-                  console.log("Gated: ", error.response.data.code)
                 return {profileGate: true, fields: error?.response?.data.data[0]} satisfies ProfileGateResult;
             }
-            console.error("Error listing lease templates:", error);
             throw error;
           }
         };
@@ -1080,10 +963,8 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await updateLeaseTemplate(id, data, token);
-            console.log("Response from updateLeaseTemplate:", res);
             return res.data;
           } catch (error) {
-            console.error("Error updating lease template:", error);
             throw error;
           }
         };
@@ -1093,10 +974,8 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await deleteLeaseTemplate(templateId, token);
-            console.log("Response from deleteLeaseTemplate:", res);
             return res.data;
           } catch (error) {
-            console.error("Error deleting lease template:", error);
             throw error;
           }
         };
@@ -1106,11 +985,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await listTenants(unitId, params, token);
-            console.log("Response from listTenants:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error listing tenants:", error);
             throw error;
           }
         };
@@ -1120,11 +997,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await listManagers( unitId, token );
-            console.log("Response from listManagers:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error listing managers:", error);
             throw error;
           }
         };
@@ -1138,22 +1013,18 @@ export function useApi() {
             const { token:jwt } = useAuthStore.getState();
             if (!jwt) throw new Error("No token available");
             const payload = { token:inviteToken, moveInDate, moveOutDate };
-            console.log("Creating lease tenant with payload:", payload);
             const res = await createLeaseTenant(payload, jwt);
             if(res.data.code=="S0174"){
               return {profileGate: true, fields: res.data.data[0]} satisfies ProfileGateResult;
             }
-            console.log("Response from createLeaseTenant:", res);
             return res.data;
 
           }
           catch (error: any) {
             if (error?.response?.data?.code === "S0174") {
-                  console.log("Gated: ", error.response.data.code)
                 return {profileGate: true, fields: error?.response?.data.data[0]} satisfies ProfileGateResult;
             }
             
-            console.error("Error creating lease tenant:", error);
             throw error;
             
           }
@@ -1164,10 +1035,8 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await leaseMessage(message, leaseId, token);
-            console.log("Response from leaseMessage:", res);
             return res.data;
           } catch (error) {
-            console.error("Error sending lease message:", error);
             throw error;
           }
         }
@@ -1177,12 +1046,10 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await listLeaseMessages(leaseId, params, token);
-            console.log("Response from listLeaseMessages:", res);
             return res.data;
           }
 
           catch (error) {
-            console.error("Error fetching lease messages:", error);
             throw error;
           }
         }
@@ -1192,11 +1059,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await signLease(leaseId, token);
-            console.log("Response from signLease:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error signing lease:", error);
             throw error;
           }
         }
@@ -1206,11 +1071,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await listLeases(params, token);
-            console.log("Response from listLeases:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error fetching leases:", error);
             throw error;
           }
         }
@@ -1220,11 +1083,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await viewLeasePDF(invoiceId, token);
-            console.log("Response from viewLeasePDF:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error viewing lease PDF:", error);
             throw error;
           }
         }
@@ -1240,13 +1101,10 @@ export function useApi() {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-            console.log("Searching properties with params:", params);
             const res = await searchProperties(params, token);
-            console.log("Response from searchProperties:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error searching properties:", error);
             throw error;
           }
         }
@@ -1255,13 +1113,10 @@ export function useApi() {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-            console.log("Searching tenants with params:", params);
             const res = await searchTenants(params, token);
-            console.log("Response from searchTenants:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error searching tenants:", error);
             throw error;
           }
         }
@@ -1270,13 +1125,10 @@ export function useApi() {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-            console.log("Searching landlords with params:", params);
             const res = await searchLandlords(params, token);
-            console.log("Response from searchLandlords:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error searching landlords:", error);
             throw error;
           }
         }
@@ -1285,13 +1137,10 @@ export function useApi() {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-            console.log("Searching units with params:", params);
             const res = await searchUnits(params, token);
-            console.log("Response from searchUnits:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error searching units:", error);
             throw error;
           }
         }
@@ -1301,11 +1150,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await getSupportedPaymentChannels(token);
-            console.log("Response from getSupportedPaymentChannels:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error fetching supported payment channels:", error);
             throw error;
           }
         }
@@ -1315,11 +1162,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await initPayment(invoiceRef, accountId, channel, token);
-            console.log("Response from initPayment:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error initializing payment:", error);
             throw error;
           }
         }
@@ -1329,11 +1174,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await listPayments(params, token);
-            console.log("Response from listPayments:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error listing payments:", error);
             throw error;
           }
         }
@@ -1343,11 +1186,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await updateFWPayment(status, ref, transactionId, token);
-            console.log("Response from updateFWPayment:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error updating FW payment:", error);
             throw error;
           }
         }
@@ -1356,13 +1197,10 @@ export function useApi() {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-            console.log("Recording manual payment with invoiceRef:", invoiceRef, "amount:", amount, "channel:", channel, "transId:", transId, "transactionDate:", transactionDate);
             const res = await manualPaymentRecord(invoiceRef, amount, token, channel, transId, transactionDate);
-            console.log("Response from manualPaymentRecord:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error recording manual payment:", error);
             throw error;
           }
         }
@@ -1372,11 +1210,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await viewParams(propertyId, token);
-            console.log("Response from viewParams:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error viewing params:", error);
             throw error;
           }
         }
@@ -1386,11 +1222,9 @@ export function useApi() {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             const res = await deletePropertyParam(groupName, propertyId, token);
-            console.log("Response from deletePropertyParam:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error deleting property param:", error);
             throw error;
           }
         }
@@ -1399,13 +1233,10 @@ export function useApi() {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-            console.log("Adding property param with groupName:", groupName, "propertyId:", propertyId);
             const res = await addPropertyParam(groupName, propertyId, token);
-            console.log("Response from addPropertyParam:", res);
             return res.data;
           }
           catch (error) {
-            console.error("Error adding property param:", error);
             throw error;
           }
         }
@@ -1420,10 +1251,8 @@ export function useApi() {
 
             const res = await listAccounts(token, params);
 
-            console.log("Response from listAccounts:", res);
             return res.data;
           } catch (error) {
-            console.error("Error listing accounts:", error);
             throw error;
           }
         };
@@ -1436,10 +1265,8 @@ export function useApi() {
 
             const res = await listAccountDetails(accountId, token);
 
-            console.log("Response from listAccountDetail:", res);
             return res.data;
           } catch (error) {
-            console.error("Error getting account detail:", error);
             throw error;
           }
         };
@@ -1452,10 +1279,8 @@ export function useApi() {
 
             const res = await activePaymentChannels(token);
 
-            console.log("Response from activePaymentChannels:", res);
             return res.data;
           } catch (error) {
-            console.error("Error getting payment channels:", error);
             throw error;
           }
         };
@@ -1472,10 +1297,8 @@ export function useApi() {
 
             const res = await createLandlordAccount(channel,name,token);
 
-            console.log("Response from createLandlordAccount:", res);
             return res.data;
           } catch (error) {
-            console.error("Error creating landlord account:", error);
             throw error;
           }
         };
@@ -1503,10 +1326,8 @@ export function useApi() {
               token
             );
 
-            console.log("Response from createSlickHoodAccount:", res);
             return res.data;
           } catch (error) {
-            console.error("Error creating SlickHood account:", error);
             throw error;
           }
         };
@@ -1528,10 +1349,8 @@ export function useApi() {
               token
             );
 
-            console.log("Response from createUpdateAccount:", res);
             return res.data;
           } catch (error) {
-            console.error("Error updating account:", error);
             throw error;
           }
         };
@@ -1550,7 +1369,6 @@ export function useApi() {
             // No logging here — res.data carries the decrypted plaintext credential.
             return res.data;
           } catch (error) {
-            console.error("Error decrypting property:", error);
             throw error;
           }
         };
@@ -1570,10 +1388,8 @@ export function useApi() {
 
             const res = await verifyAccount(accountId, verify, token, comments);
 
-            console.log("Response from verifyAccount:", res);
             return res.data;
           } catch (error) {
-            console.error("Error verifying account:", error);
             throw error;
           }
         };
@@ -1587,7 +1403,6 @@ export function useApi() {
             const res = await requestAccountVerification(accountId, token);
             return res.data;
           } catch (error) {
-            console.error("Error requesting account verification:", error);
             throw error;
           }
         };
@@ -1600,10 +1415,8 @@ export function useApi() {
 
             const res = await deleteAccount(accountId, token);
 
-            console.log("Response from deleteAccount:", res);
             return res.data;
           } catch (error) {
-            console.error("Error deleting account:", error);
             throw error;
           }
         };
@@ -1615,10 +1428,8 @@ export function useApi() {
 
             const res = await attachAccount(accountId, propertyId, token);
 
-            console.log("Response from attachAccount:", res);
             return res.data;
           } catch (error) {
-            console.error("Error attaching account:", error);
             throw error;
           }
         }
@@ -1630,10 +1441,8 @@ export function useApi() {
 
             const res = await detachAccount(accountId, propertyId, token);
 
-            console.log("Response from detachAccount:", res);
             return res.data;
           } catch (error) {
-            console.error("Error detaching account:", error);
             throw error;
           }
         }
@@ -1645,10 +1454,8 @@ export function useApi() {
 
             const res = await listPropertyAccounts(propertyId, token);
 
-            console.log("Response from listPropertyAccounts:", res);
             return res.data;
           } catch (error) {
-            console.error("Error listing property accounts:", error);
             throw error;
           }
         }
@@ -1660,10 +1467,8 @@ export function useApi() {
 
             const res = await getDashboardTotals(role, token);
 
-            console.log("Response from getDashboardTotals:", res);
             return res.data;
           } catch (error) {
-            console.error("Error fetching dashboard totals:", error);
             throw error;
           }
         }

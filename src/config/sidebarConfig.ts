@@ -146,6 +146,14 @@ export const sidebarLinks: SidebarLink[] = [
     description: "Quotes, policies, claims and renewals with Silverwood Insurance Agency.",
   },
   {
+    icon: ShieldCheck,
+    label: "Insurance Operations",
+    href: "/dashboard/insurance/operations",
+    protected: true,
+    permissions: ["review_insurance_applications", "manage_insurance_quotes", "approve_insurance_quotes", "verify_insurance_payments", "issue_insurance_policies", "manage_insurance_claims", "manage_insurance_renewals", "view_insurance_reports", "manage_insurance_catalog", "manage_insurance_payment_config"],
+    description: "Applications, quotes, payments, policies, claims and insurer catalogue.",
+  },
+  {
     icon: PiggyBank,
     label: "Community Funds",
     href: "/dashboard/community-funds",
@@ -157,10 +165,11 @@ export const sidebarLinks: SidebarLink[] = [
   {
     icon: Crown,
     label: "Admin Panel",
-    href: "/dashboard/users",
+    href: "/dashboard#admin-functions",
     description: "Manage administrative settings, controls, and system operations.",
     protected: true,
-    permissions: ["admin_access"],
+    permissions: [],
+    roles: ["Superadmin"],
   },
   {
     icon: Calculator,
@@ -383,7 +392,7 @@ export const sidebarLinks: SidebarLink[] = [
     href: "/dashboard/upgrade-plan",
     protected: false,
     permissions: [],
-    roles: ["Landlord", "EstateManager", "SalesAgent", "ServiceProvider", "Affiliate", "AssetPortfolioManager", "Superadmin"],
+    roles: ["Landlord", "EstateManager", "SalesAgent", "ServiceProvider", "Affiliate", "AssetPortfolioManager"],
     description: "Explore plan options and upgrade your subscription.",
   },
   {
@@ -437,18 +446,13 @@ export const sidebarLinks: SidebarLink[] = [
   {
     icon: Wrench,
     label: "Marketplace",
-    href: "/dashboard/marketplace",
-    description: "Find verified providers, book services, and track service jobs.",
-    permissions: ["view_sp_service"],
-    protected: true,
-  },
-  {
-    icon: ShoppingBasket,
-    label: "Soko",
-    href: "/dashboard/soko",
-    description: "Find nearby grocery shops, order essentials, and track secure deliveries.",
+    description: "Browse services and shop Soko in one place.",
     permissions: [],
     protected: true,
+    subLinks: [
+      { label: "Services", href: "/dashboard/marketplace", permissions: ["view_sp_service"], protected: true },
+      { label: "Soko", href: "/dashboard/soko", permissions: [], protected: true },
+    ],
   },
   {
     icon: BadgeDollarSign,
@@ -514,9 +518,9 @@ const sectionDefinitions = [
   { label: "Property & Leasing", links: ["Properties", "Leases", "Documents & Notices", "Estate Management", "My Home", "Property Sale Management", "My Property Purchase", "Community Funds"] },
   { label: "Money", links: ["Payment Setup", "Estate Payment Setup", "Sales Payment Setup", "Payments", "Invoices", "Tax Assist", "Reports", "Insurance Hub"] },
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
-  { label: "Services & Shopping", links: ["Marketplace", "Soko", "My Services", "Merchant Accounts", "Affiliate"] },
+  { label: "Services & Shopping", links: ["Marketplace", "My Services", "Merchant Accounts", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre", "Subscriptions", "Upgrade Plan"] },
-  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Recipient Payment Accounts", "SlickHood Accounts", "Admin Panel", "Tax Administration", "Audit Logs", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
+  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Recipient Payment Accounts", "SlickHood Accounts", "Admin Panel", "Tax Administration", "Audit Logs", "Insurance Operations", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
 ] as const
 
 const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))
@@ -545,7 +549,7 @@ export const settingsLinks: SidebarLink[] = [
       {
         label: "Global Config",
         href: "/dashboard/configs",
-        permissions: ["view_config", "edit_config"],
+        permissions: ["view_config"],
         protected: true,
       },
       {

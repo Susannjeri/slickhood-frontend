@@ -82,7 +82,8 @@ test("ordinary customer cannot open or query Silverwood operations",async({conte
  await authenticated(context,page,{title:"Homeowner",permissions:[]});
  await page.route("**/insurance/admin/**",route=>{adminRequests+=1;return route.fulfill({status:403,json:envelope(null)})});
  await page.goto("/dashboard/insurance/operations");
- await expect(page.getByRole("heading",{name:"Silverwood staff access only"})).toBeVisible();
+ // Registered navigation permissions now reject this route at the proxy boundary.
+ await expect(page).toHaveURL(/\/dashboard$/);
  expect(adminRequests).toBe(0);
 });
 

@@ -10,6 +10,8 @@ import { Account, AccountCategory } from "@/types/account";
 import { ListAccountsParams } from "@/lib/api";
 import CreateAccountDialog from "@/components/accounts/CreateAccountDialog";
 import AccountDetailDrawer from "@/components/accounts/AccountDetailDrawer";
+import { BillingNavigation } from "@/components/invoices/BillingNavigation";
+import Can from "@/components/auth/Can";
 
 function AccountIcon({ account }: { account: Account }) {
   const [errored, setErrored] = useState(false);
@@ -79,7 +81,6 @@ export default function AccountsListPage({
         setAccounts(res.data.filter((account: Account) => account.category === category));
       }
     } catch (err: any) {
-      console.error("Error loading accounts:", err);
       setError(err.message || "Failed to load accounts");
     } finally {
       setLoading(false);
@@ -94,6 +95,7 @@ export default function AccountsListPage({
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+      <BillingNavigation />
       {/* Header */}
       <div className="space-y-1.5">
         <Breadcrumb items={[{ label: title }]} />
@@ -102,16 +104,26 @@ export default function AccountsListPage({
             <h1 className="text-2xl sm:text-3xl font-bold text-[#141130]">{title}</h1>
             <p className="text-muted-foreground mt-1">{description}</p>
           </div>
-          <Button
+          <Can permissions={["create_account"]}><Button
             onClick={() => setCreateOpen(true)}
             className="group relative flex items-center px-5 py-2.5 text-white font-medium rounded-lg transition-all duration-300 ease-out hover:bg-[#d93712] hover:shadow-[0_0_20px_rgba(239,66,23,0.4)] hover:-translate-y-0.5 active:translate-y-0 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#EF4217]"
             style={{ backgroundColor: "#EF4217" }}
           >
             <Plus className="w-5 h-5 mr-2 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
             <span>Add Account</span>
-          </Button>
+          </Button></Can>
         </div>
       </div>
+
+      <section aria-label="Receiving account setup" className="rounded-xl border bg-white p-4 text-sm text-slate-600">
+        <h2 className="font-semibold text-slate-900">Set up where your business receives payments</h2>
+        <ol className="mt-2 list-inside list-decimal space-y-1">
+          <li>Add your receiving account and payment details.</li>
+          <li>Request verification before accepting payments.</li>
+          <li>{category === "SLICKHOOD" ? "Use the verified platform account for SlickHood subscriptions only." : "Attach the verified account to the relevant property, store or service."}</li>
+        </ol>
+        <p className="mt-3">SlickHood subscription payments are separate from your business collections. Changes to payment details require fresh verification. Never enter a customer&apos;s M-Pesa PIN or card security code.</p>
+      </section>
 
       {/* Error */}
       {error && (
@@ -135,10 +147,10 @@ export default function AccountsListPage({
           </div>
           <h3 className="text-xl font-semibold mb-2 text-[#141130]">No payment accounts yet</h3>
           <p className="text-gray-500 mb-6 text-center max-w-md">{emptyCollectionsCopy}</p>
-          <Button onClick={() => setCreateOpen(true)} className="text-white" style={{ backgroundColor: "#EF4217" }}>
+          <Can permissions={["create_account"]}><Button onClick={() => setCreateOpen(true)} className="text-white" style={{ backgroundColor: "#EF4217" }}>
             <Plus className="w-4 h-4 mr-2" />
             Add Account
-          </Button>
+          </Button></Can>
         </div>
       ) : (
         /* Card grid */

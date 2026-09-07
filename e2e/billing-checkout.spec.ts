@@ -33,14 +33,14 @@ test("the billed customer can pay an invoice from the billing summary using a se
     contentType: "application/pdf",
     body: "%PDF-1.4 test invoice",
   }));
-  await page.route("**/payment/invoice/payment-account**", route => route.fulfill({ json: envelope({
+  await page.route("**/payment/invoice/payment-account**", route => route.fulfill({ json: envelope([{
     id: 91,
     name: "M-Pesa Paybill 123456",
     channel: "MPESA",
     channelDisplayName: "M-Pesa",
     active: true,
     verified: true,
-  }) }));
+  }]) }));
   let initialization: { method: string; body: Record<string, unknown> } | undefined;
   await page.route("**/payment/init", async route => {
     initialization = {

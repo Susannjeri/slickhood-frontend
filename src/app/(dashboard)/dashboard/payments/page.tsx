@@ -9,6 +9,7 @@ import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BillingNavigation } from "@/components/invoices/BillingNavigation";
 
 interface PaymentRow {
   id: number;
@@ -61,6 +62,7 @@ export default function PaymentsPage() {
   };
 
   return <div className="mx-auto w-full max-w-[1450px] space-y-6 p-4 sm:p-6">
+    <BillingNavigation />
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div><h1 className="flex items-center gap-2 text-3xl font-bold text-[#08184a] dark:text-white"><CreditCard className="h-7 w-7 text-[#ef4217]" /> Payments</h1><p className="mt-2 text-sm text-slate-500">Role-scoped payment activity and transaction status.</p></div>
       <Button asChild variant="outline" className="w-full sm:w-auto"><Link href="/dashboard/reports"><BarChart3 className="mr-2 h-4 w-4" />Reconciliation report</Link></Button>

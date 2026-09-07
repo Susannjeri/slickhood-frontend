@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useApi } from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,8 @@ import {
 import { format } from "date-fns";
 import { useAuthStore } from "@/store/authStore";
 import { MyNotifications } from "@/components/notifications/MyNotifications";
+import { deliveryLabel } from "@/lib/notification-display";
+import { apiErrorMessage } from "@/lib/api-error";
 
 interface Notification {
   notificationId: number;
@@ -76,6 +78,8 @@ function AdminNotificationsPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [loadError, setLoadError] = useState<string>();
+  const requestId = useRef(0);
 
   // Debounce search
   useEffect(() => {
@@ -89,11 +93,14 @@ function AdminNotificationsPage() {
   // Load notifications
   useEffect(() => {
     loadNotifications();
+    return () => { requestId.current++; };
   }, [page, pageSize, debouncedSearch, sortField, sortOrder]);
 
   const loadNotifications = async () => {
+    const currentRequest = ++requestId.current;
     try {
       setLoading(true);
+      setLoadError(undefined);
       const response = await getNotificationList({
         page,
         size: pageSize,
@@ -101,13 +108,14 @@ function AdminNotificationsPage() {
         filter: debouncedSearch,
       });
 
+      if (currentRequest !== requestId.current) return;
       setNotifications(response.data || []);
       setTotalPages(response.totalPages || 0);
       setTotalElements(response.totalElements || 0);
-    } catch (error: any) {
-      console.error("Error loading notifications:", error);
+    } catch (error: unknown) {
+      if (currentRequest === requestId.current) setLoadError(apiErrorMessage(error, "Could not load notification delivery records. Please refresh."));
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
   };
 
@@ -172,6 +180,7 @@ function AdminNotificationsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
+        {loadError && <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4">{loadError}</p>}
         {/* Header */}
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#FEE2E2" }}>
@@ -314,12 +323,12 @@ function AdminNotificationsPage() {
                           {notification.delivered ? (
                             <div className="flex items-center gap-1 text-green-600">
                               <CheckCircle2 className="w-4 h-4" />
-                              <span className="text-sm font-medium">Delivered</span>
+                              <span className="text-sm font-medium">{deliveryLabel(notification)}</span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1 text-red-600">
+                              <div className="flex items-center gap-1 text-amber-700">
                               <XCircle className="w-4 h-4" />
-                              <span className="text-sm font-medium">Failed</span>
+                               <span className="text-sm font-medium">{deliveryLabel(notification)}</span>
                             </div>
                           )}
                         </TableCell>
@@ -433,14 +442,14 @@ function AdminNotificationsPage() {
                 <div className={`p-4 rounded-lg border-2 ${
                   selectedNotification.delivered 
                     ? 'bg-green-50 border-green-200' 
-                    : 'bg-red-50 border-red-200'
+                    : 'bg-amber-50 border-amber-200'
                 }`}>
                   <div className="flex items-center gap-3">
                     {selectedNotification.delivered ? (
                       <>
                         <CheckCircle2 className="w-6 h-6 text-green-600" />
                         <div>
-                          <p className="font-semibold text-green-900">Successfully Delivered</p>
+                          <p className="font-semibold text-green-900">{deliveryLabel(selectedNotification)}</p>
                           <p className="text-sm text-green-700">
                             Last updated: {formatDate(selectedNotification.lastUpdateOn)}
                           </p>
@@ -450,7 +459,7 @@ function AdminNotificationsPage() {
                       <>
                         <XCircle className="w-6 h-6 text-red-600" />
                         <div>
-                          <p className="font-semibold text-red-900">Delivery Failed</p>
+                          <p className="font-semibold text-amber-900">{deliveryLabel(selectedNotification)}</p>
                           <p className="text-sm text-red-700">
                             {selectedNotification.retry 
                               ? `Retries: ${selectedNotification.retryCount}` 

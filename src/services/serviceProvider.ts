@@ -278,7 +278,7 @@ export type ServiceBooking = {
   invoiceRef?:string; paymentStatus?:string; providerReference?:string;
   refundStatus?:string; refundReference?:string; refundedAmount?:number;
   settlementStatus?:string; settlementReference?:string; settledAmount?:number;
-  completionEvidenceReference?:string; startedAt?:string;
+  completionEvidenceReference?:string; startedAt?:string; customerBooking?:boolean;
 };
 export const searchMarketplace = (params?:{query?:string;categoryId?:number;minAmount?:number;maxAmount?:number;latitude?:number;longitude?:number;radiusKm?:number;page?:number;size?:number}) =>
   API.get("/sp/directory", {params:{page:0,size:24,sort:"amount,asc",...params}});

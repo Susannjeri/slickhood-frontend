@@ -44,6 +44,7 @@ test("My Wealth remains usable with incomplete legacy portfolio records", async 
 
 test("vault lists metadata and requests an owner-scoped link only when opened", async ({ context, page }) => {
   await authenticated(context, page, { title: "Landlord", permissions: ["view_wealth"] });
+  await context.route("https://documents.slickhood.test/**", route => route.fulfill({ contentType: "text/html", body: "Protected test document" }));
   let secureLinkRequests = 0;
   await page.route("**/wealth/dashboard**", route => route.fulfill({ json: envelope({
     summary: { currency: "KES" }, assets: [], obligations: [], goals: [], goalProgress: [], insights: [], projection: [],
@@ -53,7 +54,7 @@ test("vault lists metadata and requests an owner-scoped link only when opened", 
   await page.route("**/wealth/asset-types", route => route.fulfill({ json: envelope([{id:1,code:"PROPERTY",label:"Property",displayOrder:10,marketPricingAllowed:false,active:true}]) }));
   await page.route("**/wealth/vault/9", route => {
     secureLinkRequests += 1;
-    return route.fulfill({ json: envelope({ document: { id: 9, category: "WILL", displayName: "will.pdf", contentType: "application/pdf", fileSize: 128, checksumSha256: "abc" }, downloadUrl: "about:blank#protected-document" }) });
+    return route.fulfill({ json: envelope({ document: { id: 9, category: "WILL", displayName: "will.pdf", contentType: "application/pdf", fileSize: 128, checksumSha256: "abc" }, downloadUrl: "https://documents.slickhood.test/will.pdf" }) });
   });
   await page.route("**/wealth/vault", route => route.fulfill({ json: envelope([
     { document: { id: 9, category: "WILL", displayName: "will.pdf", contentType: "application/pdf", fileSize: 128, checksumSha256: "abc" }, downloadUrl: null },
@@ -64,6 +65,9 @@ test("vault lists metadata and requests an owner-scoped link only when opened", 
   const documentButton = page.getByRole("button", { name: /^will\.pdf WILL/i });
   await expect(documentButton).toBeVisible();
   expect(secureLinkRequests).toBe(0);
+  const opened = page.waitForEvent("popup");
   await documentButton.click();
+  const popup = await opened;
+  await expect(popup).toHaveURL("https://documents.slickhood.test/will.pdf");
   await expect.poll(() => secureLinkRequests).toBe(1);
 });

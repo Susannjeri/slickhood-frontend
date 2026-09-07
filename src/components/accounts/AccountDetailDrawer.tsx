@@ -117,7 +117,6 @@ export default function AccountDetailDrawer({
         );
       }
     } catch (err: any) {
-      console.error("Error loading account detail:", err);
       toast.error("Failed to load account", {
         description: err.message || "Please try again",
         descriptionClassName: "!text-black",
@@ -150,8 +149,10 @@ export default function AccountDetailDrawer({
     if (!account) return;
     // Never submit the mask — this guards against overwriting a real
     // credential with literal asterisks if the field was ever pre-filled.
-    if (field.editValue === "*****") return;
-    if (field.encrypted && !field.editValue) return;
+    if (!field.editValue.trim() || /^[*•]+$/.test(field.editValue.trim())) {
+      toast.error("Enter a new payment detail, not a blank or masked value.");
+      return;
+    }
 
     patchField(field.key, { isSaving: true });
     try {
@@ -169,10 +170,10 @@ export default function AccountDetailDrawer({
       });
       setTimeout(() => patchField(field.key, { justSaved: false }), 2000);
 
-      toast.success("Property updated");
+      setAccount(current => current ? { ...current, verified: false } : current);
+      toast.success("Payment detail updated — verification required");
       onChanged();
     } catch (err: any) {
-      console.error("Error saving property:", err);
       patchField(field.key, { isSaving: false });
       toast.error("Failed to update property", {
         description: err.message || "Please try again",
@@ -195,7 +196,6 @@ export default function AccountDetailDrawer({
       toast.success("Account verified");
       onChanged();
     } catch (err: any) {
-      console.error("Error verifying account:", err);
       toast.error("Failed to verify account", {
         description: err.message || "Please try again",
         descriptionClassName: "!text-black",
@@ -227,7 +227,6 @@ export default function AccountDetailDrawer({
       toast.success("Verification rejected");
       onChanged();
     } catch (err: any) {
-      console.error("Error rejecting account verification:", err);
       toast.error("Failed to reject verification", {
         description: err.message || "Please try again",
         descriptionClassName: "!text-black",
@@ -251,7 +250,6 @@ export default function AccountDetailDrawer({
         descriptionClassName: "!text-black",
       });
     } catch (err: any) {
-      console.error("Error requesting account verification:", err);
       toast.error("Failed to send verification request", {
         description: err.message || "Please try again",
         descriptionClassName: "!text-black",
@@ -274,7 +272,6 @@ export default function AccountDetailDrawer({
       onChanged();
       onClose();
     } catch (err: any) {
-      console.error("Error deleting account:", err);
       toast.error("Failed to delete account", {
         description: err.message || "Please try again",
         descriptionClassName: "!text-black",

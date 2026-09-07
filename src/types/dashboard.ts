@@ -39,5 +39,5 @@ export interface DashboardTotalsResponse {
   success: boolean;
   code: string;
   description: string;
-  data: DashboardTotals[];
+  data: DashboardTotals[] | DashboardTotals | null;
 }
