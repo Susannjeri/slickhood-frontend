@@ -937,7 +937,8 @@ export function useAuth() {
     password: string
   ) => {
     try {
-      const response = await validateTotp({ code, email, channel, password });
+      const inviteToken = useAuthStore.getState().inviteToken;
+      const response = await validateTotp({ code, email, channel, password, token: inviteToken || undefined });
 
       const description = response.data.description;
       const token = response.data.data[0].jwt;
@@ -969,7 +970,8 @@ export function useAuth() {
     channel: "EMAIL" | "GOOGLE_TOTP" | "SMS"
   ) => {
     try {
-      const response = await validateTotp({ code, email, channel });
+      const inviteToken = useAuthStore.getState().inviteToken;
+      const response = await validateTotp({ code, email, channel, token: inviteToken || undefined });
 
       const description = response.data.description;
       const token = response.data.data[0].jwt;

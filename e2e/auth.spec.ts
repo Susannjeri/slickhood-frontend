@@ -180,13 +180,17 @@ test("a tenant invitation survives sign-in and returns to lease initialization",
   await expect(page).toHaveURL(/\/lease\/initialize\?token=tenant-bound-token$/);
   await expect(page.getByText("Unit A-101")).toBeVisible();
   await expect(page.getByRole("button", { name: "View Lease Agreement" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in and continue" }).click();
   await expect(page).toHaveURL(/\/login\?.*returnTo=%2Flease%2Finitialize/);
+  await expect(page.getByRole("link", { name: "Forgot password?" })).toHaveAttribute(
+    "href",
+    /\/forgot-password\?.*token=tenant-bound-token.*returnTo=%2Flease%2Finitialize/,
+  );
   await page.getByPlaceholder("you@example.com").fill("tenant@example.com");
   await page.getByPlaceholder("••••••••").fill("ValidPass1!");
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page).toHaveURL(/\/lease\/initialize(?:\?token=tenant-bound-token)?$/);
+  await expect(page).toHaveURL(/\/lease\/initialize\?token=tenant-bound-token$/);
   const storedInvite = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state?.inviteToken);
   expect(storedInvite).toBe("tenant-bound-token");
 });
@@ -208,6 +212,8 @@ test("a new tenant can start registration directly from the unit invitation", as
   await page.getByRole("button", { name: "Create tenant account" }).click();
 
   await expect(page).toHaveURL(/\/register\?.*token=tenant-new-account-token.*returnTo=%2Flease%2Finitialize/);
+  await page.getByRole("link", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/login\?.*token=tenant-new-account-token.*returnTo=%2Flease%2Finitialize/);
 });
 
 test("tenant initializes the landlord-defined lease without editing dates", async ({ context, page }) => {
@@ -255,9 +261,13 @@ test("tenant email verification continues to KYC before lease initialization", a
       roles: [], roleName: [], permissions: [], propertyIds: [], propertyNames: [], activeRole: null,
     }, version: 0 }));
   });
-  await page.route("**/otp/verify", route => route.fulfill({ json: envelope([{
-    jwt, refreshToken: "tenant-refresh-token-long-enough",
-  }]) }));
+  let otpPayload: Record<string, unknown> | undefined;
+  await page.route("**/otp/verify", route => {
+    otpPayload = route.request().postDataJSON();
+    return route.fulfill({ json: envelope([{
+      jwt, refreshToken: "tenant-refresh-token-long-enough",
+    }]) });
+  });
   await page.route("**/kyc/current", route => route.fulfill({ json: envelope([{
     status: "NOT_STARTED", accountStatus: "PENDING_KYC", consentVersion: "2026-08",
     phoneVerified: false, requirements: [], missingRequirements: [], documents: [],
@@ -267,7 +277,8 @@ test("tenant email verification continues to KYC before lease initialization", a
   await page.getByRole("textbox").fill("123456");
   await page.getByRole("button", { name: "Verify Email" }).click();
 
-  await expect(page).toHaveURL(/\/kyc\?returnTo=%2Flease%2Finitialize/, { timeout: 8_000 });
+  expect(otpPayload).toMatchObject({ token: "tenant-otp-token" });
+  await expect(page).toHaveURL(/\/kyc\?.*token=tenant-otp-token.*returnTo=%2Flease%2Finitialize/, { timeout: 8_000 });
 });
 
 test("an invalid chunked access cookie is fully cleared at the request boundary", async ({ page, context }) => {

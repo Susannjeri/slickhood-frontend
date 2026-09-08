@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/store/authStore';
 import { useForm } from 'react-hook-form';
@@ -24,6 +23,7 @@ import {
   InputOTPSlot,
 } from '@/components/ui/input-otp';
 import { Mail, MessageSquare, Shield, Eye, EyeOff, Loader2, ArrowLeft, ArrowRight, Check, RefreshCw } from 'lucide-react';
+import { invitationUrl, safeInvitationReturnTo } from '@/lib/invitation-navigation';
 
 type Channel = "EMAIL" | "GOOGLE_TOTP" | "SMS";
 
@@ -56,9 +56,8 @@ type EmailFormData = z.infer<typeof emailSchema>;
 type PasswordFormData = z.infer<typeof passwordSchema>;
 
 export default function ForgotPasswordForm() {
-  const router = useRouter();
   const { getVerOptions, get_OTP, verifyTotpCodewithPass } = useAuth();
-  const { setToken, setStep } = useAuthStore();
+  const { inviteToken, setInviteToken, setToken, setStep } = useAuthStore();
 
   // State management
   const [currentStep, setCurrentStep] = useState(1);
@@ -82,6 +81,11 @@ export default function ForgotPasswordForm() {
     resolver: zodResolver(passwordSchema),
     defaultValues: { newPassword: '', confirmPassword: '' },
   });
+
+  useEffect(() => {
+    const invitationToken = new URLSearchParams(window.location.search).get('token')?.trim();
+    if (invitationToken) setInviteToken(invitationToken);
+  }, [setInviteToken]);
 
   // Resend timer
   useEffect(() => {
@@ -194,7 +198,12 @@ export default function ForgotPasswordForm() {
         setStep("complete");
         toast.success('Password reset successful! Logging you in...');
         setTimeout(() => {
-          router.push('/continue-setup');
+          const returnTo = safeInvitationReturnTo(window.location.search);
+          const pendingInvite = new URLSearchParams(window.location.search).get('token')?.trim()
+            || useAuthStore.getState().inviteToken;
+          window.location.replace(returnTo && pendingInvite
+            ? invitationUrl(returnTo, pendingInvite)
+            : '/continue-setup');
         }, 1500);
       } else {
         // Check if error is OTP-related
@@ -343,7 +352,12 @@ export default function ForgotPasswordForm() {
           {/* Sign-in link */}
           <p className="text-xs text-center text-gray-500 dark:text-gray-400">
             Remembered your password?{' '}
-            <a href="/login" className="font-semibold text-[#EF4217] hover:text-[#d63600] transition-colors">
+            <a
+              href={inviteToken
+                ? invitationUrl('/login', inviteToken, '/lease/initialize')
+                : '/login'}
+              className="font-semibold text-[#EF4217] hover:text-[#d63600] transition-colors"
+            >
               Sign in
             </a>
           </p>

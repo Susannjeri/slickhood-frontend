@@ -279,7 +279,7 @@ export const logoutUser = (token: string) => API.get("/auth/logout", {
 export const getOTP = (data: {email: string, channel: Channel }) =>
   API.get("/otp/send?email=" + data.email + "&channel=" + data.channel)
 
-export const validateTotp = (data: { code: string, email: string, channel: "EMAIL" | "GOOGLE_TOTP" | "SMS", password?:string }) => 
+export const validateTotp = (data: { code: string, email: string, channel: "EMAIL" | "GOOGLE_TOTP" | "SMS", password?:string, token?:string }) =>
   API.post("/otp/verify", data)
 
 export const verifyTOTP = (data: { totp: string }) =>

@@ -32,6 +32,7 @@ import {
   ArrowRight,
   Receipt,
   LogIn,
+  UserPlus,
 } from "lucide-react";
 
 import ProfileGateModal from "@/components/auth/ProfileGateModal";
@@ -372,6 +373,34 @@ function LeaseInitializeContent() {
             </p>
           </div>
         </div>
+
+        {!isLoggedIn && (
+          <section aria-labelledby="tenant-account-choice" className="rounded-xl border border-orange-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="mb-5">
+              <p className="text-sm font-semibold uppercase tracking-wide text-[#EF4217]">Choose how to continue</p>
+              <h2 id="tenant-account-choice" className="mt-1 text-2xl font-bold text-[#141130]">Do you already use SlickHood?</h2>
+              <p className="mt-2 text-sm text-gray-600">Use the same email address that received this invitation. Your unit and lease details will remain attached throughout.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-gray-200 p-5">
+                <LogIn className="mb-3 h-7 w-7 text-[#EF4217]" aria-hidden="true" />
+                <h3 className="text-lg font-semibold text-[#141130]">I already have an account</h3>
+                <p className="mt-1 min-h-10 text-sm text-gray-600">Sign in, return directly to this unit, and initialize the lease.</p>
+                <Button onClick={handleLoginRedirect} variant="outline" className="mt-4 w-full border-[#EF4217] text-[#EF4217] hover:bg-orange-50">
+                  Sign in and continue
+                </Button>
+              </div>
+              <div className="rounded-xl border border-orange-200 bg-orange-50/50 p-5">
+                <UserPlus className="mb-3 h-7 w-7 text-[#EF4217]" aria-hidden="true" />
+                <h3 className="text-lg font-semibold text-[#141130]">I am new to SlickHood</h3>
+                <p className="mt-1 min-h-10 text-sm text-gray-600">Create your tenant account, complete the required checks, and return here automatically.</p>
+                <Button onClick={handleRegistrationRedirect} className="mt-4 w-full bg-[#EF4217] text-white hover:bg-[#d63a14]">
+                  Create tenant account
+                </Button>
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Initialize Lease Sheet (Only for logged-in users) */}
         {isLoggedIn && (
@@ -792,24 +821,13 @@ function LeaseInitializeContent() {
                 <FileText className="w-4 h-4 mr-2" />
                 Initialize Lease
               </Button>
-            ) : (
-              <>
-                <Button onClick={handleLoginRedirect} variant="outline" className="flex-1">
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Sign in
-                </Button>
-                <Button onClick={handleRegistrationRedirect} className="flex-1 text-white" style={{ backgroundColor: "#EF4217" }}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Create tenant account
-                </Button>
-              </>
-            )}
+            ) : null}
           </div>
 
           {/* Info text for not logged in users */}
           {!isLoggedIn && (
             <p className="text-xs text-center text-gray-500 pt-2">
-              Your invitation will remain attached while you sign in or register.
+              Choose the existing-account or new-account path above. Your invitation will remain attached throughout.
             </p>
           )}
         </div>

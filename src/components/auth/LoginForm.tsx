@@ -70,7 +70,9 @@ export default function LoginForm() {
       settotpEnabled(result.totpEnabled);
       setSuccess("Login successful!");
       if (returnTo && pendingInvite) setInviteToken(pendingInvite);
-      router.push(returnTo ?? "/continue-setup");
+      router.push(returnTo && pendingInvite
+        ? invitationUrl(returnTo, pendingInvite)
+        : "/continue-setup");
     } else {
       setError(result.message);
     }
@@ -156,7 +158,9 @@ export default function LoginForm() {
     // The secure session cookie is created immediately before this hand-off.
     // Force a fresh document request so Next cannot reuse an unauthenticated
     // prefetched response for the protected continuation route.
-    window.location.replace(returnTo ?? "/continue-setup");
+    window.location.replace(returnTo && pendingInvite
+      ? invitationUrl(returnTo, pendingInvite)
+      : "/continue-setup");
   }
 
   const inputClass = "h-11 rounded-lg text-base focus-visible:ring-[#EF4217]";
@@ -244,7 +248,9 @@ export default function LoginForm() {
               <span className="text-xs text-gray-600 dark:text-gray-400">Remember me</span>
             </label>
             <Link
-              href="/forgot-password"
+              href={effectiveInviteToken
+                ? invitationUrl("/forgot-password", effectiveInviteToken, invitationReturnTo)
+                : "/forgot-password"}
               className="text-xs font-semibold text-[#EF4217] hover:text-[#d63600] transition-colors"
             >
               Forgot password?

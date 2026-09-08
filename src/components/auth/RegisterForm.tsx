@@ -56,7 +56,7 @@ export default function RegisterForm() {
     const registrationInFlightRef           = useRef(false);
 
     const router = useRouter();
-    const { setStep, setInviteToken, setToken, setmfaEnabled, settotpEnabled } = useAuthStore();
+    const { inviteToken, setStep, setInviteToken, setToken, setmfaEnabled, settotpEnabled } = useAuthStore();
     const authHydrated = useAuthHydrated();
     const { register, handleGoogleRegister } = useAuth();
 
@@ -109,8 +109,8 @@ export default function RegisterForm() {
             settotpEnabled(result.totpEnabled);
             setStep("complete");
             if (returnTo && pendingInvite) setInviteToken(pendingInvite);
-            router.push(returnTo
-                ? `/kyc?returnTo=${encodeURIComponent(returnTo)}`
+            router.push(returnTo && pendingInvite
+                ? invitationUrl("/kyc", pendingInvite, returnTo)
                 : "/account-activated");
         } else {
             setError(result.message);
@@ -380,7 +380,17 @@ export default function RegisterForm() {
 
                     {/* Error */}
                     {error && (
-                        <p className="text-red-500 text-sm text-center font-medium">{error}</p>
+                        <div className="space-y-2 text-center">
+                            <p className="text-red-500 text-sm font-medium">{error}</p>
+                            {inviteToken && (
+                                <Link
+                                    href={invitationUrl("/login", inviteToken, "/lease/initialize")}
+                                    className="inline-flex text-sm font-semibold text-[#EF4217] underline underline-offset-4"
+                                >
+                                    Already registered? Sign in and continue this invitation
+                                </Link>
+                            )}
+                        </div>
                     )}
                 </form>
             </Form>
@@ -389,7 +399,12 @@ export default function RegisterForm() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 order-2 sm:order-1">
                     Already have an account?{" "}
-                    <Link href="/login" className="font-semibold text-[#EF4217] hover:text-[#d63600] transition-colors">
+                    <Link
+                        href={inviteToken
+                            ? invitationUrl("/login", inviteToken, "/lease/initialize")
+                            : "/login"}
+                        className="font-semibold text-[#EF4217] hover:text-[#d63600] transition-colors"
+                    >
                         Sign in
                     </Link>
                 </p>

@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from '@/component
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { RegistrationStepper } from '@/components/auth/RegistrationStepper';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { safeInvitationReturnTo } from '@/lib/invitation-navigation';
+import { invitationUrl, safeInvitationReturnTo } from '@/lib/invitation-navigation';
 
 const EXPIRY_SECONDS = 5 * 60; // 5 minutes
 
@@ -104,8 +104,9 @@ const OTPForm: React.FC = () => {
         // Give the user a moment to read the modal before the redirect fires.
         setTimeout(() => {
           const returnTo = safeInvitationReturnTo(window.location.search);
-          router.replace(returnTo
-            ? `/kyc?returnTo=${encodeURIComponent(returnTo)}`
+          const pendingInvite = useAuthStore.getState().inviteToken;
+          router.replace(returnTo && pendingInvite
+            ? invitationUrl('/kyc', pendingInvite, returnTo)
             : '/account-activated');
         }, 2000);
       } else {

@@ -33,7 +33,7 @@ import { KycDocumentViewer } from "@/components/auth/KycDocumentViewer";
 import { resolveOnboardingContinuation } from "@/services/onboarding-continuation.service";
 import { updateContact, verifyContact } from "@/lib/api";
 import { MAX_KYC_FILE_LABEL, prepareKycUpload } from "@/lib/kyc-upload";
-import { safeInvitationReturnTo } from "@/lib/invitation-navigation";
+import { invitationUrl, safeInvitationReturnTo } from "@/lib/invitation-navigation";
 
 const label = (value: string) =>
   value
@@ -158,6 +158,7 @@ export default function KycPage() {
   const token = useAuthStore((state) => state.token);
   const activeRole = useAuthStore((state) => state.activeRole);
   const inviteToken = useAuthStore((state) => state.inviteToken);
+  const setInviteToken = useAuthStore((state) => state.setInviteToken);
   const sessionReady = useAuthStore((state) => state.sessionReady);
   const [kyc, setKyc] = useState<KycCase>();
   const [loading, setLoading] = useState(true);
@@ -186,11 +187,13 @@ export default function KycPage() {
   }, []);
 
   useEffect(() => {
+    const invitationToken = new URLSearchParams(window.location.search).get("token")?.trim();
+    if (invitationToken) setInviteToken(invitationToken);
     setProfileRemediation(
       new URLSearchParams(window.location.search).get("remediate") ===
         "profile",
     );
-  }, []);
+  }, [setInviteToken]);
 
   useEffect(() => {
     if (!sessionReady) return;
@@ -321,8 +324,9 @@ export default function KycPage() {
   const continueSetup = async () => {
     if (!token) return;
     const returnTo = safeInvitationReturnTo(window.location.search);
-    if (returnTo && inviteToken) {
-      router.replace(returnTo);
+    const pendingInvite = new URLSearchParams(window.location.search).get("token")?.trim() || inviteToken;
+    if (returnTo && pendingInvite) {
+      router.replace(invitationUrl(returnTo, pendingInvite));
       return;
     }
     const next = await resolveOnboardingContinuation(token, activeRole);
