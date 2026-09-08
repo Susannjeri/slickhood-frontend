@@ -38,7 +38,11 @@ test("homeowner sees ownership, reconciled balances, and overdue state", async (
   await expect(page.getByText("KES 2,500.00", { exact: true })).toBeVisible();
   await expect(page.getByText("OVERDUE", { exact: true })).toBeVisible();
   await expect(page.getByText(/Silverwood Estate \/ A-101/).last()).toBeVisible();
+  await expect(page.getByText("My homes", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Pay now" })).toHaveAttribute("href", "/dashboard/invoices?invoiceId=44");
   await expect(page.getByRole("button", { name: "Open home & invite" })).toHaveCount(0);
+  await expect(page.getByText("Assign a homeowner")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "End ownership" })).toHaveCount(0);
   await expect(page.getByText("Annual homeowners meeting")).toBeVisible();
   await page.getByRole("tab", { name: "Budgets" }).click();
   await expect(page.getByText(/Planned KES 500,000/)).toBeVisible();

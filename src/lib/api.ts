@@ -1376,6 +1376,7 @@ export const requestLeaseTermination = (
 
 //Invoice APIs
 export interface ListInvoicesParams {
+  invoiceId?: number;
   sort?: string;
   page?: number;
   size?: number;
@@ -1388,8 +1389,9 @@ export const listLeases = (
   params: ListInvoicesParams = {},
   token: string
 ) => {
-  const { sort = 'id,desc', page = 0, size = 10, tenantId, landlordId, propertyId, unitId } = params;
+  const { sort = 'id,desc', page = 0, size = 10, invoiceId, tenantId, landlordId, propertyId, unitId } = params;
   const query = new URLSearchParams({ sort, page: String(page), size: String(size) });
+  if (invoiceId !== undefined) query.set("invoiceId", String(invoiceId));
   if (tenantId !== undefined) query.set("tenantId", String(tenantId));
   if (landlordId !== undefined) query.set("landlordId", String(landlordId));
   if (propertyId !== undefined) query.set("propertyId", String(propertyId));

@@ -69,6 +69,7 @@ export interface Invoice {
 // ─── Active filters — what gets sent to the API ───────────────────────────────
 
 export interface InvoiceFilters {
+  invoiceId?: number;
   propertyId?: number;
   unitId?: number;
   tenantId?: number;

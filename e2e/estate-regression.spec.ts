@@ -74,8 +74,8 @@ test("estate pagination preserves records and paid amounts are not shown as zero
   await page.goto("/dashboard/estate");
   await expect(page.getByText("KES 1,500.00 paid", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: /Load more ownership records/ }).click();
-  await expect(page.getByText("Homeowner 10", { exact: true })).toBeVisible();
-  await expect(page.getByText("Homeowner 9", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cedar Estate / HOME-10", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Cedar Estate / HOME-9", { exact: true }).first()).toBeVisible();
 });
 
 test("changing estate clears invoice recipient and resets operations context", async ({ context, page }) => {

@@ -21,7 +21,7 @@ for (const role of ["Homeowner","EstateManager"]) {
       return route.fulfill({json:{...envelope([document]),totalPages:1}});
     });
     await page.goto("/dashboard/estate");
-    await page.getByRole("link",{name:"View agreements",exact:true}).click();
+    await page.getByRole("link",{name:"View agreement",exact:true}).click();
     await expect(page).toHaveURL(/unitId=77/);
     await expect(page.getByText(/The estate manager and homeowner have signed/)).toBeVisible();
     await page.getByRole("button",{name:"PDF",exact:true}).click();

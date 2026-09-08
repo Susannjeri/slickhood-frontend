@@ -2,7 +2,7 @@ import { API } from "@/lib/api";
 import { SaleMilestoneCreate, SaleStatus } from "@/types/business-workflows";
 
 export const estateService = {
-  listOwnership: (params: {page?:number;size?:number;propertyId?:number;active?:boolean} = {}) =>
+  listOwnership: (params: {page?:number;size?:number;propertyId?:number;active?:boolean;search?:string} = {}) =>
     API.get("/estate/ownership", { params: { page: 0, size: 50, ...params } }),
   createOwnership: (data:{propertyId:number;unitId?:number;homeownerUserId:number;ownershipStart:string;source?:string}) => API.post("/estate/ownership",data),
   endOwnership: (id:number,data:{endDate:string;reason:string}) => API.post(`/estate/ownership/${id}/end`,data),
@@ -11,7 +11,7 @@ export const estateService = {
   createServiceCharge: (data:{ownershipId:number;amount:number;currency:string;dueDate:string;description:string}) => API.post("/estate/service-charges",data),
 };
 export const salesService = {
-  list: (params:{page?:number;size?:number}={}) => API.get("/sales",{params:{page:0,size:25,...params}}),
+  list: (params:{page?:number;size?:number;search?:string}={}) => API.get("/sales",{params:{page:0,size:25,...params}}),
   create: (data:{propertyId:number;unitId:number;buyerUserId?:number;buyerEmail?:string;askingPrice:number;currency:string;notes?:string}) => API.post("/sales",data),
   update: (id:number,data:{status:SaleStatus;offerAmount?:number;notes?:string}) => API.put(`/sales/${id}`,data),
   acceptOffer: (id:number) => API.post(`/sales/${id}/accept-offer`),

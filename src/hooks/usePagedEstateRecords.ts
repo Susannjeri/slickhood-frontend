@@ -5,9 +5,9 @@ import { API } from "@/lib/api";
 
 /** Independent, bounded lists: one failed feed must not hide successful estate records. */
 export function usePagedEstateRecords<T extends { id?: number; budget?: { id: number } }>(
-  path: string, enabled: boolean, propertyId?: number, active?: boolean,
+  path: string, enabled: boolean, propertyId?: number, active?: boolean, search?: string,
 ) {
-  const scope = `${path}:${enabled}:${propertyId ?? "all"}:${active ?? "all"}`;
+  const scope = `${path}:${enabled}:${propertyId ?? "all"}:${active ?? "all"}:${search ?? ""}`;
   const sequence = useRef(0);
   const [data, setData] = useState<{ scope: string; items: T[]; page: number; pages: number; total: number }>({ scope: "", items: [], page: -1, pages: 0, total: 0 });
   const [loading, setLoading] = useState(enabled);
@@ -17,7 +17,7 @@ export function usePagedEstateRecords<T extends { id?: number; budget?: { id: nu
     if (!enabled) { setLoading(false); return; }
     setLoading(true); setError(null);
     try {
-      const response = await API.get(path, { params: { page, size: 25, sort: "id,desc", propertyId, active } });
+      const response = await API.get(path, { params: { page, size: 25, sort: "id,desc", propertyId, active, search: search?.trim() || undefined } });
       if (request !== sequence.current) return;
       const incoming = (response.data?.data ?? []) as T[];
       if (!Array.isArray(incoming) || incoming.some(item => !Number.isSafeInteger(item?.id ?? item?.budget?.id))) {
@@ -33,7 +33,7 @@ export function usePagedEstateRecords<T extends { id?: number; budget?: { id: nu
     } finally {
       if (request === sequence.current) setLoading(false);
     }
-  }, [active, enabled, path, propertyId, scope]);
+  }, [active, enabled, path, propertyId, scope, search]);
   useEffect(() => {
     let cancelled = false;
     void Promise.resolve().then(() => { if (!cancelled) void fetchPage(0); });

@@ -15,6 +15,7 @@ import { Loader2, SlidersHorizontal, X } from "lucide-react";
 type StatusFilter = "ALL" | InvoiceStatus;
 
 interface Props {
+  initialFilters?: InvoiceFilters;
   selectedId: number | null;
   onSelect: (invoice: Invoice) => void;
   autoSelectFirst?: boolean; // desktop: true, mobile: false
@@ -22,7 +23,7 @@ interface Props {
   onRefetchReady (fn: () => void): void; // called when the internal refetch function is ready to be used by parent
 }
 
-export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPaymentSuccess, onRefetchReady }: Props) {
+export function InvoiceList({ initialFilters = {}, selectedId, onSelect, autoSelectFirst = true, onPaymentSuccess, onRefetchReady }: Props) {
   const activeRole = useAuthStore(state => state.activeRole?.title);
   const isTenant = activeRole === "Tenant";
   const isPlatformAdmin = activeRole === "Superadmin";
@@ -156,13 +157,13 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
   useEffect(() => {
     setInvoices([]);
     setPage(0);
-    setAppliedFilters({});
-    appliedFiltersRef.current = {};
+    setAppliedFilters(initialFilters);
+    appliedFiltersRef.current = initialFilters;
     hasMoreRef.current = true;
     setActiveSearch("");
     setSearchInput("");
     setStatusFilter("ALL");
-    fetchPage(0, true, {});
+    fetchPage(0, true, initialFilters);
   }, [activeRole]);
 
   // ─── Infinite scroll ───────────────────────────────────────────────────────

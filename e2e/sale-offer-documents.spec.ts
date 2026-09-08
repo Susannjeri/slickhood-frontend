@@ -8,16 +8,16 @@ test("sales failure can be retried and older transactions remain accessible",asy
   if(new URL(route.request().url()).pathname.includes("dashboard"))return route.continue();
   if(fail)return route.fulfill({status:503,json:{description:"Sales temporarily unavailable"}});
   const second=new URL(route.request().url()).searchParams.get("page")==="1";
-  return route.fulfill({json:{...envelope([{id:second?92:91,propertyId:11,unitId:77,status:"RESERVED",askingPrice:1000,currency:"KES"}]),totalPages:2,totalElements:26}});
+  return route.fulfill({json:{...envelope([{id:second?92:91,propertyId:11,propertyName:second?"Older Purchase":"Current Purchase",unitId:77,unitRef:second?"B-02":"A-01",status:"RESERVED",askingPrice:1000,currency:"KES"}]),totalPages:2,totalElements:26}});
  });
  await page.goto("/dashboard/sales");
  await expect(page.getByRole("button",{name:"Retry sales"})).toBeVisible();
  await expect(page.getByText("No property sale transactions for this active role.")).toHaveCount(0);
  fail=false;await page.getByRole("button",{name:"Retry sales"}).click();
- await expect(page.getByText("Sale #91",{exact:true})).toBeVisible();
+ await expect(page.getByText("Current Purchase",{exact:true}).first()).toBeVisible();
  await page.getByRole("button",{name:"Next",exact:true}).click();
- await expect(page.getByText("Sale #92",{exact:true})).toBeVisible();
- await expect(page.getByText("Sale #91",{exact:true})).toHaveCount(0);
+ await expect(page.getByText("Older Purchase",{exact:true}).first()).toBeVisible();
+ await expect(page.getByText("Current Purchase",{exact:true})).toHaveCount(0);
 });
 
 for(const role of ["SalesAgent","Buyer"]){

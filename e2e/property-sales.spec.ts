@@ -41,8 +41,23 @@ test("buyer is routed to review and sign the sale letter of offer",async({contex
  });
 
  await page.goto("/dashboard/sales");
+ await expect(page.getByRole("heading",{name:"My Property Purchases"})).toBeVisible();
+ await expect(page.getByText("Next:")).toBeVisible();
+ await expect(page.getByText("Review and sign the letter of offer.")).toBeVisible();
  await expect(page.getByText("Offer: KES 14,500,000")).toBeVisible();
  await expect(page.getByRole("link",{name:"Review and sign letter of offer"})).toHaveAttribute("href","/dashboard/documents?saleId=91&type=PROPERTY_SALE_LETTER_OF_OFFER&amount=14500000&currency=KES");
+});
+
+test("buyer opens the exact participant-scoped sale invoice",async({context,page})=>{
+ await authenticated(context,page,{title:"Buyer",permissions:["view_sale_pipeline","accept_sale_offer","view_invoice_list"]});
+ await page.route("**/sales**",async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path==="/dashboard/sales"){await route.continue();return}
+  await route.fulfill({json:pageEnvelope([{id:91,propertyId:11,propertyName:"Acacia Court",unitId:77,unitRef:"A-07",salesAgentUserId:100,buyerUserId:200,buyerEmail:"buyer@example.com",status:"RESERVED",askingPrice:15000000,offerAmount:14500000,escrowInvoiceId:301,escrowRequiredAmount:250000,currency:"KES"}])});
+ });
+ await page.goto("/dashboard/sales");
+ await expect(page.getByText("Pay the sale invoice and follow due diligence.")).toBeVisible();
+ await expect(page.getByRole("link",{name:"Pay sale invoice #301"})).toHaveAttribute("href","/dashboard/invoices?invoiceId=301");
 });
 
 test("sales escrow is backed by a buyer invoice and never a typed payment reference",async({context,page})=>{

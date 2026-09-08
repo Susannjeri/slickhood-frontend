@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { authenticated, envelope } from "./support";
 
-test("the billed customer can pay an invoice from the billing summary using a server-authorized rail", async ({ context, page }) => {
+test("the billed customer can deep-link to and pay an exact participant-scoped invoice", async ({ context, page }) => {
   await authenticated(context, page, {
     title: "Tenant",
     permissions: ["view_invoice_list", "view_invoice_pdf", "view_payment_list"],
   });
-  await page.route("**/payment/invoice/list**", route => route.fulfill({ json: {
+  let invoiceListUrl = "";
+  await page.route("**/payment/invoice/list**", route => { invoiceListUrl = route.request().url(); return route.fulfill({ json: {
     ...envelope([{
       id: 501,
       createdOn: "2026-09-03T08:00:00+03:00",
@@ -28,7 +29,7 @@ test("the billed customer can pay an invoice from the billing summary using a se
     totalPages: 1,
     totalElements: 1,
     size: 10,
-  } }));
+  } }); });
   await page.route("**/payment/view/invoice**", route => route.fulfill({
     contentType: "application/pdf",
     body: "%PDF-1.4 test invoice",
@@ -50,7 +51,9 @@ test("the billed customer can pay an invoice from the billing summary using a se
     await route.fulfill({ json: { ...envelope([]), code: "S0091", description: "Payment requested" } });
   });
 
-  await page.goto("/dashboard/invoices");
+  await page.goto("/dashboard/invoices?invoiceId=501");
+  await expect.poll(() => invoiceListUrl).not.toBe("");
+  expect(new URL(invoiceListUrl).searchParams.get("invoiceId")).toBe("501");
   await expect(page.getByText("Balance due")).toBeVisible();
   await expect(page.getByText("KES 6,501.00").first()).toBeVisible();
   await page.getByRole("button", { name: "Pay balance" }).click();

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Invoice } from "@/types/invoice";
 import { InvoiceList } from "./InvoiceList";
 import { InvoiceDetail } from "./InvoiceDetail";
@@ -15,6 +16,10 @@ import {
 } from "@/components/ui/sheet";
 
 export function InvoicesPage() {
+  const searchParams = useSearchParams();
+  const requestedInvoiceId = Number(searchParams.get("invoiceId"));
+  const requestedPropertyId = Number(searchParams.get("propertyId"));
+  const requestedUnitId = Number(searchParams.get("unitId"));
   const isMobile = useIsInvoiceMobile(); // null | true | false
   const activeRole = useAuthStore(state => state.activeRole?.title);
 
@@ -59,6 +64,11 @@ export function InvoicesPage() {
       {/* Left panel */}
       <div className="w-full lg:w-[380px] lg:shrink-0 bg-white rounded-xl border border-gray-200 p-4 lg:p-5 overflow-hidden flex flex-col">
         <InvoiceList
+          initialFilters={{
+            invoiceId: Number.isSafeInteger(requestedInvoiceId) && requestedInvoiceId > 0 ? requestedInvoiceId : undefined,
+            propertyId: Number.isSafeInteger(requestedPropertyId) && requestedPropertyId > 0 ? requestedPropertyId : undefined,
+            unitId: Number.isSafeInteger(requestedUnitId) && requestedUnitId > 0 ? requestedUnitId : undefined,
+          }}
           selectedId={selectedInvoice?.id ?? null}
           onSelect={handleSelect}
           autoSelectFirst={!isMobile}
