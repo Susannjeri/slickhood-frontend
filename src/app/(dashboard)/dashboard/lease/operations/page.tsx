@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { FileSignature, Loader2, RefreshCw } from "lucide-react";
+import { CalendarDays, FileSignature, Home, Loader2, MailCheck, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { ActiveLease, listActiveLeases, requestLeaseTermination } from "@/lib/api";
+import { ActiveLease, listActiveLeases, listPendingTenantInvites, PendingTenantInvite, requestLeaseTermination } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,8 @@ function LeaseOperationsWorkspace() {
   const token = useAuthStore((state) => state.token);
   const activeRole = useAuthStore((state) => state.activeRole);
   const [leases, setLeases] = useState<ActiveLease[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PendingTenantInvite[]>([]);
+  const [inviteError, setInviteError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<number | null>(null);
   const [terminating, setTerminating] = useState<number | null>(null);
@@ -36,23 +38,33 @@ function LeaseOperationsWorkspace() {
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const requestId = useRef(0);
+  const isTenant = activeRole?.title?.toLowerCase() === "tenant";
 
   const load = useCallback(async () => {
     if (!token) return;
     const request = ++requestId.current;
-    setLoading(true); setError(""); setLeases([]);
+    setLoading(true); setError(""); setInviteError(""); setLeases([]); setPendingInvites([]);
     try {
-      const response = await listActiveLeases(page, 25, token);
+      const [leaseResult, inviteResult] = await Promise.allSettled([
+        listActiveLeases(page, 25, token),
+        isTenant ? listPendingTenantInvites(token) : Promise.resolve(null),
+      ]);
       if (request !== requestId.current) return;
-      const envelope = response.data as Envelope;
+      if (leaseResult.status === "rejected") throw leaseResult.reason;
+      const envelope = leaseResult.value.data as Envelope;
       setLeases(envelope.data ?? []);
       setTotalPages(envelope.totalPages ?? 0);
+      if (inviteResult.status === "fulfilled" && inviteResult.value) {
+        setPendingInvites(inviteResult.value.data.data ?? []);
+      } else if (inviteResult.status === "rejected") {
+        setInviteError(apiErrorMessage(inviteResult.reason, "Could not load pending invitations."));
+      }
     } catch (error) {
       if (request === requestId.current) setError(apiErrorMessage(error, "Could not load leases. Please retry."));
     } finally {
       if (request === requestId.current) setLoading(false);
     }
-  }, [token, page]);
+  }, [token, page, isTenant]);
 
   useEffect(() => { void load(); return () => { requestId.current++; }; }, [load]);
 
@@ -73,9 +85,25 @@ function LeaseOperationsWorkspace() {
       <div><h1 className="text-2xl font-bold text-[#141130]">Lease operations</h1><p className="text-sm text-muted-foreground">Drafts, signatures, active tenancies and controlled termination notices.</p></div>
       <Button variant="outline" onClick={() => void load()} disabled={loading}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button>
     </div>
+    {isTenant && !loading && <section className="rounded-2xl border border-orange-200 bg-orange-50/60 p-5" aria-labelledby="pending-invitations-heading">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex gap-3">
+          <span className="rounded-full bg-white p-2 text-[#EF4217]"><MailCheck className="h-5 w-5" aria-hidden="true" /></span>
+          <div><h2 id="pending-invitations-heading" className="font-semibold text-[#141130]">Pending unit invitations</h2><p className="text-sm text-muted-foreground">Assignments sent to your verified SlickHood email appear here—even if the email link is delayed or hidden.</p></div>
+        </div>
+        <Badge variant="outline" className="bg-white">{pendingInvites.length} pending</Badge>
+      </div>
+      {inviteError ? <div role="alert" className="mt-4 rounded-xl border border-red-200 bg-white p-4 text-sm">{inviteError}<Button className="ml-3" size="sm" variant="outline" onClick={() => void load()}>Retry invitations</Button></div> : pendingInvites.length === 0 ?
+        <p className="mt-4 rounded-xl border bg-white p-4 text-sm text-muted-foreground">No new unit invitations are waiting for this account.</p> :
+        <div className="mt-4 grid gap-3 md:grid-cols-2">{pendingInvites.map(invite => <article key={invite.inviteId} className="rounded-xl border bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold text-[#141130]">{invite.propertyName}</h3><p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground"><Home className="h-4 w-4" aria-hidden="true" />Unit {invite.unitRef || `#${invite.unitId}`}</p></div><Badge>Invitation</Badge></div>
+          <p className="mt-3 flex items-center gap-2 text-sm"><CalendarDays className="h-4 w-4 text-[#EF4217]" aria-hidden="true" />{invite.leaseStartDate} to {invite.leaseEndDate}</p>
+          <Button asChild className="mt-4 w-full"><Link href={`/lease/initialize?token=${encodeURIComponent(invite.token)}`}>Review unit and continue</Link></Button>
+        </article>)}</div>}
+    </section>}
     {error && <div role="alert" className="rounded-xl border border-red-200 bg-white p-5">{error}<Button variant="outline" onClick={() => void load()}>Retry leases</Button></div>}
     {loading ? <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin" /></div> : !error && (leases.length === 0 ?
-      <div className="rounded-xl border bg-white p-12 text-center text-muted-foreground">No accessible leases.</div> :
+      <div className="rounded-xl border bg-white p-12 text-center text-muted-foreground">{isTenant && pendingInvites.length > 0 ? "Choose a pending invitation above to initialize its lease." : "No accessible leases."}</div> :
       <div className="grid gap-4">{leases.map((lease) => <div key={lease.id} className="rounded-xl border bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4"><div className="flex gap-3"><FileSignature className="mt-1 h-5 w-5 text-[#EF4217]" /><div><h2 className="font-semibold">{lease.name || `Lease #${lease.id}`}</h2><p className="text-sm text-muted-foreground">{lease.tenantName || "Tenant pending"}{lease.expiryDate ? ` · expires ${lease.expiryDate}` : ""}</p></div></div><Badge variant={lease.lifecycleStatus === "NOTICE_GIVEN" ? "destructive" : lease.signed ? "default" : "outline"}>{lease.lifecycleStatus || (lease.signed ? "ACTIVE" : "DRAFT")}</Badge></div>
         {lease.terminationEffectiveDate && <p className="mt-3 text-sm text-amber-700">Termination effective {lease.terminationEffectiveDate}</p>}

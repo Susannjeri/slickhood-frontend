@@ -3,6 +3,25 @@ import { authenticated } from "./support";
 
 const envelope = (data: unknown[]) => ({ success: true, code: "S00000", description: "Success", data, size: 100, totalPages: 1, totalElements: data.length });
 
+test("existing tenant discovers an email-bound invitation after signing in normally", async ({context,page}) => {
+  await authenticated(context,page,{title:"Tenant",permissions:["view_active_lease","create_new_lease"]});
+  await page.unroute("**/invite/pending/tenant");
+  await page.route("**/invite/pending/tenant", route => route.fulfill({json:envelope([{
+    inviteId:188,token:"secure-email-bound-token",unitId:515,unitRef:"B-204",propertyName:"Silverwood Court",
+    leaseStartDate:"2026-10-01",leaseEndDate:"2027-09-30",expiresAt:"2026-09-22T12:00:00",
+  }])}));
+  await page.route("**/lease/list**", route => route.fulfill({json:envelope([])}));
+
+  await page.goto("/dashboard/lease/operations");
+
+  await expect(page.getByRole("heading",{name:"Pending unit invitations"})).toBeVisible();
+  await expect(page.getByText("Silverwood Court")).toBeVisible();
+  await expect(page.getByText("Unit B-204")).toBeVisible();
+  await expect(page.getByRole("link",{name:"Review unit and continue"}))
+    .toHaveAttribute("href","/lease/initialize?token=secure-email-bound-token");
+  await expect(page.getByText("Choose a pending invitation above to initialize its lease.")).toBeVisible();
+});
+
 test("lease list errors can be retried and pagination reaches older leases", async ({context,page}) => {
   await authenticated(context,page,{title:"Tenant",permissions:["view_active_lease","view_lease_document"]});
   let failed = true;

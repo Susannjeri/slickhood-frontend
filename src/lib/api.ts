@@ -992,6 +992,22 @@ export const validateInviteToken = (inviteToken: string, token?: string) => {
   return API.get(`/invite/validate?token=${encodeURIComponent(inviteToken)}`, { headers });
 }
 
+export interface PendingTenantInvite {
+  inviteId: number;
+  token: string;
+  unitId: number;
+  unitRef: string;
+  propertyName: string;
+  leaseStartDate: string;
+  leaseEndDate: string;
+  expiresAt: string;
+}
+
+export const listPendingTenantInvites = (token: string) =>
+  API.get<{ data?: PendingTenantInvite[] }>("/invite/pending/tenant", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
 export const createEmailOccupantInvite = (
   data: { inviteType: "TENANT" | "HOMEOWNER"; entityId: number; email: string; leaseStartDate?: string; leaseEndDate?: string },
   token: string

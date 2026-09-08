@@ -72,6 +72,7 @@ export async function authenticated(
       documents: [],
     }],
   } }));
+  await page.route("**/invite/pending/tenant", route => route.fulfill({ json: envelope([]) }));
   return token;
 }
 
