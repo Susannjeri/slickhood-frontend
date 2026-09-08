@@ -106,6 +106,8 @@ test("tenant can continue to the governed agreement and sees no owner catalogue 
         tenantSignDate: "2026-09-04",
         ownerSignDate: null,
         governedDocumentRequired: true,
+        agreementDocumentId: 91,
+        agreementStatus: "ISSUED",
       }]) });
       return;
     }
@@ -120,6 +122,24 @@ test("tenant can continue to the governed agreement and sees no owner catalogue 
   await expect(page.getByText("Properties", { exact: true })).toHaveCount(0);
   await expect(page.getByText("All Properties", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Lease templates", { exact: true })).toHaveCount(0);
+});
+
+test("tenant is not sent to an empty document page while the landlord prepares the agreement", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: ["view_active_lease", "view_lease_document"] });
+  await page.route("**/lease/list**", route => route.fulfill({ json: envelope([{
+    id: 53,
+    name: "Newly initialized lease",
+    leaseMode: "RENT",
+    tenantName: "Legacy Tenant",
+    signed: false,
+    lifecycleStatus: "DRAFT",
+    governedDocumentRequired: true,
+  }]) }));
+
+  await page.goto("/dashboard/lease/operations");
+
+  await expect(page.getByText("Agreement preparation: waiting for the landlord or manager to prepare the draft. You do not need to initialize the lease again.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "View and sign agreement" })).toHaveCount(0);
 });
 
 test("tenant reviews the draft and sees clear two-party signing status without loading templates", async ({ context, page }) => {

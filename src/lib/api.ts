@@ -1337,6 +1337,8 @@ export interface ActiveLease {
   ownerSignDate?: string;
   ownerSignName?: string;
   governedDocumentRequired?: boolean;
+  agreementDocumentId?: number;
+  agreementStatus?: "DRAFT" | "ISSUED" | "ACKNOWLEDGED" | "PARTIALLY_SIGNED" | "SIGNED";
   lifecycleStatus?: "DRAFT" | "ACTIVE" | "NOTICE_GIVEN" | "TERMINATED";
   terminationEffectiveDate?: string;
 }

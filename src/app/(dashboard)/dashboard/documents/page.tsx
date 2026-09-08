@@ -3,6 +3,7 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { FilePlus2, Pencil, Send, Signature } from "lucide-react";
 import { ProtectedPdfButton } from "@/components/documents/ProtectedPdfButton";
 import { leaseDocumentService } from "@/services/lease-document.service";
@@ -283,7 +284,9 @@ function DocumentsWorkspace() {
     <Card><CardHeader><CardTitle>Your documents</CardTitle></CardHeader><CardContent className="space-y-3">
       {loading && <p role="status">Loading documents…</p>}
       {loadError && <div role="alert">{loadError}<Button variant="outline" onClick={() => void load()}>Retry</Button></div>}
-      {!loading && !loadError && documents.length === 0 && <p className="py-8 text-center text-muted-foreground">No documents match this account and selection.</p>}
+      {!loading && !loadError && documents.length === 0 && (isTenant && searchParams.get("leaseId") ?
+        <div className="space-y-2 py-8 text-center"><p className="font-medium text-amber-800">Your lease is initialized, but its agreement has not been prepared yet.</p><p className="text-sm text-muted-foreground">The landlord or manager must prepare and issue the agreement before you can sign it. You do not need to initialize the lease again.</p><Button variant="outline" asChild><Link href="/dashboard/lease/operations">Return to lease status</Link></Button></div> :
+        <p className="py-8 text-center text-muted-foreground">No documents match this account and selection.</p>)}
       {!loading && !loadError && documents.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-center lg:justify-between">
         <div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{item.name}</p><Badge variant="outline">{label(item.status)}</Badge>
           {item.legalReviewRequired && <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Legal review</Badge>}</div>
