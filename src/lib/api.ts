@@ -500,7 +500,7 @@ export const createUnit = (data: {
 };
 
 export const getSupportedUnitTypes = (propertyType: string) => {
-  return API.get(`property/unit/type?propertyType=${propertyType}`, {
+  return API.get(`/property/unit/type?propertyType=${propertyType}`, {
     headers: {
       'Content-Type': 'application/json',
      } });
@@ -993,7 +993,7 @@ export const validateInviteToken = (inviteToken: string, token?: string) => {
 }
 
 export const createEmailOccupantInvite = (
-  data: { inviteType: "TENANT" | "HOMEOWNER"; entityId: number; email: string },
+  data: { inviteType: "TENANT" | "HOMEOWNER"; entityId: number; email: string; leaseStartDate?: string; leaseEndDate?: string },
   token: string
 ) => API.post("/invite/email", data, {
   headers: {
@@ -1245,8 +1245,6 @@ export const listManagers = (
 
 export interface CreateLeaseTenantPayload {
   token: string;
-  moveInDate: string;
-  moveOutDate: string;
 }
 
 export const createLeaseTenant = (payload: CreateLeaseTenantPayload, jwt: string) => {

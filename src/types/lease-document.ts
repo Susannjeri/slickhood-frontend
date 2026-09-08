@@ -6,7 +6,7 @@ export type LeaseDocumentType =
 
 export type LeaseDocumentStatus =
   | "DRAFT" | "ISSUED" | "ACKNOWLEDGED" | "PARTIALLY_SIGNED"
-  | "SIGNED" | "CANCELLED" | "EXPIRED";
+  | "SIGNED" | "REJECTED" | "CANCELLED" | "EXPIRED";
 
 export interface LeaseDocument {
   id: number;
@@ -31,6 +31,7 @@ export interface LeaseDocument {
   acknowledgedAt?: string;
   issuerSignedAt?: string;
   recipientSignedAt?: string;
+  recipientRejectionReason?: string;
   viewerParty?: "ISSUER" | "RECIPIENT";
 }
 

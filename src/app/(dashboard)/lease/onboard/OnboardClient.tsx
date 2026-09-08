@@ -52,7 +52,10 @@ export default function OnboardClient() {
         // ===== NEW FLOW: EVERYONE GOES TO LEASE INITIALIZE =====
         console.log('Tenant invite - redirecting to lease initialization');
         setInviteToken(token);
-        router.replace('/lease/initialize');
+        // Keep the one-time token in the destination URL as well as the
+        // persisted store. This makes the invitation resilient to refreshes,
+        // privacy controls and storage hydration races.
+        router.replace(`/lease/initialize?token=${encodeURIComponent(token)}`);
       } else {
         if (code === 'S0023' || code === 'S00141') {
           // A bound invitation may belong to either an existing or a new user.

@@ -706,11 +706,13 @@ export function useApi() {
         const handleCreateEmailOccupantInvite = async(
           inviteType: "TENANT" | "HOMEOWNER",
           entityId: number,
-          email: string
+          email: string,
+          leaseStartDate?: string,
+          leaseEndDate?: string
         ) => {
           const { token } = useAuthStore.getState();
           if (!token) throw new Error("No token available");
-          const res = await createEmailOccupantInvite({ inviteType, entityId, email }, token);
+          const res = await createEmailOccupantInvite({ inviteType, entityId, email, leaseStartDate, leaseEndDate }, token);
           return res.data;
         };
 
@@ -1004,15 +1006,11 @@ export function useApi() {
           }
         };
 
-        const handleCreateLeaseTenant = async (
-          inviteToken: string,
-          moveInDate: string,
-          moveOutDate: string
-        ) => {
+        const handleCreateLeaseTenant = async (inviteToken: string) => {
           try {
             const { token:jwt } = useAuthStore.getState();
             if (!jwt) throw new Error("No token available");
-            const payload = { token:inviteToken, moveInDate, moveOutDate };
+            const payload = { token:inviteToken };
             const res = await createLeaseTenant(payload, jwt);
             if(res.data.code=="S0174"){
               return {profileGate: true, fields: res.data.data[0]} satisfies ProfileGateResult;

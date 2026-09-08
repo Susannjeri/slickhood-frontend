@@ -1,13 +1,11 @@
 // app/lease/initialize/page.tsx - PART A
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useApi } from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -70,8 +68,26 @@ interface UnitCharge {
 }
 
 export default function LeaseInitializePage() {
+  return (
+    <Suspense
+      fallback={(
+        <div className="flex min-h-[50vh] items-center justify-center" aria-live="polite">
+          <Loader2 className="h-8 w-8 animate-spin" aria-hidden="true" />
+          <span className="sr-only">Loading your lease invitation</span>
+        </div>
+      )}
+    >
+      <LeaseInitializeContent />
+    </Suspense>
+  );
+}
+
+function LeaseInitializeContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { inviteToken, setInviteToken, setStep, token: authToken } = useAuthStore();
+  const urlInviteToken = searchParams.get("token")?.trim() || null;
+  const effectiveInviteToken = urlInviteToken || inviteToken;
   const {
     handleValidateInviteToken,
     getPropertyImage,
@@ -95,8 +111,8 @@ export default function LeaseInitializePage() {
 
   // Sheet state
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [moveInDate, setMoveInDate] = useState("");
-  const [moveOutDate, setMoveOutDate] = useState("");
+  const [leaseStartDate, setLeaseStartDate] = useState("");
+  const [leaseEndDate, setLeaseEndDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Profile Gate State
@@ -104,51 +120,51 @@ export default function LeaseInitializePage() {
 
 
   useEffect(() => {
+    if (urlInviteToken && inviteToken !== urlInviteToken) {
+      setInviteToken(urlInviteToken);
+    }
     // Check if user has invite token
-    if (!inviteToken) {
+    if (!effectiveInviteToken) {
       toast.error("No invite token found. Please use your invite link.");
       router.replace("/login");
       return;
     }
 
-    loadData();
-  }, [inviteToken]);
+    loadData(effectiveInviteToken);
+  }, [effectiveInviteToken, inviteToken, urlInviteToken]);
 
-  const loadData = async () => {
+  const loadData = async (token: string) => {
     try {
       setLoading(true);
 
       // Check if invite token exists (TypeScript guard)
-      if (!inviteToken) {
-        toast.error("No invite token found. Please use your invite link.");
-        router.replace("/login");
-        return;
-      }
-
       // Re-validate invite token to get fresh unit details
-      const response = await handleValidateInviteToken(inviteToken);
+      const response = await handleValidateInviteToken(token);
 
       if (response.success && response.code === "S0058" && response.data) {
         // Tenant invite validation returns one UnitDTO object.  Older
         // clients/tests represented it as a one-item array, so keep the
         // compatibility branch without requiring a fictitious array shape.
-        const unit = Array.isArray(response.data) ? response.data[0] : response.data;
+        const invitation = Array.isArray(response.data) ? response.data[0] : response.data;
+        const unit = invitation?.unit ?? invitation;
         if (!unit) {
           toast.error("Invalid or expired invite token");
           router.replace("/login");
           return;
         }
         setUnitDetails(unit);
+        setLeaseStartDate(invitation?.leaseStartDate ?? "");
+        setLeaseEndDate(invitation?.leaseEndDate ?? "");
         await getUnitTypes(unit.propertyType);
         // Load unit images using inviteToken
         // Legacy invitations can contain an empty thumbnail. Skipping blank
         // storage keys prevents the tenant journey waiting on an invalid file.
         const allImages = [unit.thumbnail, ...(unit.images || [])]
           .filter((imagePath): imagePath is string => Boolean(imagePath?.trim()));
-        await loadUnitImages(allImages);
+        await loadUnitImages(allImages, token);
 
         // Load unit charges using inviteToken
-        await loadUnitCharges(unit.unitId);
+        await loadUnitCharges(unit.unitId, token);
       } else {
         toast.error("Invalid or expired invite token");
         router.replace("/login");
@@ -162,14 +178,12 @@ export default function LeaseInitializePage() {
     }
   };
 
-  const loadUnitImages = async (imagePaths: string[]) => {
-    if (!inviteToken) return;
-
+  const loadUnitImages = async (imagePaths: string[], token: string) => {
     const urls: string[] = [];
     for (const imagePath of imagePaths) {
       try {
         // Pass inviteToken to getPropertyImage
-        const imageBlob = await getPropertyImage(imagePath, inviteToken);
+        const imageBlob = await getPropertyImage(imagePath, token);
         urls.push(URL.createObjectURL(imageBlob));
       } catch (err) {
         console.error("Error loading unit image:", err);
@@ -178,12 +192,10 @@ export default function LeaseInitializePage() {
     setImageUrls(urls);
   };
 
-  const loadUnitCharges = async (unitId: number) => {
-    if (!inviteToken) return;
-
+  const loadUnitCharges = async (unitId: number, token: string) => {
     try {
       setLoadingCharges(true);
-      const response = await handleGetUnitCharges(unitId,inviteToken);
+      const response = await handleGetUnitCharges(unitId, token);
       if (response.success && response.data) {
         console.log("Unit Charges Response:", response.data);
         setUnitCharges(response.data);
@@ -195,28 +207,14 @@ export default function LeaseInitializePage() {
     } 
   };
 
-  const validateDates = (): boolean => {
-    if (!moveInDate || !moveOutDate) {
-      toast.error("Please select both move in and move out dates");
-      return false;
-    }
-
-    const moveIn = new Date(moveInDate);
-    const moveOut = new Date(moveOutDate);
-
-    if (moveOut <= moveIn) {
-      toast.error("Move out date must be after move in date");
-      return false;
-    }
-
-    return true;
-  };
-
   const handleSubmitLease = async () => {
-    if (!validateDates()) return;
+    if (!leaseStartDate || !leaseEndDate) {
+      toast.error("This invitation does not contain a lease period. Ask the landlord to send a new assignment.");
+      return;
+    }
 
     // Check if invite token exists (TypeScript guard)
-    if (!inviteToken) {
+    if (!effectiveInviteToken) {
       toast.error("Invite token is missing. Please try again.");
       return;
     }
@@ -224,11 +222,7 @@ export default function LeaseInitializePage() {
     try {
       setIsSubmitting(true);
 
-      const response:any = await handleCreateLeaseTenant(
-        inviteToken,
-        moveInDate,
-        moveOutDate
-      );
+      const response:any = await handleCreateLeaseTenant(effectiveInviteToken);
 
       if(response?.profileGate) {
         setProfileGate(response.fields)
@@ -239,12 +233,13 @@ export default function LeaseInitializePage() {
       if (response.success && response.code === "S0162") {
         toast.success("Lease initialized successfully!");
         
+        const result = Array.isArray(response.data) ? response.data[0] : response.data;
         // Clear invite token
         setInviteToken(null);
         
         // Redirect to dashboard
         setTimeout(() => {
-          router.push("/dashboard/lease/operations");
+          router.push(result?.leaseId ? `/dashboard/documents?leaseId=${result.leaseId}` : "/dashboard/lease/operations");
         }, 1000);
       } else {
         toast.error(response.description || "Failed to initialize lease");
@@ -258,14 +253,14 @@ export default function LeaseInitializePage() {
   };
 
   const handleLoginRedirect = () => {
-    if (!inviteToken) return;
-    router.push(`/login?invitation=tenant&token=${encodeURIComponent(inviteToken)}&returnTo=${encodeURIComponent("/lease/initialize")}`);
+    if (!effectiveInviteToken) return;
+    router.push(`/login?invitation=tenant&token=${encodeURIComponent(effectiveInviteToken)}&returnTo=${encodeURIComponent("/lease/initialize")}`);
   };
 
   const handleRegistrationRedirect = () => {
-    if (!inviteToken) return;
+    if (!effectiveInviteToken) return;
     setStep("account");
-    router.push(invitationUrl("/register", inviteToken, "/lease/initialize"));
+    router.push(invitationUrl("/register", effectiveInviteToken, "/lease/initialize"));
   };
 
   const handlePreviousImage = () => {
@@ -281,7 +276,11 @@ export default function LeaseInitializePage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+    const value = dateOnly
+      ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+      : new Date(dateString);
+    return value.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -355,7 +354,7 @@ export default function LeaseInitializePage() {
               {isLoggedIn ? (
                 <>
                   <strong>Next Steps:</strong> Review the unit details below. When ready, 
-                  click "Initialize Lease" to set your move-in and move-out dates.
+                  click "Initialize Lease" to accept the landlord-defined lease period and create your agreement.
                 </>
               ) : (
                 <>
@@ -374,7 +373,7 @@ export default function LeaseInitializePage() {
               <SheetHeader className="mb-6">
                 <SheetTitle className="text-[#141130]">Initialize Your Lease</SheetTitle>
                 <SheetDescription>
-                  Select your move-in and move-out dates to initialize your lease for Unit {unitDetails.ref}
+                  Confirm the landlord-defined lease period for Unit {unitDetails.ref}. These dates cannot be changed here.
                 </SheetDescription>
               </SheetHeader>
 
@@ -406,54 +405,24 @@ export default function LeaseInitializePage() {
                   </div>
                 </div>
 
-                {/* Date Inputs */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="moveInDate" className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" style={{ color: "#EF4217" }} />
-                      Move In Date *
-                    </Label>
-                    <Input
-                      id="moveInDate"
-                      type="date"
-                      value={moveInDate}
-                      onChange={(e) => setMoveInDate(e.target.value)}
-                      min={new Date().toISOString().split("T")[0]}
-                      required
-                      className="w-full"
-                    />
-                    <p className="text-xs text-gray-500">
-                      Select your preferred move-in date
-                    </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border bg-white p-3">
+                    <p className="text-xs text-gray-500">Lease starts</p>
+                    <p className="mt-1 font-semibold text-[#141130]">{leaseStartDate ? formatDate(leaseStartDate) : "Missing from invitation"}</p>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="moveOutDate" className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" style={{ color: "#EF4217" }} />
-                      Move Out Date *
-                    </Label>
-                    <Input
-                      id="moveOutDate"
-                      type="date"
-                      value={moveOutDate}
-                      onChange={(e) => setMoveOutDate(e.target.value)}
-                      min={moveInDate || new Date().toISOString().split("T")[0]}
-                      required
-                      className="w-full"
-                    />
-                    <p className="text-xs text-gray-500">
-                      Must be after your move-in date
-                    </p>
+                  <div className="rounded-lg border bg-white p-3">
+                    <p className="text-xs text-gray-500">Lease ends</p>
+                    <p className="mt-1 font-semibold text-[#141130]">{leaseEndDate ? formatDate(leaseEndDate) : "Missing from invitation"}</p>
                   </div>
                 </div>
 
                 {/* Duration Display */}
-                {moveInDate && moveOutDate && new Date(moveOutDate) > new Date(moveInDate) && (
+                {leaseStartDate && leaseEndDate && new Date(leaseEndDate) > new Date(leaseStartDate) && (
                   <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                     <p className="text-sm text-green-800">
                       <strong>Lease Duration:</strong>{" "}
                       {Math.ceil(
-                        (new Date(moveOutDate).getTime() - new Date(moveInDate).getTime()) /
+                        (new Date(leaseEndDate).getTime() - new Date(leaseStartDate).getTime()) /
                           (1000 * 60 * 60 * 24)
                       )}{" "}
                       days
@@ -464,9 +433,7 @@ export default function LeaseInitializePage() {
                 {/* Important Notice */}
                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-xs text-yellow-800">
-                    <strong>Important:</strong> By initializing this lease, you're declaring your interest 
-                    in this unit. The landlord will review your application and the lease terms will be 
-                    finalized upon approval.
+                    <strong>Important:</strong> Initializing creates the lease and an immutable agreement from these terms. Review the PDF before signing. You may reject it if the terms are not correct.
                   </p>
                 </div>
 
@@ -482,7 +449,7 @@ export default function LeaseInitializePage() {
                   </Button>
                   <Button
                     onClick={handleSubmitLease}
-                    disabled={isSubmitting || !moveInDate || !moveOutDate}
+                    disabled={isSubmitting || !leaseStartDate || !leaseEndDate}
                     className="flex-1 text-white"
                     style={{ backgroundColor: "#EF4217" }}
                   >
@@ -561,7 +528,10 @@ export default function LeaseInitializePage() {
                 </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-                  <Loader2 className="w-12 h-12 animate-spin text-gray-400" />
+                  <div className="text-center text-gray-500">
+                    <Home className="mx-auto mb-2 h-12 w-12 text-gray-400" />
+                    <p className="text-sm font-medium">No unit image provided</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -657,6 +627,32 @@ export default function LeaseInitializePage() {
             )}
           </div>
         </div>
+
+        <section className="rounded-lg border border-blue-200 bg-blue-50 p-5" aria-labelledby="invited-lease-period">
+          <div className="mb-3 flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-blue-700" />
+            <h2 id="invited-lease-period" className="text-lg font-semibold text-[#141130]">
+              Landlord-defined lease period
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-blue-100 bg-white p-3">
+              <p className="text-xs text-gray-500">Lease starts</p>
+              <p className="mt-1 font-semibold text-[#141130]">
+                {leaseStartDate ? formatDate(leaseStartDate) : "Missing from invitation"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-blue-100 bg-white p-3">
+              <p className="text-xs text-gray-500">Lease ends</p>
+              <p className="mt-1 font-semibold text-[#141130]">
+                {leaseEndDate ? formatDate(leaseEndDate) : "Missing from invitation"}
+              </p>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-blue-900">
+            These dates were set by the landlord. You can review them before initializing; reject the generated agreement if its terms are not correct.
+          </p>
+        </section>
 
         {/* ==================== END OF PART C ==================== */}
         {/* Continue to PART D below */}
@@ -790,8 +786,7 @@ export default function LeaseInitializePage() {
             <div className="max-w-3xl mx-auto text-center space-y-4">
               <h2 className="text-2xl sm:text-3xl font-bold">Ready to Initialize Your Lease?</h2>
               <p className="text-white/90">
-                Review all the details above and click the button below to set your move-in and move-out dates. 
-                Once you submit, the landlord will review your application.
+                Review the unit and landlord-defined lease period. Initializing creates the agreement for you to review, accept and sign.
               </p>
               <Button
                 onClick={() => setIsSheetOpen(true)}

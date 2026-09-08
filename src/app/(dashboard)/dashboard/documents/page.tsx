@@ -36,6 +36,7 @@ const tenantStatusMessage = (document: LeaseDocument) => {
     return "One party has signed. The agreement becomes active after both signatures.";
   }
   if (document.status === "SIGNED") return "Complete: you and the landlord or manager have signed.";
+  if (document.status === "REJECTED") return "You rejected this agreement. The unit was released and the landlord can send a corrected assignment.";
   if (document.status === "CANCELLED") return "This document was cancelled and can no longer be signed.";
   if (document.status === "EXPIRED") return "This document expired. Ask the landlord or manager to issue a current version.";
   return null;
@@ -243,6 +244,19 @@ function DocumentsWorkspace() {
     } finally { setBusy(false); }
   }
 
+  async function rejectAgreement(id: number) {
+    const reason = window.prompt("Tell the landlord what must be corrected before a new assignment is sent:")?.trim();
+    if (!reason) return;
+    setBusy(true);
+    try {
+      await leaseDocumentService.reject(id, reason);
+      toast.success("Agreement rejected. The landlord can now send a corrected assignment.");
+      await load();
+    } catch (error: unknown) {
+      toast.error(apiErrorMessage(error, "The agreement could not be rejected."));
+    } finally { setBusy(false); }
+  }
+
   async function saveTemplate(event: FormEvent) {
     event.preventDefault();
     if (!editing) return;
@@ -295,12 +309,14 @@ function DocumentsWorkspace() {
           {saleTypes.includes(item.documentType) && <p className="mt-2 max-w-2xl text-sm font-medium text-[#14235C]">{saleStatusMessage(item)}</p>}
           {isTenant && tenantStatusMessage(item) && <p className="mt-2 max-w-2xl text-sm font-medium text-[#14235C]">{tenantStatusMessage(item)}</p>}
           <p className="mt-2 text-sm">Issuer: {item.issuerSignedAt ? "Signed" : "Not signed"} · Recipient: {item.recipientSignedAt ? "Signed" : "Not signed"}{item.responseDueDate ? ` · Respond by ${item.responseDueDate}` : ""}</p>
+          {item.status === "REJECTED" && item.recipientRejectionReason && <p className="mt-1 text-sm text-red-700">Reason: {item.recipientRejectionReason}</p>}
           {item.documentType === "PROPERTY_SALE_LETTER_OF_OFFER" && !["EXPIRED","CANCELLED"].includes(item.status) && <p className="text-sm text-muted-foreground">Both signatures reserve the sale automatically. No separate acceptance is needed.</p>}
           {item.legalReviewRequired && <p className="text-sm text-amber-800">Issue is blocked pending template approval. Cancel this draft and regenerate after the approved version is available.</p>}</div>
         <div className="flex flex-wrap gap-2"><ProtectedPdfButton load={() => leaseDocumentService.pdf(item.id)} name={`${item.name} - ${item.status} - ${item.id}`} />
           {canIssue && item.viewerParty === "ISSUER" && item.status === "DRAFT" && <Button size="sm" onClick={() => action(item.id, "issue")} disabled={busy || item.legalReviewRequired}><Send className="mr-1 h-4 w-4" />Issue</Button>}
           {canCreate && item.viewerParty === "ISSUER" && item.status === "DRAFT" && <Button size="sm" variant="outline" onClick={() => action(item.id, "cancelDraft")} disabled={busy}>Cancel draft</Button>}
           {canAcknowledge && item.viewerParty === "RECIPIENT" && item.status === "ISSUED" && <Button size="sm" variant="outline" onClick={() => action(item.id, "acknowledge")} disabled={busy}>Acknowledge</Button>}
+          {canAcknowledge && item.viewerParty === "RECIPIENT" && ["ISSUED", "ACKNOWLEDGED"].includes(item.status) && !item.recipientSignedAt && <Button size="sm" variant="outline" className="border-red-300 text-red-700" onClick={() => rejectAgreement(item.id)} disabled={busy}>Reject</Button>}
           {canSign && ((item.viewerParty === "RECIPIENT" && !item.recipientSignedAt) || (item.viewerParty === "ISSUER" && !item.issuerSignedAt && (!item.documentType.includes("LEASE_AGREEMENT") || item.recipientSignedAt))) && ["ISSUED", "ACKNOWLEDGED", "PARTIALLY_SIGNED"].includes(item.status) && <Button size="sm" variant="outline" onClick={() => action(item.id, "sign")} disabled={busy}><Signature className="mr-1 h-4 w-4" />Sign</Button>}
         </div></div>)}
       {totalPages > 1 && <div className="flex items-center justify-between border-t pt-4"><Button type="button" variant="outline" disabled={page === 0 || busy} onClick={() => setPage(value => value - 1)}>Previous</Button><span className="text-sm text-muted-foreground">Page {page + 1} of {totalPages}</span><Button type="button" variant="outline" disabled={page >= totalPages - 1 || busy} onClick={() => setPage(value => value + 1)}>Next</Button></div>}

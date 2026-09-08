@@ -137,6 +137,9 @@ interface Invite {
   type: string;
   validDays: number;
   visits: number;
+  maskedRecipient?: string;
+  leaseStartDate?: string;
+  leaseEndDate?: string;
 }
 
 interface LeaseMessage {
@@ -278,6 +281,8 @@ export default function ViewUnitPage() {
   const [createInviteOpen, setCreateInviteOpen] = useState(false);
   const [shareInviteOpen, setShareInviteOpen] = useState(false);
   const [occupantEmail, setOccupantEmail] = useState("");
+  const [leaseStartDate, setLeaseStartDate] = useState("");
+  const [leaseEndDate, setLeaseEndDate] = useState("");
   const [selectedInviteId, setSelectedInviteId] = useState<number | null>(null);
   const [selectedInviteLink, setSelectedInviteLink] = useState("");
   const [shareRecipient, setShareRecipient] = useState("");
@@ -540,12 +545,20 @@ export default function ViewUnitPage() {
   const onCreateOccupantInvite = async () => {
     const inviteType = unit?.leaseMode === "SERVICE_CHARGE" || origin === "homeowners" ? "HOMEOWNER" : "TENANT";
     const inviteLabel = inviteType === "HOMEOWNER" ? "Homeowner" : "Tenant";
+    if (inviteType === "TENANT" && (!leaseStartDate || !leaseEndDate || leaseEndDate <= leaseStartDate)) {
+      toast.error("Choose a valid lease period. The end date must be after the start date.");
+      return;
+    }
     try {
       setActionLoading(true);
-      const response = await handleCreateEmailOccupantInvite(inviteType, Number(unitId), occupantEmail.trim());
+      const response = await handleCreateEmailOccupantInvite(inviteType, Number(unitId), occupantEmail.trim(),
+        inviteType === "TENANT" ? leaseStartDate : undefined,
+        inviteType === "TENANT" ? leaseEndDate : undefined);
       if (response.success) {
         toast.success(`${inviteLabel} invitation sent to ${occupantEmail.trim().toLowerCase()}`);
         setOccupantEmail("");
+        setLeaseStartDate("");
+        setLeaseEndDate("");
         setCreateInviteOpen(false);
         loadUnitInvites();
       }
@@ -834,9 +847,9 @@ export default function ViewUnitPage() {
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5" style={{ color: "#EF4217" }} />Create {occupantLabel} Invite
+                <UserPlus className="w-5 h-5" style={{ color: "#EF4217" }} />{occupantLabel === "Tenant" ? "Assign tenant" : `Create ${occupantLabel} Invite`}
               </DialogTitle>
-            <DialogDescription>Enter the {occupantLabel.toLowerCase()}&apos;s email. SlickHood will send a secure, email-bound invitation for this unit.</DialogDescription>
+            <DialogDescription>{occupantLabel === "Tenant" ? "Set the lease period and tenant email. SlickHood will freeze these terms and send a secure invitation." : `Enter the ${occupantLabel.toLowerCase()}'s email. SlickHood will send a secure, email-bound invitation for this unit.`}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -844,15 +857,25 @@ export default function ViewUnitPage() {
                 <Input id="occupant-email" type="email" autoComplete="email" placeholder="tenant@example.com" value={occupantEmail} onChange={(event) => setOccupantEmail(event.target.value)} required />
                 <p className="text-xs text-gray-500">Only this email address can accept the invitation. Existing users sign in; new users register with the same email.</p>
               </div>
+              {occupantLabel === "Tenant" && <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="lease-start-date">Lease start</Label>
+                  <Input id="lease-start-date" type="date" min={new Date().toISOString().slice(0, 10)} value={leaseStartDate} onChange={(event) => setLeaseStartDate(event.target.value)} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lease-end-date">Lease end</Label>
+                  <Input id="lease-end-date" type="date" min={leaseStartDate || new Date().toISOString().slice(0, 10)} value={leaseEndDate} onChange={(event) => setLeaseEndDate(event.target.value)} required />
+                </div>
+              </div>}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-gray-700">The invitation will be linked to Unit {unit.ref} and sent by email. You can revoke or resend it from the invitation list.</p>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => { setCreateInviteOpen(false); setOccupantEmail(""); }}>
+              <Button variant="outline" onClick={() => { setCreateInviteOpen(false); setOccupantEmail(""); setLeaseStartDate(""); setLeaseEndDate(""); }}>
                 Cancel
               </Button>
-              <Button onClick={onCreateOccupantInvite} disabled={actionLoading || !/^\S+@\S+\.\S+$/.test(occupantEmail.trim())} className="text-white" style={{ backgroundColor: "#EF4217" }}>
+              <Button onClick={onCreateOccupantInvite} disabled={actionLoading || !/^\S+@\S+\.\S+$/.test(occupantEmail.trim()) || (occupantLabel === "Tenant" && (!leaseStartDate || !leaseEndDate || leaseEndDate <= leaseStartDate))} className="text-white" style={{ backgroundColor: "#EF4217" }}>
                 {actionLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending...</> : <><Mail className="w-4 h-4 mr-2" />Send invitation</>}
               </Button>
             </DialogFooter>
@@ -1484,7 +1507,7 @@ export default function ViewUnitPage() {
                         <div className="space-y-4">
                           <div className="flex justify-end">
                             <Button onClick={() => setCreateInviteOpen(true)} size="sm" className="text-white" style={{ backgroundColor: "#EF4217" }}>
-                              <UserPlus className="w-4 h-4 mr-2" />Create Tenant Invite
+                              <UserPlus className="w-4 h-4 mr-2" />Assign tenant
                             </Button>
                           </div>
                           {invitesLoading ? (
@@ -1504,6 +1527,8 @@ export default function ViewUnitPage() {
                                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{invite.validDays} days left</span>
                                       <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{invite.visits} visits</span>
                                     </div>
+                                    {invite.maskedRecipient && <p className="text-xs text-gray-600">Sent to {invite.maskedRecipient}</p>}
+                                    {invite.leaseStartDate && invite.leaseEndDate && <p className="text-xs font-medium text-[#141130]">Lease: {formatDate(invite.leaseStartDate)} – {formatDate(invite.leaseEndDate)}</p>}
                                     <div className="flex gap-2">
                                       <Button size="sm" variant="outline" onClick={() => copyToClipboard(invite.link)} className="flex-1 text-xs"><Copy className="w-3 h-3 mr-1" />Copy</Button>
                                       <Button size="sm" variant="outline" onClick={() => openShareDialog(invite.id, invite.link)} className="flex-1 text-xs"><Send className="w-3 h-3 mr-1" />Share</Button>

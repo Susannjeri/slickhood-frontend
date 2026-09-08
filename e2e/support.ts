@@ -25,16 +25,22 @@ export const testToken = (roles: TestRole[]) => `${encode({ alg: "none", typ: "J
   roles: roles.map(normalizedRole),
 })}.test-signature`;
 
-export async function authenticated(context: BrowserContext, page: Page, role: TestRole) {
+export async function authenticated(
+  context: BrowserContext,
+  page: Page,
+  role: TestRole,
+  authState: Record<string, unknown> = {},
+) {
   const persisted = normalizedRole(role);
   const token = testToken([persisted]);
   await context.addCookies([{ name: "token", value: token, domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
-  await page.addInitScript(({ persistedRole }) => {
+  await page.addInitScript(({ persistedRole, additionalAuthState, accessToken }) => {
     // Initialize once per browser tab. Real persisted auth state survives a
     // full-page reload, which is required when a workspace boundary changes.
     if (sessionStorage.getItem("slickhood-e2e-auth-initialized") === "true") return;
     localStorage.setItem("auth-storage", JSON.stringify({
       state: {
+        token: accessToken,
         mfaEnabled: false,
         totpEnabled: false,
         email: "e2e@slickhood.test",
@@ -45,11 +51,12 @@ export async function authenticated(context: BrowserContext, page: Page, role: T
         propertyIds: persistedRole.propertyIds ?? [],
         propertyNames: persistedRole.propertyNames ?? [],
         activeRole: persistedRole,
+        ...additionalAuthState,
       },
       version: 0,
     }));
     sessionStorage.setItem("slickhood-e2e-auth-initialized", "true");
-  }, { persistedRole: persisted });
+  }, { persistedRole: persisted, additionalAuthState: authState, accessToken: token });
   await page.route("**/kyc/current", route => route.fulfill({ json: {
     success: true,
     code: "KYC_DETAILS",

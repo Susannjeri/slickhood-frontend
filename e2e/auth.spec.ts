@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { envelope, testToken } from "./support";
+import { authenticated, envelope, testToken } from "./support";
 
 test("an unauthenticated dashboard visit is sent to sign in", async ({ page }) => {
   await page.route("https://accounts.google.com/**", route => route.abort());
@@ -160,15 +160,16 @@ test("a tenant invitation survives sign-in and returns to lease initialization",
   await page.route("https://accounts.google.com/**", route => route.abort());
   await page.route("**/invite/validate**", route => route.fulfill({ json: {
     success: true, code: "S0058", description: "Tenant invite",
-    data: {
+    data: { unit: {
       propertyId: 11, unitId: 77, ref: "A-101", propertyType: "APARTMENT",
       unitType: "APARTMENT", size: 85, measurementUnits: { id: 1, name: "sqm" },
       utilities: [], leaseMode: "RENT", price: 25000, currency: "KES",
       occupied: false, advertise: false, thumbnail: "", images: [], templateId: 9,
-    },
+    }, leaseStartDate: "2026-10-01", leaseEndDate: "2027-09-30" },
   } }));
+  await page.route("**/property/type", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/property/unit/type**", route => route.fulfill({ json: envelope([]) }));
-  await page.route("**/property/unit/charges/public**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/property/unit/charges?**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/lease/template/public**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/auth/login", route => route.fulfill({ json: envelope([{
     jwt, refreshToken: "tenant-refresh-token-long-enough", totpEnabled: false, mfaSetup: true,
@@ -176,7 +177,7 @@ test("a tenant invitation survives sign-in and returns to lease initialization",
   await page.route("**/browser-session/refresh", route => route.fulfill({ json: { success: true } }));
 
   await page.goto("/lease/onboard?token=tenant-bound-token");
-  await expect(page).toHaveURL(/\/lease\/initialize$/);
+  await expect(page).toHaveURL(/\/lease\/initialize\?token=tenant-bound-token$/);
   await expect(page.getByText("Unit A-101")).toBeVisible();
   await expect(page.getByRole("button", { name: "View Lease Agreement" })).toHaveCount(0);
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -185,7 +186,7 @@ test("a tenant invitation survives sign-in and returns to lease initialization",
   await page.getByPlaceholder("••••••••").fill("ValidPass1!");
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await expect(page).toHaveURL(/\/lease\/initialize$/);
+  await expect(page).toHaveURL(/\/lease\/initialize(?:\?token=tenant-bound-token)?$/);
   const storedInvite = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state?.inviteToken);
   expect(storedInvite).toBe("tenant-bound-token");
 });
@@ -194,10 +195,12 @@ test("a new tenant can start registration directly from the unit invitation", as
   await page.route("https://accounts.google.com/**", route => route.abort());
   await page.route("**/invite/validate**", route => route.fulfill({ json: {
     success: true, code: "S0058", description: "Tenant invite",
-    data: { propertyId: 11, unitId: 77, ref: "A-101", propertyType: "APARTMENT", unitType: "APARTMENT", size: 85,
+    data: { unit: { propertyId: 11, unitId: 77, ref: "A-101", propertyType: "APARTMENT", unitType: "APARTMENT", size: 85,
       measurementUnits: { id: 1, name: "sqm" }, utilities: [], leaseMode: "RENT", price: 25000, currency: "KES",
       occupied: false, advertise: false, thumbnail: "", images: [], templateId: 9 },
+      leaseStartDate: "2026-10-01", leaseEndDate: "2027-09-30" },
   } }));
+  await page.route("**/property/type", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/property/unit/type**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/property/unit/charges**", route => route.fulfill({ json: envelope([]) }));
 
@@ -205,6 +208,43 @@ test("a new tenant can start registration directly from the unit invitation", as
   await page.getByRole("button", { name: "Create tenant account" }).click();
 
   await expect(page).toHaveURL(/\/register\?.*token=tenant-new-account-token.*returnTo=%2Flease%2Finitialize/);
+});
+
+test("tenant initializes the landlord-defined lease without editing dates", async ({ context, page }) => {
+  await authenticated(
+    context,
+    page,
+    {title:"Tenant",permissions:["create_new_lease","view_lease_document"]},
+    {inviteToken:"multi-unit-tenant-token"},
+  );
+  await page.route("**/invite/validate**",route=>route.fulfill({json:{
+    success:true,code:"S0058",description:"Tenant invite",data:[{
+      unit:{propertyId:11,unitId:77,ref:"A-101",propertyType:"APARTMENT",unitType:"APARTMENT",size:85,
+        measurementUnits:{id:1,name:"sqm"},utilities:[],leaseMode:"RENT",price:25000,currency:"KES",
+        occupied:false,advertise:false,thumbnail:"",images:[],templateId:9},
+      leaseStartDate:"2026-10-01",leaseEndDate:"2027-09-30",
+    }],
+  }}));
+  await page.route("**/property/type",route=>route.fulfill({json:envelope([])}));
+  await page.route("**/property/unit/type**",route=>route.fulfill({json:envelope([])}));
+  await page.route("**/property/unit/charges?**",route=>route.fulfill({json:envelope([])}));
+  let payload:unknown;
+  await page.route("**/lease/tenant/create",route=>{
+    payload=route.request().postDataJSON();
+    return route.fulfill({json:{success:true,code:"S0162",description:"Lease initialized",data:[{
+      leaseId:501,agreementDocumentId:601,leaseStartDate:"2026-10-01",leaseEndDate:"2027-09-30",agreementStatus:"ISSUED",
+    }]}});
+  });
+  await page.route("**/lease/documents**",route=>route.fulfill({json:{...envelope([]),totalPages:1}}));
+  await page.route("**/lease/list**",route=>route.fulfill({json:envelope([])}));
+
+  await page.goto("/lease/initialize?token=multi-unit-tenant-token");
+  await expect(page.getByText("Oct 1, 2026").first()).toBeVisible();
+  await expect(page.getByText("Sep 30, 2027").first()).toBeVisible();
+  await page.getByRole("button",{name:"Initialize Lease"}).first().click();
+  await page.getByRole("button",{name:"Initialize Lease"}).last().click();
+  await expect.poll(()=>payload).toEqual({token:"multi-unit-tenant-token"});
+  await expect(page).toHaveURL(/\/dashboard\/documents\?leaseId=501/);
 });
 
 test("tenant email verification continues to KYC before lease initialization", async ({ page }) => {

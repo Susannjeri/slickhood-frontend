@@ -33,6 +33,21 @@ test("tenant reviews and signs once, then waits for landlord", async ({ context,
   await expect(page.getByRole("button",{name:"Sign",exact:true})).toHaveCount(0);
 });
 
+test("tenant can reject an unsigned lease agreement with a reason", async ({ context, page }) => {
+  await authenticated(context,page,{title:"Tenant",permissions:["view_lease_document","acknowledge_lease_document"]});
+  let rejected=false;
+  await documents(page,[base]);
+  await page.route("**/lease/documents/61/reject", async route => {
+    expect(route.request().postDataJSON()).toEqual({reason:"Lease dates are incorrect"});
+    rejected=true;
+    await route.fulfill({json:envelope({})});
+  });
+  page.on("dialog",dialog=>dialog.accept("Lease dates are incorrect"));
+  await page.goto("/dashboard/documents?leaseId=11");
+  await page.getByRole("button",{name:"Reject",exact:true}).click();
+  await expect.poll(()=>rejected).toBe(true);
+});
+
 test("landlord cannot countersign an unsigned tenant agreement", async ({context,page})=>{
   await authenticated(context,page,{title:"Landlord",permissions:["view_lease_document","sign_lease_document"]});
   await documents(page,[{...base,viewerParty:"ISSUER"}]);
