@@ -1322,6 +1322,9 @@ export const updateUnitTypeCatalog = (propertyType: string, unitTypeIds: string[
 
 export interface ActiveLease {
   moveInDate?: string;
+  firstRentDueDate?: string;
+  depositDueDate?: string;
+  nextRentDueDate?: string;
   price?: number;
   currency?: string;
   id: number;

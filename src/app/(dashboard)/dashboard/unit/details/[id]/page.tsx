@@ -868,7 +868,7 @@ export default function ViewUnitPage() {
                 </div>
               </div>}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-gray-700">The invitation will be linked to Unit {unit.ref} and sent by email. You can revoke or resend it from the invitation list.</p>
+                <p className="text-sm text-gray-700">The invitation will be linked to Unit {unit.ref} and sent by email. First rent and any configured one-time deposit will be due on the lease start date. The initial invoice is issued after both parties sign; future rent follows the lease template's monthly rent-due day.</p>
               </div>
             </div>
             <DialogFooter>

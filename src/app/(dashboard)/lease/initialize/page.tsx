@@ -113,6 +113,8 @@ function LeaseInitializeContent() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [leaseStartDate, setLeaseStartDate] = useState("");
   const [leaseEndDate, setLeaseEndDate] = useState("");
+  const [firstRentDueDate, setFirstRentDueDate] = useState("");
+  const [depositDueDate, setDepositDueDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Profile Gate State
@@ -155,6 +157,8 @@ function LeaseInitializeContent() {
         setUnitDetails(unit);
         setLeaseStartDate(invitation?.leaseStartDate ?? "");
         setLeaseEndDate(invitation?.leaseEndDate ?? "");
+        setFirstRentDueDate(invitation?.firstRentDueDate ?? invitation?.leaseStartDate ?? "");
+        setDepositDueDate(invitation?.depositDueDate ?? invitation?.leaseStartDate ?? "");
         await getUnitTypes(unit.propertyType);
         // Load unit images using inviteToken
         // Legacy invitations can contain an empty thumbnail. Skipping blank
@@ -326,6 +330,9 @@ function LeaseInitializeContent() {
     );
   }
 
+  const depositCharge = unitCharges.find((charge) =>
+    charge.chargeName?.toLowerCase().includes("deposit"));
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
@@ -414,6 +421,15 @@ function LeaseInitializeContent() {
                     <p className="text-xs text-gray-500">Lease ends</p>
                     <p className="mt-1 font-semibold text-[#141130]">{leaseEndDate ? formatDate(leaseEndDate) : "Missing from invitation"}</p>
                   </div>
+                </div>
+
+                <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+                  <h3 className="font-semibold text-[#141130]">Payment timing</h3>
+                  <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                    <div><p className="text-gray-600">First rent due</p><p className="font-semibold">{firstRentDueDate ? formatDate(firstRentDueDate) : "Missing from invitation"}</p></div>
+                    <div><p className="text-gray-600">Deposit due</p><p className="font-semibold">{depositCharge ? `${unitDetails.currency} ${depositCharge.amount.toLocaleString()} on ${depositDueDate ? formatDate(depositDueDate) : "the lease start date"}` : "No deposit configured"}</p></div>
+                  </div>
+                  <p className="mt-3 text-xs text-orange-900">The initial invoice is issued after both parties sign. Rent and any configured deposit must be paid by the stated due date.</p>
                 </div>
 
                 {/* Duration Display */}
@@ -652,6 +668,24 @@ function LeaseInitializeContent() {
           <p className="mt-3 text-sm text-blue-900">
             These dates were set by the landlord. You can review them before initializing; reject the generated agreement if its terms are not correct.
           </p>
+        </section>
+
+        <section className="rounded-lg border border-orange-200 bg-orange-50 p-5" aria-labelledby="initial-payment-timing">
+          <div className="mb-3 flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-orange-700" />
+            <h2 id="initial-payment-timing" className="text-lg font-semibold text-[#141130]">Initial payment timing</h2>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-orange-100 bg-white p-3">
+              <p className="text-xs text-gray-500">First rent due</p>
+              <p className="mt-1 font-semibold text-[#141130]">{firstRentDueDate ? formatDate(firstRentDueDate) : "Missing from invitation"}</p>
+            </div>
+            <div className="rounded-lg border border-orange-100 bg-white p-3">
+              <p className="text-xs text-gray-500">Deposit due</p>
+              <p className="mt-1 font-semibold text-[#141130]">{depositCharge ? `${unitDetails.currency} ${depositCharge.amount.toLocaleString()} · ${depositDueDate ? formatDate(depositDueDate) : "lease start"}` : "No deposit configured"}</p>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-orange-900">Your first invoice is created only after both parties sign. It is payable by the lease start date; future rent follows the agreed monthly rent-due day.</p>
         </section>
 
         {/* ==================== END OF PART C ==================== */}
