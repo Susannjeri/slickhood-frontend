@@ -6,10 +6,10 @@ import {
 } from "@/types/invoice";
 import { InvoiceCard } from "./InvoiceCard";
 import { SearchCombobox } from "./SearchCombobox";
-import Can from "@/components/auth/Can";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useApi } from "@/hooks/useApi";
+import { useAuthStore } from "@/store/authStore";
 import { Loader2, SlidersHorizontal, X } from "lucide-react";
 
 type StatusFilter = "ALL" | InvoiceStatus;
@@ -23,12 +23,14 @@ interface Props {
 }
 
 export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPaymentSuccess, onRefetchReady }: Props) {
+  const activeRole = useAuthStore(state => state.activeRole?.title);
+  const isTenant = activeRole === "Tenant";
+  const isPlatformAdmin = activeRole === "Superadmin";
   const {
     handleListLeases,
     handleSearchProperties,
     handleSearchUnits,
     handleSearchTenants,
-    handleSearchLandlords,
   } = useApi();
 
   // ─── Data state ────────────────────────────────────────────────────────────
@@ -52,7 +54,6 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
   const [stagedProperty, setStagedProperty] = useState<SearchOption | null>(null);
   const [stagedUnit, setStagedUnit]         = useState<SearchOption | null>(null);
   const [stagedTenant, setStagedTenant]     = useState<SearchOption | null>(null);
-  const [stagedLandlord, setStagedLandlord] = useState<SearchOption | null>(null);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -60,6 +61,7 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadingRef  = useRef(false);
   const hasMoreRef  = useRef(true);
+  const requestSequenceRef = useRef(0);
 
   // ─── Combobox cache ────────────────────────────────────────────────────────
   // Structured as a Map keyed by a cache key string.
@@ -94,11 +96,6 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
       handleSearchTenants({ search: q }).then(r => r.data)
     );
 
-  const searchLandlords = (q: string) =>
-    withCache(`landlords::${q}`, () =>
-      handleSearchLandlords({ search: q }).then(r => r.data)
-    );
-
   // Units cache key includes propertyId because the same query "A1"
   // means different things under different properties
   const searchUnits = (q: string) =>
@@ -118,6 +115,7 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
     if (!hasMoreRef.current && !replace) return;
 
     loadingRef.current = true;
+    const requestSequence = ++requestSequenceRef.current;
     setLoading(true);
     setError(null);
 
@@ -128,6 +126,7 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
 
     try {
       const res = await handleListLeases({ page: pageNumber, size: 10, ...filters });
+      if (requestSequence !== requestSequenceRef.current) return;
       const transformed: Invoice[] = res.data.map(
         (item: InvoiceListItem) => transformInvoice(item)
       );
@@ -143,17 +142,28 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
       hasMoreRef.current = !noMorePages;
 
     } catch {
+      if (requestSequence !== requestSequenceRef.current) return;
       setError("Failed to load invoices. Please try again.");
     } finally {
-      loadingRef.current = false;
-      setLoading(false);
+      if (requestSequence === requestSequenceRef.current) {
+        loadingRef.current = false;
+        setLoading(false);
+      }
     }
   }, [handleListLeases, onSelect]);
 
   // ─── Initial load ──────────────────────────────────────────────────────────
   useEffect(() => {
+    setInvoices([]);
+    setPage(0);
+    setAppliedFilters({});
+    appliedFiltersRef.current = {};
+    hasMoreRef.current = true;
+    setActiveSearch("");
+    setSearchInput("");
+    setStatusFilter("ALL");
     fetchPage(0, true, {});
-  }, []);
+  }, [activeRole]);
 
   // ─── Infinite scroll ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -194,7 +204,6 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
       propertyId:  stagedProperty?.id,
       unitId:      stagedUnit?.id,
       tenantId:    stagedTenant?.id,
-      landlordId:  stagedLandlord?.id,
     };
     // Update both state and ref — state for UI, ref for IntersectionObserver closure
     setAppliedFilters(filters);
@@ -208,7 +217,6 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
     setStagedProperty(null);
     setStagedUnit(null);
     setStagedTenant(null);
-    setStagedLandlord(null);
     const empty = {};
     setAppliedFilters(empty);
     appliedFiltersRef.current = empty;
@@ -224,12 +232,6 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
 
   const handleTenantChange = (option: SearchOption | null) => {
     setStagedTenant(option);
-    if (option) setStagedLandlord(null); // landlord disabled when tenant picked
-  };
-
-  const handleLandlordChange = (option: SearchOption | null) => {
-    setStagedLandlord(option);
-    if (option) setStagedTenant(null); // tenant disabled when landlord picked
   };
 
   const appliedFilterCount = Object.values(appliedFilters).filter(Boolean).length;
@@ -252,8 +254,16 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
     if (appliedFilters.propertyId) return "No invoices found for this property.";
     if (appliedFilters.tenantId) return "No invoices found for this tenant.";
     if (appliedFilters.landlordId) return "No invoices found for this landlord.";
-    return "No invoices found.";
+    if (isTenant) return "You do not have any invoices yet.";
+    if (isPlatformAdmin) return "No SlickHood subscription invoices found.";
+    return "No customer invoices found.";
   })();
+
+  const listTitle = isTenant
+    ? "My invoices"
+    : isPlatformAdmin
+      ? "SlickHood subscription invoices"
+      : "Customer invoices";
 
   const handleSearch  = () => setActiveSearch(searchInput);
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -270,7 +280,7 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-[#141130]">Invoices</h2>
+        <h2 className="text-lg font-semibold text-[#141130]">{listTitle}</h2>
         {appliedFilterCount > 0 && (
           <span className="text-xs bg-[#EF4217] text-white px-2 py-0.5 rounded-full font-semibold">
             {appliedFilterCount} filter{appliedFilterCount > 1 ? "s" : ""} active
@@ -322,7 +332,7 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
       </div>
 
       {/* Advanced filters toggle */}
-      <button
+      {!isTenant && <button
         onClick={() => setShowAdvanced(prev => !prev)}
         className="flex items-center gap-2 text-xs font-semibold text-gray-500 hover:text-[#EF4217] transition-colors mb-3 self-start"
       >
@@ -331,12 +341,12 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
         {appliedFilterCount > 0 && !showAdvanced && (
           <span className="text-[#EF4217]">({appliedFilterCount} active)</span>
         )}
-      </button>
+      </button>}
 
       {/* Advanced filters panel */}
-      {showAdvanced && (
+      {showAdvanced && !isTenant && (
         <div className="border border-gray-100 rounded-xl p-4 mb-3 bg-gray-50 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          {!isPlatformAdmin && <div className="grid grid-cols-2 gap-3">
             <SearchCombobox
               label="Property"
               placeholder="Search properties..."
@@ -352,28 +362,19 @@ export function InvoiceList({ selectedId, onSelect, autoSelectFirst = true, onPa
               disabled={!stagedProperty}
               onSearch={searchUnits}
             />
-          </div>
+          </div>}
 
-          <Can roles={["Superadmin"]}>
-            <div className="grid grid-cols-2 gap-3">
+          {isPlatformAdmin && (
+            <div>
               <SearchCombobox
-                label="Tenant"
-                placeholder="Search tenants..."
+                label="Subscriber"
+                placeholder="Search subscribers..."
                 value={stagedTenant}
                 onChange={handleTenantChange}
                 onSearch={searchTenants}
-                disabled={!!stagedLandlord}
-              />
-              <SearchCombobox
-                label="Landlord"
-                placeholder="Search landlords..."
-                value={stagedLandlord}
-                onChange={handleLandlordChange}
-                onSearch={searchLandlords}
-                disabled={!!stagedTenant}
               />
             </div>
-          </Can>
+          )}
 
           <div className="flex gap-2 pt-1">
             <Button

@@ -1,11 +1,12 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Invoice } from "@/types/invoice";
 import { InvoiceList } from "./InvoiceList";
 import { InvoiceDetail } from "./InvoiceDetail";
 import { BillingNavigation } from "./BillingNavigation";
 import { FileText, Loader2 } from "lucide-react";
 import { useIsInvoiceMobile } from "@/hooks/use-invoice-mobile";
+import { useAuthStore } from "@/store/authStore";
 import {
   Sheet,
   SheetContent,
@@ -15,6 +16,7 @@ import {
 
 export function InvoicesPage() {
   const isMobile = useIsInvoiceMobile(); // null | true | false
+  const activeRole = useAuthStore(state => state.activeRole?.title);
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [sheetOpen, setSheetOpen]             = useState(false);
@@ -24,6 +26,12 @@ export function InvoicesPage() {
 
   // Ref to InvoiceList's refetch function — called after payment to reload cards
   const invoiceListRefetchRef = useRef<(() => void) | null>(null);
+
+  // Never carry invoice details from one role workspace into another.
+  useEffect(() => {
+    setSelectedInvoice(null);
+    setSheetOpen(false);
+  }, [activeRole]);
 
   const handleSelect = (invoice: Invoice) => {
     setSelectedInvoice(invoice);

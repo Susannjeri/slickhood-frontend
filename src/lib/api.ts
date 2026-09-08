@@ -1389,8 +1389,12 @@ export const listLeases = (
   token: string
 ) => {
   const { sort = 'id,desc', page = 0, size = 10, tenantId, landlordId, propertyId, unitId } = params;
-  const queryString = `?sort=${sort}&page=${page}&size=${size}&tenantId=${tenantId || ''}&landlordId=${landlordId || ''}&propertyId=${propertyId || ''}&unitId=${unitId || ''}`;
-  return API.get(`/payment/invoice/list${queryString}`,
+  const query = new URLSearchParams({ sort, page: String(page), size: String(size) });
+  if (tenantId !== undefined) query.set("tenantId", String(tenantId));
+  if (landlordId !== undefined) query.set("landlordId", String(landlordId));
+  if (propertyId !== undefined) query.set("propertyId", String(propertyId));
+  if (unitId !== undefined) query.set("unitId", String(unitId));
+  return API.get(`/payment/invoice/list?${query.toString()}`,
     {
     headers: {
       "Content-Type": 'application/json',
