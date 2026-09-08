@@ -81,7 +81,7 @@ test("lease operations routes drafts through governed documents and records a te
   });
 
   await page.goto("/dashboard/lease/operations");
-  await expect(page.getByRole("link", { name: "Prepare or continue agreement" })).toHaveAttribute("href", "/dashboard/documents?leaseId=41&type=RESIDENTIAL_LEASE_AGREEMENT");
+  await expect(page.getByRole("link", { name: "Prepare agreement" })).toHaveAttribute("href", "/dashboard/documents?leaseId=41&type=RESIDENTIAL_LEASE_AGREEMENT");
 
   await page.getByRole("button", { name: "Give termination notice" }).click();
   await page.getByLabel("Termination effective date").fill("2027-08-31");
