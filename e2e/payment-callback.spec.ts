@@ -20,11 +20,39 @@ test("Flutterwave browser return never claims success when backend verification 
   expect(verificationUrl).toContain("transaction_id=7788");
 });
 
-test("Paystack return is labelled submitted, not paid, until server verification completes", async ({ context, page }) => {
+test("Paystack return is labelled paid only after authenticated server verification", async ({ context, page }) => {
   await authenticated(context, page, { title: "Tenant", permissions: ["view_invoice_list"] });
-  await page.goto("/payment/callback?reference=PSTACK-TEST-91");
-  await expect(page.getByRole("heading", { name: "Payment submitted" })).toBeVisible();
-  await expect(page.getByText("PSTACK-TEST-91")).toBeVisible();
-  await expect(page.getByText(/confirming it securely before updating the invoice/i)).toBeVisible();
-  await expect(page.getByText(/Payment Confirmed/i)).toHaveCount(0);
+  let confirmationUrl = "";
+  await page.route("**/payment/paystack/confirm**", async route => {
+    confirmationUrl = route.request().url();
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: { invoiceRef: "INV-TEST-91", paid: true, paymentStatus: "successful" },
+      }),
+    });
+  });
+
+  await page.goto("/payment/callback?reference=91");
+  await expect(page.getByRole("heading", { name: "Payment confirmed" })).toBeVisible();
+  await expect(page.getByText("91", { exact: true })).toBeVisible();
+  await expect(page.getByText(/invoice and subscription have been updated/i)).toBeVisible();
+  expect(confirmationUrl).toContain("reference=91");
+});
+
+test("Paystack return remains pending when authenticated server verification fails", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: ["view_invoice_list"] });
+  await page.route("**/payment/paystack/confirm**", route => route.fulfill({
+    status: 502,
+    contentType: "application/json",
+    body: JSON.stringify({ success: false, description: "Provider verification is temporarily unavailable." }),
+  }));
+
+  await page.goto("/payment/callback?reference=92");
+  await expect(page.getByRole("heading", { name: "Confirmation pending" })).toBeVisible();
+  await expect(page.getByText(/confirmation has not completed yet/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry confirmation" })).toBeVisible();
+  await expect(page.getByText(/Payment confirmed/i)).toHaveCount(0);
 });
