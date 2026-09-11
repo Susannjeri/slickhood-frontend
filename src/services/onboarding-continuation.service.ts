@@ -51,6 +51,15 @@ export async function resolveOnboardingContinuation(
     };
   }
 
+  if (normalizedRole === "homeowner") {
+    return {
+      complete: true,
+      destination: "/dashboard/homeowners?onboarding=agreement",
+      areaTitle: "My Home",
+      message: "Your homeowner workspace is ready. Review your assigned home and estate agreement.",
+    };
+  }
+
   const selectedArea = selectedBusinessAreaId
     ? businessAreas.find(item => item.id === selectedBusinessAreaId && item.roleTitles.includes(normalizedRole))
     : undefined;

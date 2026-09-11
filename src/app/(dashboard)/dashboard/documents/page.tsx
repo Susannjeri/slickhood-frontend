@@ -250,7 +250,7 @@ function DocumentsWorkspace() {
     setBusy(true);
     try {
       await leaseDocumentService.reject(id, reason);
-      toast.success("Agreement rejected. The landlord can now send a corrected assignment.");
+      toast.success("Agreement rejected. The issuing manager can review the reason and prepare a corrected agreement.");
       await load();
     } catch (error: unknown) {
       toast.error(apiErrorMessage(error, "The agreement could not be rejected."));
@@ -317,7 +317,7 @@ function DocumentsWorkspace() {
           {canCreate && item.viewerParty === "ISSUER" && item.status === "DRAFT" && <Button size="sm" variant="outline" onClick={() => action(item.id, "cancelDraft")} disabled={busy}>Cancel draft</Button>}
           {canAcknowledge && item.viewerParty === "RECIPIENT" && item.status === "ISSUED" && <Button size="sm" variant="outline" onClick={() => action(item.id, "acknowledge")} disabled={busy}>Acknowledge</Button>}
           {canAcknowledge && item.viewerParty === "RECIPIENT" && ["ISSUED", "ACKNOWLEDGED"].includes(item.status) && !item.recipientSignedAt && <Button size="sm" variant="outline" className="border-red-300 text-red-700" onClick={() => rejectAgreement(item.id)} disabled={busy}>Reject</Button>}
-          {canSign && ((item.viewerParty === "RECIPIENT" && !item.recipientSignedAt) || (item.viewerParty === "ISSUER" && !item.issuerSignedAt && (!item.documentType.includes("LEASE_AGREEMENT") || item.recipientSignedAt))) && ["ISSUED", "ACKNOWLEDGED", "PARTIALLY_SIGNED"].includes(item.status) && <Button size="sm" variant="outline" onClick={() => action(item.id, "sign")} disabled={busy}><Signature className="mr-1 h-4 w-4" />Sign</Button>}
+          {canSign && ((item.viewerParty === "RECIPIENT" && !item.recipientSignedAt) || (item.viewerParty === "ISSUER" && !item.issuerSignedAt && (!["RESIDENTIAL_LEASE_AGREEMENT", "COMMERCIAL_LEASE_AGREEMENT", "ESTATE_RESIDENTIAL_AGREEMENT"].includes(item.documentType) || item.recipientSignedAt))) && ["ISSUED", "ACKNOWLEDGED", "PARTIALLY_SIGNED"].includes(item.status) && <Button size="sm" variant="outline" onClick={() => action(item.id, "sign")} disabled={busy}><Signature className="mr-1 h-4 w-4" />Sign</Button>}
         </div></div>)}
       {totalPages > 1 && <div className="flex items-center justify-between border-t pt-4"><Button type="button" variant="outline" disabled={page === 0 || busy} onClick={() => setPage(value => value - 1)}>Previous</Button><span className="text-sm text-muted-foreground">Page {page + 1} of {totalPages}</span><Button type="button" variant="outline" disabled={page >= totalPages - 1 || busy} onClick={() => setPage(value => value + 1)}>Next</Button></div>}
     </CardContent></Card>

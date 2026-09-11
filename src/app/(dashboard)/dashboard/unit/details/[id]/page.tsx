@@ -168,6 +168,12 @@ function formatUnitPrice(price: number | null | undefined) {
   return Number.isFinite(Number(price)) ? Number(price).toLocaleString() : "Not set";
 }
 
+function nairobiToday() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Nairobi", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+}
+
 function resolveLeaseSignState(tenant: Tenant): LeaseSignState {
   const { tenantSignedDate, managerSignedDate, signedByManagerName } = tenant;
   if (!tenantSignedDate && !managerSignedDate) return { kind: "both_pending" };
@@ -552,7 +558,7 @@ export default function ViewUnitPage() {
     try {
       setActionLoading(true);
       const response = await handleCreateEmailOccupantInvite(inviteType, Number(unitId), occupantEmail.trim(),
-        inviteType === "TENANT" ? leaseStartDate : undefined,
+        inviteType === "TENANT" ? leaseStartDate : (leaseStartDate || nairobiToday()),
         inviteType === "TENANT" ? leaseEndDate : undefined);
       if (response.success) {
         toast.success(`${inviteLabel} invitation sent to ${occupantEmail.trim().toLowerCase()}`);
@@ -849,7 +855,7 @@ export default function ViewUnitPage() {
               <DialogTitle className="flex items-center gap-2">
                 <UserPlus className="w-5 h-5" style={{ color: "#EF4217" }} />{occupantLabel === "Tenant" ? "Assign tenant" : `Create ${occupantLabel} Invite`}
               </DialogTitle>
-            <DialogDescription>{occupantLabel === "Tenant" ? "Set the lease period and tenant email. SlickHood will freeze these terms and send a secure invitation." : `Enter the ${occupantLabel.toLowerCase()}'s email. SlickHood will send a secure, email-bound invitation for this unit.`}</DialogDescription>
+            <DialogDescription>{occupantLabel === "Tenant" ? "Set the lease period and tenant email. SlickHood will freeze these terms and send a secure invitation." : "Enter the homeowner email and agreement effective date. SlickHood will freeze the approved agreement, send a secure invitation, and present it for signature after identity verification."}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -867,8 +873,13 @@ export default function ViewUnitPage() {
                   <Input id="lease-end-date" type="date" min={leaseStartDate || new Date().toISOString().slice(0, 10)} value={leaseEndDate} onChange={(event) => setLeaseEndDate(event.target.value)} required />
                 </div>
               </div>}
+              {occupantLabel === "Homeowner" && <div className="space-y-2">
+                <Label htmlFor="homeowner-agreement-date">Agreement effective date</Label>
+                <Input id="homeowner-agreement-date" type="date" max={nairobiToday()} value={leaseStartDate || nairobiToday()} onChange={(event) => setLeaseStartDate(event.target.value)} required />
+                <p className="text-xs text-gray-500">This date becomes the ownership record start and the effective date printed on the frozen estate agreement.</p>
+              </div>}
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-gray-700">The invitation will be linked to Unit {unit.ref} and sent by email. First rent and any configured one-time deposit will be due on the lease start date. The initial invoice is issued after both parties sign; future rent follows the lease template's monthly rent-due day.</p>
+                <p className="text-sm text-gray-700">{occupantLabel === "Tenant" ? `The invitation will be linked to Unit ${unit.ref} and sent by email. First rent and any configured one-time deposit will be due on the lease start date. The initial invoice is issued after both parties sign; future rent follows the lease template's monthly rent-due day.` : `The invitation is linked to Unit ${unit.ref}. An existing SlickHood user signs in; a new user registers and completes identity verification. The homeowner then reviews, accepts or rejects, and signs the estate agreement before the estate manager countersigns.`}</p>
               </div>
             </div>
             <DialogFooter>
@@ -1529,6 +1540,7 @@ export default function ViewUnitPage() {
                                     </div>
                                     {invite.maskedRecipient && <p className="text-xs text-gray-600">Sent to {invite.maskedRecipient}</p>}
                                     {invite.leaseStartDate && invite.leaseEndDate && <p className="text-xs font-medium text-[#141130]">Lease: {formatDate(invite.leaseStartDate)} – {formatDate(invite.leaseEndDate)}</p>}
+                                    {invite.type === "HOMEOWNER" && invite.leaseStartDate && <p className="text-xs font-medium text-[#141130]">Agreement effective: {formatDate(invite.leaseStartDate)}</p>}
                                     <div className="flex gap-2">
                                       <Button size="sm" variant="outline" onClick={() => copyToClipboard(invite.link)} className="flex-1 text-xs"><Copy className="w-3 h-3 mr-1" />Copy</Button>
                                       <Button size="sm" variant="outline" onClick={() => openShareDialog(invite.id, invite.link)} className="flex-1 text-xs"><Send className="w-3 h-3 mr-1" />Share</Button>
