@@ -18,6 +18,7 @@ import { LeaseTemplatePayload } from '@/lib/api';
 import { LeaseMode } from '@/types';
 import { toast } from 'sonner';
 import ProfileGateModal, {ProfileGateFields} from '@/components/auth/ProfileGateModal';
+import { ResponsivePdfViewer } from '@/components/documents/ResponsivePdfViewer';
 
 const LeaseTemplatesPage = () => {
   const [templates, setTemplates] = useState<any[]>([]);
@@ -673,11 +674,8 @@ const LeaseTemplatesPage = () => {
           </DialogHeader>
           <div className="flex-1 w-full h-full p-4">
             {pdfUrl ? (
-              <iframe
-                src={pdfUrl}
-                className="w-full h-full border rounded"
-                title="Lease Template PDF"
-              />
+              <ResponsivePdfViewer url={pdfUrl} title="Lease Template PDF"
+                downloadName="lease-template.pdf" frameClassName="h-full w-full rounded border" />
             ) : (
               <div className="flex items-center justify-center h-full">
                 <p className="text-gray-500">Loading PDF...</p>

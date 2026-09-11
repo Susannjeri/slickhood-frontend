@@ -55,7 +55,13 @@ for (const mobile of [false,true]) {
     await page.getByRole("button",{name:"PDF",exact:true}).click();
     await expect(page.getByRole("dialog")).toBeVisible();
     await expect(page.getByRole("link",{name:"Download PDF"})).toHaveAttribute("href",/^blob:/);
-    await expect(page.getByTitle("Rental Agreement - SIGNED - 91 PDF preview")).toBeVisible();
+    if (mobile) {
+      await expect(page.getByRole("link",{name:"Open PDF"})).toHaveAttribute("href",/^blob:/);
+      await expect(page.getByTitle("Rental Agreement - SIGNED - 91 PDF preview")).toBeHidden();
+    } else {
+      await expect(page.getByTitle("Rental Agreement - SIGNED - 91 PDF preview")).toBeVisible();
+      await expect(page.getByRole("link",{name:"Open PDF"})).toBeHidden();
+    }
     expect(context.pages()).toHaveLength(tabs);
     await page.getByRole("button",{name:"Close",exact:true}).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);

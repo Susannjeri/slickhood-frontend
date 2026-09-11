@@ -26,7 +26,8 @@ for (const role of ["Homeowner","EstateManager"]) {
     await expect(page.getByText(/The estate manager and homeowner have signed/)).toBeVisible();
     await page.getByRole("button",{name:"PDF",exact:true}).click();
     await expect(page.getByRole("link",{name:"Download PDF"})).toHaveAttribute("href",/^blob:/);
-    await expect(page.getByTitle("Estate Residential Agreement - SIGNED - 81 PDF preview")).toBeVisible();
+    await expect(page.getByRole("link",{name:"Open PDF"})).toHaveAttribute("href",/^blob:/);
+    await expect(page.getByTitle("Estate Residential Agreement - SIGNED - 81 PDF preview")).toBeHidden();
     await expect(page.getByRole("button",{name:"Sign",exact:true})).toHaveCount(0);
   });
 }

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchKycDocumentContent, KycDocument } from "@/services/kyc.service";
+import { ResponsivePdfViewer } from "@/components/documents/ResponsivePdfViewer";
 
 export function KycDocumentViewer({ document, className }: { document: KycDocument; className?: string }) {
   const [open, setOpen] = useState(false);
@@ -39,7 +40,7 @@ export function KycDocumentViewer({ document, className }: { document: KycDocume
         <div className="min-h-0 overflow-hidden rounded-xl border bg-slate-100">
           {loading && <div className="flex h-full items-center justify-center"><Loader2 className="mr-2 h-6 w-6 animate-spin" />Opening protected document…</div>}
           {!loading && objectUrl && contentType.startsWith("image/") && <img src={objectUrl} alt="Uploaded KYC original" className="h-full w-full object-contain" />}
-          {!loading && objectUrl && !contentType.startsWith("image/") && <iframe title="Uploaded KYC original" src={objectUrl} className="h-full w-full bg-white" />}
+          {!loading && objectUrl && !contentType.startsWith("image/") && <ResponsivePdfViewer url={objectUrl} title="Uploaded KYC original" frameClassName="h-full w-full bg-white" allowDownload={false} />}
         </div>
         {objectUrl && <a href={objectUrl} target="_blank" rel="noreferrer" className="absolute right-14 top-4 text-slate-500 hover:text-[#EF4217]" aria-label="Open document in a new tab"><ExternalLink className="h-4 w-4" /></a>}
       </DialogContent>

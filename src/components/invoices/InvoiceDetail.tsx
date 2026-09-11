@@ -12,6 +12,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { FileText, CreditCard, Loader2, Building2, ClipboardList } from "lucide-react";
+import { ResponsivePdfViewer } from "@/components/documents/ResponsivePdfViewer";
 
 interface Props {
   invoice: Invoice;
@@ -168,11 +169,8 @@ export function InvoiceDetail({ invoice, refetchKey, onPaymentSuccess }: Props) 
                 </div>
               )}
               {pdfUrl && !pdfLoading && (
-                <iframe
-                  src={pdfUrl}
-                  className="w-full h-full border-0"
-                  title={`Invoice ${invoice.ref}`}
-                />
+                <ResponsivePdfViewer url={pdfUrl} title={`Invoice ${invoice.ref}`}
+                  downloadName={`${invoice.ref.replace(/[^a-zA-Z0-9 -]/g, "_")}.pdf`} frameClassName="h-full w-full border-0" />
               )}
             </div>
           </AccordionContent>

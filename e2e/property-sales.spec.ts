@@ -6,6 +6,8 @@ const pageEnvelope=(data:unknown[])=>({success:true,code:"s00000",description:"S
 test("sales owner starts an email-bound sale from scoped property and unit selectors",async({context,page})=>{
  await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline","view_property","view_unit","view_account"]});
  await page.route("**/property/list**",route=>route.fulfill({json:pageEnvelope([{id:11,name:"Acacia Court",managementMode:"SALE"}])}));
+ await page.route("**/account/list**",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:81,name:"Sales collections",channel:"MPESA",category:"PROPERTY_SALES",active:true,verified:true}]}}));
+ await page.route("**/lease/documents/templates",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:9,documentType:"PROPERTY_SALE_LETTER_OF_OFFER",legalReviewRequired:false,legalReviewedAt:"2026-09-01T10:00:00"}]}}));
  let unitListUrl="";
  await page.route("**/property/unit/list**",route=>{unitListUrl=route.request().url();return route.fulfill({json:pageEnvelope([{unitId:77,propertyId:11,ref:"A-07",currency:"KES",price:15000000,leaseMode:"SALE"}])})});
  await page.route("**/sales**",async route=>{
@@ -25,10 +27,12 @@ test("sales owner starts an email-bound sale from scoped property and unit selec
  expect(unitQuery.get("leaseMode")).toBe("SALE");
  await page.getByLabel("Buyer email").fill("newbuyer@example.com");
  await expect(page.getByLabel("Asking price")).toHaveValue("15000000");
+ await expect(page.getByLabel("Agreed offer amount")).toHaveValue("15000000");
  const requestPromise=page.waitForRequest(request=>request.url().includes("/sales")&&request.method()==="POST");
- await page.getByRole("button",{name:"Start sale and invite buyer"}).click();
+ await page.getByRole("button",{name:"Send invitation and Letter of Offer"}).click();
  const body=await requestPromise.then(request=>request.postDataJSON());
- expect(body).toMatchObject({propertyId:11,unitId:77,buyerEmail:"newbuyer@example.com",askingPrice:15000000,currency:"KES"});
+ expect(body).toMatchObject({propertyId:11,unitId:77,buyerEmail:"newbuyer@example.com",askingPrice:15000000,offerAmount:15000000,currency:"KES"});
+ expect(body.responseDueDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
  expect(body.buyerUserId).toBeUndefined();
 });
 
@@ -65,6 +69,7 @@ test("sales escrow is backed by a buyer invoice and never a typed payment refere
  let invoiced=false;
  const base={id:5,propertyId:11,propertyName:"Acacia Court",unitId:77,unitRef:"A-07",salesAgentUserId:100,buyerUserId:200,buyerEmail:"buyer@example.com",status:"RESERVED",askingPrice:15000000,offerAmount:14500000,currency:"KES"};
  await page.route("**/account/list**",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:81,name:"Sales collections",channel:"MPESA",channelDisplayName:"M-Pesa",category:"PROPERTY_SALES",active:true,verified:true}]}}));
+ await page.route("**/lease/documents/templates",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:9,documentType:"PROPERTY_SALE_LETTER_OF_OFFER",legalReviewRequired:false,legalReviewedAt:"2026-09-01T10:00:00"}]}}));
  await page.route("**/sales/5/**",async route=>{
   const path=new URL(route.request().url()).pathname;
   if(path.endsWith("/escrow-invoice")&&route.request().method()==="POST"){

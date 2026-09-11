@@ -40,7 +40,8 @@ for(const role of ["SalesAgent","Buyer"]){
   await expect(page).toHaveURL(/saleId=91/);
   await page.getByRole("button",{name:"PDF",exact:true}).click();
   await expect(page.getByRole("link",{name:"Download PDF"})).toHaveAttribute("href",/^blob:/);
-  await expect(page.getByTitle("Property Sale Letter of Offer - SIGNED - 71 PDF preview")).toBeVisible();
+  await expect(page.getByRole("link",{name:"Open PDF"})).toHaveAttribute("href",/^blob:/);
+  await expect(page.getByTitle("Property Sale Letter of Offer - SIGNED - 71 PDF preview")).toBeHidden();
   await expect(page.getByRole("button",{name:"Sign",exact:true})).toHaveCount(0);
  });
 }

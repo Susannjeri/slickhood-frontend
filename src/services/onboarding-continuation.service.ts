@@ -59,6 +59,14 @@ export async function resolveOnboardingContinuation(
       message: "Your homeowner workspace is ready. Review your assigned home and estate agreement.",
     };
   }
+  if (normalizedRole === "buyer") {
+    return {
+      complete: true,
+      destination: "/dashboard/sales?onboarding=offer",
+      areaTitle: "My Property Purchase",
+      message: "Your buyer workspace is ready. Review the invited property and its Letter of Offer.",
+    };
+  }
 
   const selectedArea = selectedBusinessAreaId
     ? businessAreas.find(item => item.id === selectedBusinessAreaId && item.roleTitles.includes(normalizedRole))

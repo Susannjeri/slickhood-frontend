@@ -12,7 +12,7 @@ export const estateService = {
 };
 export const salesService = {
   list: (params:{page?:number;size?:number;search?:string}={}) => API.get("/sales",{params:{page:0,size:25,...params}}),
-  create: (data:{propertyId:number;unitId:number;buyerUserId?:number;buyerEmail?:string;askingPrice:number;currency:string;notes?:string}) => API.post("/sales",data),
+  create: (data:{propertyId:number;unitId:number;buyerUserId?:number;buyerEmail?:string;askingPrice:number;currency:string;notes?:string;offerAmount?:number;responseDueDate?:string}) => API.post("/sales",data),
   update: (id:number,data:{status:SaleStatus;offerAmount?:number;notes?:string}) => API.put(`/sales/${id}`,data),
   acceptOffer: (id:number) => API.post(`/sales/${id}/accept-offer`),
   createEscrowInvoice: (id:number,amount:number,paymentAccountId:number) => API.post(`/sales/${id}/escrow-invoice`,{amount,paymentAccountId}),

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuthStore } from "@/store/authStore";
+import { ResponsivePdfViewer } from "@/components/documents/ResponsivePdfViewer";
 
 type PdfProps = {load: () => Promise<{data: Blob}>; name: string; label?: string};
 
@@ -61,8 +62,7 @@ function PdfPreview({ load, name, label = "PDF" }: PdfProps) {
         {loading && <p role="status">Loading PDF…</p>}
         {error && <div role="alert"><p>{error}</p><Button variant="outline" onClick={() => void show()}>Retry PDF</Button></div>}
         {url && <>
-          <Button asChild variant="outline"><a href={url} download={`${name.replace(/[^a-zA-Z0-9 -]/g, "_")}.pdf`}>Download PDF</a></Button>
-          <iframe title={`${name} PDF preview`} src={url} className="h-[65dvh] w-full rounded border" />
+          <ResponsivePdfViewer url={url} title={`${name} PDF preview`} downloadName={`${name.replace(/[^a-zA-Z0-9 -]/g, "_")}.pdf`} />
         </>}
       </DialogContent>
     </Dialog>
