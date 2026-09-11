@@ -1,19 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2, Loader2, ArrowRight, LayoutGrid, KeyRound, Tag, Users, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { useApi } from "@/hooks/useApi";
-import { useAuthStore } from "@/store/authStore";
 import CanProperty from "@/components/auth/CanProperty";
 import { originFromLeaseMode } from "@/lib/unitNavigation";
+import { usePagedBusinessProperties } from "@/hooks/usePagedBusinessOptions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -25,21 +26,21 @@ const LEASE_MODE_OPTIONS: { value: LeaseMode; label: string; description: string
   { value: "SERVICE_CHARGE", label: "Homeowner Unit", description: "Owner-occupied, service charge billed", icon: Users },
 ];
 
-interface PropertyOption { id: number; name: string; }
-
 export default function CreateUnitEntryPage() {
   const router = useRouter();
   const { viewPropertyDetails } = useApi();
 
-  const propertyIds = useAuthStore((s) => s.propertyIds);
-  const propertyNames = useAuthStore((s) => s.propertyNames);
-  const properties: PropertyOption[] = propertyIds.map((id, i) => ({
-    id, name: propertyNames[i] ?? `Property #${id}`,
-  }));
+  const propertyOptions = usePagedBusinessProperties(true);
+  const properties = propertyOptions.items;
 
   const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(null);
   const [leaseMode, setLeaseMode] = useState<LeaseMode | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("propertyId");
+    if (requested && /^\d+$/.test(requested)) setSelectedPropertyId(Number(requested));
+  }, []);
 
   const handleContinue = async () => {
     if (!selectedPropertyId || !leaseMode) return;
@@ -95,7 +96,12 @@ export default function CreateUnitEntryPage() {
         </div>
       </div>
 
-      {properties.length === 0 ? (
+      {propertyOptions.loading && properties.length === 0 ? (
+        <div className="bg-white p-10 rounded-lg border shadow-sm flex items-center justify-center gap-3 text-gray-500">
+          <Loader2 className="w-5 h-5 animate-spin text-[#EF4217]" />
+          Loading your accessible properties...
+        </div>
+      ) : properties.length === 0 ? (
         /* ── Empty state: no properties to create a unit for ── */
         <div className="bg-white p-6 rounded-lg border shadow-sm flex flex-col items-center text-center py-12 gap-3">
           <div
@@ -137,6 +143,21 @@ export default function CreateUnitEntryPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Input
+              value={propertyOptions.search}
+              onChange={(event) => propertyOptions.setSearch(event.target.value)}
+              placeholder="Search properties by name"
+              aria-label="Search properties"
+            />
+            {propertyOptions.error ? (
+              <p className="text-xs text-red-600">Properties could not be loaded. Please retry your search.</p>
+            ) : null}
+            {propertyOptions.hasMore ? (
+              <Button type="button" variant="ghost" size="sm" onClick={propertyOptions.loadMore} disabled={propertyOptions.loading}>
+                {propertyOptions.loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                Load more properties
+              </Button>
+            ) : null}
           </div>
 
           {/* Unit Type — selectable cards, not a buried dropdown */}

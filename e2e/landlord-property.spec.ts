@@ -25,7 +25,7 @@ test("property creation remains usable when Google Maps is not configured", asyn
 
   await page.goto("/dashboard/property/create");
 
-  await expect(page.getByRole("heading", { name: "What do you want to manage?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What should the first unit category be?" })).toBeVisible();
   await page.getByRole("button", { name: /Rental property/i }).click();
   await expect(page.getByRole("heading", { name: "Create new property" })).toBeVisible();
   await expect(page.getByText(/Map search is temporarily unavailable/i)).toBeVisible();

@@ -27,8 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import { useAuthStore } from "@/store/authStore";
 import Can, { usePermissions } from "@/components/auth/Can";
 import PropertyRoleBadges from "@/components/property/PropertyRoleBadges";
 import ProfileGateModal, { ProfileGateFields } from "@/components/auth/ProfileGateModal";
@@ -47,20 +45,10 @@ interface Property {
   userRoleInProperty?: string;
 }
 
-const ROLE_COLORS = [
-  "bg-blue-500", "bg-green-500", "bg-orange-400",
-  "bg-purple-500", "bg-pink-500", "bg-teal-500",
-];
-
 export default function PropertiesPage() {
   const router = useRouter();
   const { getProperties } = useApi();
   const { hasPermission } = usePermissions();
-
-  const roles = useAuthStore((s) => s.roles);
-  const setActiveRole = useAuthStore((s) => s.setActiveRole);
-  const activeRole = useAuthStore((s) => s.activeRole);
-  const propertyIds = useAuthStore((s) => s.propertyIds);
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,25 +76,20 @@ export default function PropertiesPage() {
   }, [search]);
 
   useEffect(() => {
-    setProperties([]);
-    setPage(0);
-  }, [activeRole?.title]);
-
-  useEffect(() => {
     const initAndLoad = async () => {
       setLoading(true);
       if (!isLoadingTypes) {
         try {
-          await loadProperties(propertyIds);
+          await loadProperties();
         } finally {
           setLoading(false);
         }
       }
     };
     initAndLoad();
-  }, [page, pageSize, debouncedSearch, sortField, sortOrder, isLoadingTypes, activeRole?.title, propertyIds]);
+  }, [page, pageSize, debouncedSearch, sortField, sortOrder, isLoadingTypes]);
 
-  const loadProperties = async (currentPropertyIds: number[]) => {
+  const loadProperties = async () => {
     try {
       setError(null);
       const response: any = await getProperties({
@@ -121,11 +104,9 @@ export default function PropertiesPage() {
         return;
       }
 
-      const filtered = activeRole
-        ? response.data.filter((p: Property) => currentPropertyIds.includes(p.id))
-        : response.data;
-
-      setProperties(filtered);
+      // The API applies ownership, tenancy, ownership-record and selected-workspace
+      // authorization. Token claim property lists can be stale after role changes.
+      setProperties(response.data);
       setTotalPages(response.totalPages);
       setTotalElements(response.totalElements);
 
@@ -289,38 +270,10 @@ export default function PropertiesPage() {
             </>
           ) : (
             <>
-              <h3 className="text-xl font-semibold mb-2 text-[#141130]">No properties for this role</h3>
+              <h3 className="text-xl font-semibold mb-2 text-[#141130]">No accessible properties</h3>
               <p className="text-gray-500 mb-6 text-center max-w-md">
-                Your <span className="font-medium text-gray-700">{activeRole?.title}</span> role
-                doesn&apos;t have any properties assigned to it yet.
-                {roles.length > 1 && " Switch to a different role to see your properties."}
+                You do not currently own, occupy, or manage a property in this workspace.
               </p>
-              {roles.length > 1 && (
-                <div className="flex flex-col items-center gap-3">
-                  <p className="text-xs text-muted-foreground">Switch to:</p>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {roles
-                      .filter(r => r.title !== activeRole?.title && (r.properties?.length || 0) > 0)
-                      .map((r) => (
-                        <button
-                          key={r.title}
-                          onClick={() => { setActiveRole(r); router.push("/dashboard"); }}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all hover:border-[#EF4217] hover:bg-[#EF4217]/5 text-[#141130]"
-                          style={{ borderColor: "#e5e7eb" }}
-                        >
-                          <span className={cn(
-                            "size-2 rounded-full",
-                            ROLE_COLORS[roles.findIndex(ro => ro.title === r.title) % ROLE_COLORS.length]
-                          )} />
-                          {r.title}
-                          <span className="text-xs text-muted-foreground">
-                            ({r.properties?.length} {r.properties?.length === 1 ? "property" : "properties"})
-                          </span>
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              )}
             </>
           )}
         </div>

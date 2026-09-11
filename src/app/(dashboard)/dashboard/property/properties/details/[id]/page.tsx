@@ -481,11 +481,7 @@ export default function PropertyDetailsPage() {
     // Navigation handlers
     const handleAddUnit = () => {
         if (!property) return;
-        const nameSlug = property.name.replace(/\s+/g, "-").toLowerCase();
-        const currency = property?.currency || "";
-        const propertyType = property?.type || "";
-        const leaseMode = property.managementMode === "RENTAL" ? "RENT" : property.managementMode;
-        router.push(`/dashboard/unit/create/${propertyId}?name=${nameSlug}&currency=${currency}&propertyType=${propertyType}&leaseMode=${leaseMode}&from=property`);
+        router.push(`/dashboard/unit/create?propertyId=${propertyId}`);
     };
 
     const handleEdit = () => {
@@ -815,11 +811,6 @@ export default function PropertyDetailsPage() {
                     <PropertyAccountsSheet
                         propertyId={Number(propertyId)}
                         propertyName={property.name}
-                        accountCategory={property.managementMode === "SALE"
-                            ? "PROPERTY_SALES"
-                            : property.managementMode === "SERVICE_CHARGE"
-                                ? "ESTATE_MANAGEMENT"
-                                : "LANDLORD"}
                         open={accountsSheetOpen}
                         onOpenChange={setAccountsSheetOpen}
                     />

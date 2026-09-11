@@ -55,7 +55,7 @@ export default function CreatePropertyPage() {
   const router = useRouter();
   const imageInput = useRef<HTMLInputElement>(null);
   const { handleTokenRefresh } = useAuth();
-  const activeRole = useAuthStore(state => state.activeRole);
+  const roles = useAuthStore(state => state.roles);
   const { createNewProperty } = useApi();
   const { isLoadingTypes, propertyTypeOptions } = usePropertyMetadata();
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY?.trim() ?? "";
@@ -82,14 +82,13 @@ export default function CreatePropertyPage() {
 
   const managementMode = watch("managementMode");
   const mapLocation = watch("mapLocation");
-  const roleTitle = activeRole?.title?.toLowerCase().replace(/[ _-]/g, "") ?? "";
-  const availableJourneys = roleTitle === "landlord"
-    ? managementJourneys.filter(item => item.value === "RENTAL")
-    : roleTitle.includes("estate")
-      ? managementJourneys.filter(item => item.value === "SERVICE_CHARGE")
-      : roleTitle.includes("sales") || roleTitle.includes("listing")
-        ? managementJourneys.filter(item => item.value === "SALE")
-        : roleTitle === "superadmin" ? managementJourneys : [];
+  const roleTitles = roles.map(role => role.title.toLowerCase().replace(/[ _-]/g, ""));
+  const superAdmin = roleTitles.includes("superadmin");
+  const availableJourneys = managementJourneys.filter(item => superAdmin || (
+    (item.value === "RENTAL" && roleTitles.includes("landlord"))
+    || (item.value === "SERVICE_CHARGE" && roleTitles.some(title => title.includes("estate")))
+    || (item.value === "SALE" && roleTitles.some(title => title.includes("sale") || title.includes("listing")))
+  ));
 
   useEffect(() => () => {
     if (imagePreview) URL.revokeObjectURL(imagePreview);
@@ -179,7 +178,7 @@ export default function CreatePropertyPage() {
         <div>
           <p className="text-sm font-medium text-[#EF4217]">Step {step === "journey" ? "1" : "2"} of 5</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-[#141130]">{step === "journey" ? "Create property" : "Create new property"}</h1>
-          <p className="mt-1 text-slate-600">{step === "journey" ? "Choose the workflow this property needs." : "Add the core property details to your portfolio."}</p>
+          <p className="mt-1 text-slate-600">{step === "journey" ? "Choose the initial unit category. You can add other subscribed unit categories later." : "Add the core property details to your shared portfolio."}</p>
         </div>
         <Can permissions={["view_property"]}>
           <Button type="button" onClick={() => router.push("/dashboard/property/properties")} className="bg-[#EF4217] hover:bg-[#d93712]">View properties</Button>
@@ -188,8 +187,8 @@ export default function CreatePropertyPage() {
 
       {step === "journey" ? (
         <section aria-labelledby="journey-heading" className="rounded-2xl border bg-white p-5 shadow-sm sm:p-8">
-          <h2 id="journey-heading" className="text-2xl font-semibold text-[#141130]">What do you want to manage?</h2>
-          <p className="mt-1 text-sm text-slate-600">Your active business role and subscription determine which property workflow is available.</p>
+          <h2 id="journey-heading" className="text-2xl font-semibold text-[#141130]">What should the first unit category be?</h2>
+          <p className="mt-1 text-sm text-slate-600">A property is shared across your portfolio. Its units may be rental, for sale, or homeowner units when those subscriptions are active.</p>
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
             {availableJourneys.map(journey => {
               const Icon = journeyIcons[journey.value];
@@ -203,7 +202,7 @@ export default function CreatePropertyPage() {
               );
             })}
           </div>
-          {availableJourneys.length === 0 && <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Select an active subscribed business role before creating a property.</p>}
+          {availableJourneys.length === 0 && <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Add a landlord, estate-management, or property-sales role and subscription before creating a property.</p>}
         </section>
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>

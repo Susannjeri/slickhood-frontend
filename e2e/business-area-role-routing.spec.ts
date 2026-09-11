@@ -25,7 +25,7 @@ test("landlord cannot open property-sale-management operator workspace", async (
   await expect(page.getByRole("heading", { name: "Property Sale Management" })).toHaveCount(0);
 });
 
-test("estate manager can open the estate-management operator workspace", async ({ context, page }) => {
+test("estate manager sees shared physical properties and selects only estate units afterwards", async ({ context, page }) => {
   await authenticated(context, page, {
     title: "EstateManager",
     permissions: ["view_estate", "manage_estate"],
@@ -43,7 +43,7 @@ test("estate manager can open the estate-management operator workspace", async (
   await expect(page.locator("main").getByRole("heading", { name: "Estate Management", exact: true })).toBeVisible();
   await page.getByRole("combobox", { name: "Estate" }).click();
   await expect(page.getByRole("option", { name: "Green Court" })).toBeVisible();
-  await expect(page.getByRole("option", { name: "Rental Court" })).toHaveCount(0);
+  await expect(page.getByRole("option", { name: "Rental Court" })).toBeVisible();
 });
 
 test("estate selector searches and paginates beyond the first 25 server records", async ({ context, page }) => {
@@ -80,7 +80,31 @@ test("estate selector searches and paginates beyond the first 25 server records"
   await expect(page.getByRole("option", { name: "Searched Estate" })).toBeVisible();
   expect(propertyRequests.some(url => url.searchParams.get("page") === "1")).toBeTruthy();
   expect(propertyRequests.some(url => url.searchParams.get("search") === "Searched")).toBeTruthy();
-  expect(propertyRequests.every(url => url.searchParams.get("managementMode") === "SERVICE_CHARGE")).toBeTruthy();
+  expect(propertyRequests.every(url => !url.searchParams.has("managementMode"))).toBeTruthy();
+});
+
+test("one owner identity can choose rental, homeowner, or sale units for one shared property", async ({ context, page }) => {
+  const roles = [
+    { title: "Landlord", permissions: ["create_property", "view_property", "create_unit"] },
+    { title: "EstateManager", permissions: ["create_property", "view_property", "create_unit", "manage_estate"] },
+    { title: "SalesAgent", permissions: ["create_property", "view_property", "create_unit", "manage_sale_pipeline"] },
+  ];
+  const token = testToken(roles);
+  await context.addCookies([{ name: "token", value: token, domain: "127.0.0.1", path: "/", httpOnly: true, sameSite: "Lax" }]);
+  await page.addInitScript(({ ownerRoles, accessToken }) => {
+    localStorage.setItem("auth-storage", JSON.stringify({ state: {
+      token: accessToken, sessionReady: true, step: "complete", roles: ownerRoles,
+      roleName: ownerRoles.map(role => role.title), permissions: ownerRoles[0].permissions,
+      propertyIds: [], propertyNames: [], activeRole: ownerRoles[0], selectedBusinessAreaId: "property-management",
+    }, version: 0 }));
+  }, { ownerRoles: roles, accessToken: token });
+  await page.route("**/kyc/current", route => route.fulfill({ json: { success: true, data: [{ status: "APPROVED", accountStatus: "ACTIVE", phoneVerified: true, requirements: [], missingRequirements: [], documents: [] }] } }));
+
+  await page.goto("/dashboard/property/create");
+
+  await expect(page.getByRole("button", { name: /Rental property/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Homeowner estate/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Property for sale/i })).toBeVisible();
 });
 
 test("same-role staff explicitly select a workspace and subsequent requests carry its boundary", async ({ context, page }) => {

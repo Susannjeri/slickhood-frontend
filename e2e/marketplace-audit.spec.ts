@@ -30,7 +30,9 @@ test("one Marketplace menu contains Services and Soko without duplicate shopping
   await page.route("**/sp/directory**",r=>r.fulfill({json:envelope([])}));
   await page.route("**/sp/category/list**",r=>r.fulfill({json:envelope([])}));
   await page.goto("/dashboard/marketplace");
-  await page.getByRole("button",{name:"Marketplace",exact:true}).click();
+  const marketplace = page.getByRole("button",{name:"Marketplace",exact:true});
+  if (await marketplace.getAttribute("aria-expanded") !== "true") await marketplace.click();
+  await expect(marketplace).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("link",{name:"Services",exact:true})).toHaveCount(1);
   await expect(page.getByRole("link",{name:"Soko",exact:true})).toHaveCount(1);
   await expect(page.getByRole("button",{name:"Soko · Groceries Catalog"})).toHaveCount(0);

@@ -24,6 +24,16 @@ interface Props {
 
 type ModalStep = "accounts" | "confirm" | "instructions";
 
+const RECEIVING_CATEGORY_BY_BILLING_TYPE: Record<string, Account["category"]> = {
+  RENTAL: "LANDLORD",
+  SERVICE_CHARGE: "ESTATE_MANAGEMENT",
+  SALE: "PROPERTY_SALES",
+  COMMUNITY_FUND: "COMMUNITY_FUND",
+  SOKO: "MERCHANT",
+  SERVICE_MARKETPLACE: "MERCHANT",
+  SUBSCRIPTION: "SLICKHOOD",
+};
+
 const MPESA_CODE     = "S0091";
 const HOSTED_CHECKOUT_CODE = "S00115";
 const PESALINK_CODE  = "S00268";
@@ -88,8 +98,16 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
           : (await handleListAccounts({ propertyId: invoice.propertyId ?? undefined })).data;
         // ResponseDTO wraps a single account in an array; tolerate older object envelopes.
         const candidates: Account[] = Array.isArray(data) ? data : data ? [data] : [];
+        const expectedCategory = RECEIVING_CATEGORY_BY_BILLING_TYPE[invoice.billingType || "RENTAL"];
         if (!cancelled) setAccounts(candidates.filter(account =>
-          account?.active === true && account.verified === true && account.channel !== "FLUTTER_WAVE"));
+          account?.active === true
+          && account.verified === true
+          && account.channel !== "FLUTTER_WAVE"
+          // Invoice-specific responses may come from an older backend shape that
+          // omitted category. Keep those usable because the backend has already
+          // resolved the pinned destination and revalidates it at payment init;
+          // still hide any explicitly mismatched category returned by newer APIs.
+          && (!expectedCategory || !account.category || account.category === expectedCategory)));
       } catch {
         if (cancelled) return;
         toast.error("Could not load payment accounts. Please try again.");
@@ -101,7 +119,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
     fetch();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, invoice.id, invoice.paymentAccountId, invoice.propertyId]);
+  }, [open, invoice.id, invoice.paymentAccountId, invoice.propertyId, invoice.billingType]);
 
   const handleSelectAccount = (account: Account) => {
     setSelected(account);

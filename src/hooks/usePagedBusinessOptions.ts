@@ -14,7 +14,7 @@ function mergeById<T>(current: T[], incoming: T[], id: (item: T) => number) {
 
 export function usePagedBusinessProperties(
   enabled: boolean,
-  managementMode: "RENTAL" | "SALE" | "SERVICE_CHARGE",
+  managementMode?: "RENTAL" | "SALE" | "SERVICE_CHARGE",
   initialItems: BusinessPropertyOption[] = [],
 ) {
   const [search, setSearchState] = useState("");
@@ -34,7 +34,7 @@ export function usePagedBusinessProperties(
         .then(response => {
           if (requestId.current !== currentRequestId) return;
           const incoming = ((response.data?.data ?? []) as BusinessPropertyOption[])
-            .filter(item => !item.managementMode || item.managementMode === managementMode);
+            .filter(item => !managementMode || !item.managementMode || item.managementMode === managementMode);
           setItems(existing => page === 0 ? incoming : mergeById(existing, incoming, item => item.id));
           setTotalPages(response.data?.totalPages ?? 0);
           setError(null);

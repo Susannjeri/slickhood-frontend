@@ -29,7 +29,7 @@ export const managementJourneys: Array<{
   },
   {
     value: "SERVICE_CHARGE",
-    title: "Service charge property",
+    title: "Homeowner estate",
     description: "Run estate operations and owner service-charge billing.",
     capabilities: "Owners · service charge · estate operations",
   },

@@ -50,7 +50,7 @@ function SalesWorkspace(){
  const [milestoneAmount,setMilestoneAmount]=useState<Record<number,string>>({}),[evidenceId,setEvidenceId]=useState<Record<number,string>>({});
  const [paymentAccounts,setPaymentAccounts]=useState<Account[]>([]),[escrowAccountId,setEscrowAccountId]=useState<Record<number,string>>({});
  const [evidenceReferences,setEvidenceReferences]=useState<Record<number,string>>({}),[evidenceNotes,setEvidenceNotes]=useState<Record<number,string>>({});
- const propertyOptions=usePagedBusinessProperties(canManage,"SALE"),properties=propertyOptions.items,propertiesLoading=propertyOptions.loading;
+ const propertyOptions=usePagedBusinessProperties(canManage),properties=propertyOptions.items,propertiesLoading=propertyOptions.loading;
  const unitOptions=usePagedBusinessUnits(canManage,propertyId?Number(propertyId):null,"SALE"),units=unitOptions.items,unitsLoading=unitOptions.loading;
 
  const load=useCallback(async()=>{

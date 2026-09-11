@@ -47,7 +47,7 @@ test("configuration read-only access displays zero and never shows edit or secre
   await page.route("**/config/value?**", route => route.fulfill({ json: envelope([{ name: "SMS_MAX_RETRIES", stringValue: null, intValue: 0, encrypted: false }]) }));
   await page.goto("/dashboard/configs");
   await page.getByRole("button", { name: "Load value", exact: true }).click();
-  await expect(page.getByText("0", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Sms Max Retries").getByText("0", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
 });
 
@@ -78,12 +78,15 @@ test("configuration rejects failed save honestly, retains the draft and never de
 
 test("dashboard failure exposes retry without fabricating zero totals", async ({ context, page }) => {
   await authenticated(context, page, { title: "Superadmin", permissions: [] });
-  let calls = 0;
-  await page.route("**/dash/totals**", route => { calls++; return calls === 1 ? route.fulfill({ status: 503 }) : route.fulfill({ json: envelope([{ totalActiveProperties: 17, inActiveUserPercent: 20 }]) }); });
+  let recovered = false;
+  await page.route("**/dash/totals**", route => recovered
+    ? route.fulfill({ json: envelope([{ totalActiveProperties: 17, inActiveUserPercent: 20 }]) })
+    : route.fulfill({ status: 503 }));
   await page.route("**/reports/catalog", route => route.fulfill({ json: envelope([]) }));
   await page.goto("/dashboard");
-  await expect(page.getByText("Failed to load dashboard totals.")).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Successfully loaded insights are shown below." })).toBeVisible();
   await expect(page.getByText("Active properties", { exact: true })).toHaveCount(0);
+  recovered = true;
   await page.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect(page.getByText("17", { exact: true })).toBeVisible();
 });

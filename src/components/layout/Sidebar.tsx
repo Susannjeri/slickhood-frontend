@@ -221,8 +221,8 @@ export default function AppSidebar() {
     setupPolling(count > 0);
   };
 
-  const toggleSubMenu = (label: string) =>
-    setOpenSubMenus(prev => ({ ...prev, [label]: !prev[label] }));
+  const setSubMenuOpen = (label: string, nextOpen: boolean) =>
+    setOpenSubMenus(prev => ({ ...prev, [label]: nextOpen }));
 
   const isLinkActive = (href?: string, subLinks?: typeof sidebarLinks[0]['subLinks']) => {
     if (href && pathname === href) return true;
@@ -335,8 +335,8 @@ export default function AppSidebar() {
                       <SidebarMenuItem key={link.href || link.label}>
                         {link.subLinks && link.subLinks.length > 0 ? (
                           <Collapsible
-                            open={openSubMenus[link.label]}
-                            onOpenChange={() => toggleSubMenu(link.label)}
+                            open={openSubMenus[link.label] ?? isLinkActive(link.href, visibleSubLinks(link))}
+                            onOpenChange={(nextOpen) => setSubMenuOpen(link.label, nextOpen)}
                             className="group/collapsible"
                           >
                             <CollapsibleTrigger asChild>

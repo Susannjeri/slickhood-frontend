@@ -61,7 +61,7 @@ function EstateWorkspace() {
   const [chargeDue, setChargeDue] = useState(today());
   const [chargeDescription, setChargeDescription] = useState("Service charge");
   const queryScopeApplied = useRef(false);
-  const propertyOptions = usePagedBusinessProperties(canSelectEstate && Boolean(token), "SERVICE_CHARGE",
+  const propertyOptions = usePagedBusinessProperties(canSelectEstate && Boolean(token), undefined,
     scopedPropertyIds.map((id, index) => ({ id, name: scopedPropertyNames[index] ?? `Estate ${id}`, managementMode: "SERVICE_CHARGE" })));
   const properties = propertyOptions.items;
   const propertiesLoading = propertyOptions.loading;

@@ -805,6 +805,10 @@ export default function EditUnitPage() {
               {errors.leaseMode && (
                 <p className="text-sm text-red-600">{errors.leaseMode.message}</p>
               )}
+              <p className="text-xs text-amber-700 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                Changing category is allowed only before this unit has an active tenant, sale, homeowner,
+                service charge, unpaid invoice, occupancy, or published listing. Closed history is retained.
+              </p>
             </div>
             
             <div className="space-y-2">

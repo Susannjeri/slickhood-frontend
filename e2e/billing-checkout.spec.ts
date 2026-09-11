@@ -37,8 +37,17 @@ test("the billed customer can deep-link to and pay an exact participant-scoped i
   await page.route("**/payment/invoice/payment-account**", route => route.fulfill({ json: envelope([{
     id: 91,
     name: "M-Pesa Paybill 123456",
+    category: "LANDLORD",
     channel: "MPESA",
     channelDisplayName: "M-Pesa",
+    active: true,
+    verified: true,
+  }, {
+    id: 92,
+    name: "Property Sale Paystack",
+    category: "PROPERTY_SALES",
+    channel: "PAYSTACK",
+    channelDisplayName: "Paystack",
     active: true,
     verified: true,
   }]) }));
@@ -57,6 +66,7 @@ test("the billed customer can deep-link to and pay an exact participant-scoped i
   await expect(page.getByText("Balance due")).toBeVisible();
   await expect(page.getByText("KES 6,501.00").first()).toBeVisible();
   await page.getByRole("button", { name: "Pay balance" }).click();
+  await expect(page.getByRole("button", { name: /Property Sale Paystack/ })).toHaveCount(0);
   await page.getByRole("button", { name: /M-Pesa Paybill 123456/ }).click();
   await page.getByRole("button", { name: "Confirm Payment" }).click();
 

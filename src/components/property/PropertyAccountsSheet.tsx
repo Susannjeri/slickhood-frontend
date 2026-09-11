@@ -42,7 +42,6 @@ import { Account, AccountCategory } from "@/types/account";
 interface PropertyAccountsSheetProps {
   propertyId: number;
   propertyName: string;
-  accountCategory: AccountCategory;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -113,7 +112,6 @@ function RowSkeleton() {
 export default function PropertyAccountsSheet({
   propertyId,
   propertyName,
-  accountCategory,
   open,
   onOpenChange,
 }: PropertyAccountsSheetProps) {
@@ -165,7 +163,9 @@ export default function PropertyAccountsSheet({
       setPickerLoading(true);
       const res = await handleListAccounts({ byLandlord: true });
       if (res?.success && res.data) {
-        setLandlordAccounts(res.data.filter((account: Account) => account.category === accountCategory));
+        setLandlordAccounts(res.data.filter((account: Account) =>
+          (["LANDLORD", "ESTATE_MANAGEMENT", "PROPERTY_SALES"] as AccountCategory[]).includes(account.category)
+        ));
       }
       setPickerLoaded(true);
     } catch (err: any) {
@@ -276,7 +276,7 @@ export default function PropertyAccountsSheet({
                   ) : landlordAccounts.length === 0 ? (
                     <div className="text-center py-6 px-2">
                       <p className="text-sm text-gray-600">
-                        You don&apos;t have any payment accounts yet.
+                        You don&apos;t have any rental, estate, or property-sale payment accounts yet.
                       </p>
                       <Link
                         href="/dashboard/accounts"
