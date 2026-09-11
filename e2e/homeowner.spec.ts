@@ -51,11 +51,17 @@ test("service-charge unit sends an email-bound homeowner invite rather than expo
     json: envelope([]),
   }));
   await page.getByLabel("Homeowner email").fill("owner@example.com");
+  await page.getByLabel("Agreement effective date").fill("2026-09-01");
   const requestPromise = page.waitForRequest(request => request.url().includes("/invite/email") && request.method() === "POST");
   await page.getByRole("button", { name: "Send invitation" }).click();
   const request = await requestPromise;
 
-  expect(request.postDataJSON()).toEqual({ inviteType: "HOMEOWNER", entityId: 77, email: "owner@example.com" });
+  expect(request.postDataJSON()).toEqual({
+    inviteType: "HOMEOWNER",
+    entityId: 77,
+    email: "owner@example.com",
+    leaseStartDate: "2026-09-01",
+  });
   await expect(page.getByText(/invitation sent to owner@example.com/i)).toBeVisible();
   await expect(page.getByText("Generated Invite Link")).toHaveCount(0);
 });
