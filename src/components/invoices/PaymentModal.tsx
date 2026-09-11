@@ -279,6 +279,11 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
                   You&apos;ll receive the bank Paybill and account reference. SlickHood marks the invoice paid only after the bank callback is verified.
                 </p>
               )}
+              {selected.channel === "PESAWISE" && (
+                <p className="text-xs text-gray-400 text-center -mt-2">
+                  PesaWise will send an M-Pesa prompt to the invoice phone number. SlickHood updates the invoice only after a signed webhook and server-side status check agree.
+                </p>
+              )}
               {selected.channel === "PESA_LINK" && (
                 <p className="text-xs text-gray-400 text-center -mt-2">
                   You&apos;ll receive the destination bank details and exact invoice reference. The invoice remains unpaid until the transfer is reconciled.

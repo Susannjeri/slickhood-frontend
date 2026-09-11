@@ -87,7 +87,9 @@ test("sales escrow is backed by a buyer invoice and never a typed payment refere
  });
 
  await page.goto("/dashboard/sales");
- await expect(page.getByRole("link", { name: "Sales Payment Setup" })).toBeVisible();
+ await expect(page.getByRole("button", { name: "Billing", exact: true })).toBeVisible();
+ await page.getByRole("button", { name: "Billing", exact: true }).click();
+ await expect(page.getByRole("link", { name: "Receiving accounts" })).toHaveAttribute("href", "/dashboard/sales/accounts");
  await page.getByText("Due diligence, verified payment and handover evidence").click();
  await page.getByRole("combobox").filter({hasText:"Select milestone"}).click();
  await page.getByRole("option",{name:"Escrow Funded"}).click();

@@ -50,6 +50,8 @@ export default function SubscriptionCheckoutModal({ open, plan, role, product, t
   const [loading, setLoading] = useState(false);
   const [checkout, setCheckout] = useState<SubscriptionCheckout | null>(null);
   const [paymentInstructions, setPaymentInstructions] = useState<string | null>(null);
+  const [providerUrl, setProviderUrl] = useState<string | null>(null);
+  const [confirmationTimedOut, setConfirmationTimedOut] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [baselineTermVersion, setBaselineTermVersion] = useState(0);
   const [baselinePlanCode, setBaselinePlanCode] = useState<string | null>(null);
@@ -61,6 +63,8 @@ export default function SubscriptionCheckoutModal({ open, plan, role, product, t
     setStep("method");
     setCheckout(null);
     setPaymentInstructions(null);
+    setProviderUrl(null);
+    setConfirmationTimedOut(false);
     setErrorMessage(null);
     setSelectedId(null);
     if (isFree) {
@@ -94,7 +98,10 @@ export default function SubscriptionCheckoutModal({ open, plan, role, product, t
       } catch {
         // A transient poll error must not restart or duplicate payment.
       }
-      if (checks >= 24) window.clearInterval(timer);
+      if (checks >= 24) {
+        window.clearInterval(timer);
+        setConfirmationTimedOut(true);
+      }
     }, 5000);
     return () => window.clearInterval(timer);
   }, [step, plan, token, role, product, onComplete, baselinePlanCode, baselineTermVersion]);
@@ -103,7 +110,7 @@ export default function SubscriptionCheckoutModal({ open, plan, role, product, t
 
   const startCheckout = async () => {
     if (!selected && !isFree) return;
-    if (selected?.channel === "MPESA" && !/^\+?254\d{9}$/.test(phone.replace(/\s/g, ""))) {
+    if (["MPESA", "PESAWISE"].includes(selected?.channel ?? "") && !/^\+?254\d{9}$/.test(phone.replace(/\s/g, ""))) {
       toast.error("Enter a valid Kenyan M-Pesa number, for example +254712345678.");
       return;
     }
@@ -130,15 +137,16 @@ export default function SubscriptionCheckoutModal({ open, plan, role, product, t
       if (!selected) throw new Error("A payment method is required for a paid plan.");
       const paymentResponse = await initSubscriptionPayment(
         token, pending.invoiceRef, selected.id, selected.channel,
-        selected.channel === "MPESA" ? phone.replace(/\s/g, "") : undefined
+        ["MPESA", "PESAWISE"].includes(selected.channel) ? phone.replace(/\s/g, "") : undefined
       );
       const redirectUrl = paymentResponse.data?.data?.[0];
+      setProviderUrl(typeof redirectUrl === "string" && redirectUrl.startsWith("https://") ? redirectUrl : null);
       setPaymentInstructions(
         typeof redirectUrl === "string" && !redirectUrl.startsWith("http") ? redirectUrl : null
       );
-      if (selected.channel === "MPESA") {
+      if (["MPESA", "PESAWISE"].includes(selected.channel)) {
         setStep("waiting");
-      } else if (typeof redirectUrl === "string" && redirectUrl.startsWith("http")) {
+      } else if (typeof redirectUrl === "string" && redirectUrl.startsWith("https://")) {
         window.open(redirectUrl, "_blank", "noopener,noreferrer");
         setStep("waiting");
       } else {
@@ -196,7 +204,7 @@ export default function SubscriptionCheckoutModal({ open, plan, role, product, t
                   </button>
                 ))}
               </div>
-              {selected?.channel === "MPESA" && (
+              {["MPESA", "PESAWISE"].includes(selected?.channel ?? "") && (
                 <div className="mx-auto mt-4 max-w-lg">
                   <label htmlFor="subscription-mpesa-phone" className="mb-2 block text-sm font-semibold text-[#0b1b5c]">M-Pesa phone number</label>
                   <input id="subscription-mpesa-phone" inputMode="tel" autoComplete="tel" value={phone} onChange={event => setPhone(event.target.value)} placeholder="+254 712 345 678"
@@ -217,7 +225,7 @@ export default function SubscriptionCheckoutModal({ open, plan, role, product, t
               <p className="mt-2 text-slate-500">
                 {paymentInstructions
                   ? paymentInstructions
-                  : selected?.channel === "MPESA"
+                  : ["MPESA", "PESAWISE"].includes(selected?.channel ?? "")
                     ? `Approve the request sent to ${phone}.`
                     : "Complete payment in the secure provider window."}
               </p>
@@ -227,6 +235,8 @@ export default function SubscriptionCheckoutModal({ open, plan, role, product, t
                 <div className="mt-3 flex justify-between"><span>Invoice</span><strong>{checkout?.invoiceRef}</strong></div>
               </div>
               <p className="mt-6 text-sm text-slate-400">Confirmation is performed by the server. Closing this window will not cancel a completed provider payment.</p>
+              {providerUrl && <a href={providerUrl} target="_blank" rel="noopener noreferrer" className="mx-auto mt-5 inline-flex rounded-xl bg-[#08184a] px-6 py-3 font-bold text-white">Open secure payment page</a>}
+              {confirmationTimedOut && <div className="mx-auto mt-6 max-w-lg rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><strong className="block">Confirmation is taking longer than expected.</strong><span>Your invoice remains safe and unpaid until the provider confirms it. Open Billing → Bills &amp; invoices to refresh its status; do not start another payment if money has already left your account.</span></div>}
             </div>
           )}
 

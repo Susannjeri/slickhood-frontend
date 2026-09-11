@@ -127,7 +127,9 @@ test("landlord navigation is grouped in task order", async ({ page }) => {
   await expect(labels).toContainText(["Overview", "Property & Leasing", "Money", "Support"]);
   await expect(page.getByRole("link", { name: "Home" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Properties", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Payment Setup" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Billing", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Billing", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Receiving accounts" })).toBeVisible();
 });
 
 test("landlord navigation follows the active subscription feature set", async ({ page }) => {
@@ -146,7 +148,8 @@ test("landlord navigation follows the active subscription feature set", async ({
 
   await page.goto("/dashboard/property/create");
   await expect(page.getByRole("button", { name: "Properties", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Payment Setup" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Billing", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Receiving accounts" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Reports" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Subscriptions" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Subscription & billing" })).toBeVisible();
 });

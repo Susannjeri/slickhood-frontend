@@ -12,10 +12,11 @@ for (const [title, path] of [
   ["EstateManager", "/dashboard/estate/accounts"],
   ["SalesAgent", "/dashboard/sales/accounts"],
   ["ServiceProvider", "/dashboard/merchant-accounts"],
+  ["InsuranceManager", "/dashboard/insurance/accounts"],
   ["Superadmin", "/dashboard/slickhood-accounts"],
 ]) {
   test(`${title} billing navigation points to its own receiving settings`, async ({ context, page }, testInfo) => {
-    await authenticated(context, page, { title, permissions: ["view_account", "view_invoice_list", "view_payment_list"] });
+    await authenticated(context, page, { title, permissions: ["view_account", "view_invoice_list", "view_payment_list", "manage_insurance_payment_config"] });
     await page.route("**/account/list**", route => route.fulfill({ json: envelope([]) }));
     await page.goto(path);
     await expect(page.getByRole("navigation", { name: "Billing", exact: true }).getByRole("link", { name: "Receiving accounts" })).toHaveAttribute("href", path);
