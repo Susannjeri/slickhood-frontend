@@ -1,14 +1,45 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { API } from "@/lib/api";
 
 function PaystackCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const reference = searchParams.get("reference") ?? searchParams.get("trxref");
+  const [status, setStatus] = useState<"confirming" | "paid" | "pending" | "error">("confirming");
+
+  const confirmPayment = useCallback(async () => {
+    if (!reference) {
+      setStatus("error");
+      return;
+    }
+    setStatus("confirming");
+    try {
+      const sessionResponse = await fetch("/browser-session/get-token", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!sessionResponse.ok) throw new Error("Session unavailable");
+      const sessionBody = await sessionResponse.json();
+      const token = sessionBody?.data?.jwt;
+      if (typeof token !== "string" || !token) throw new Error("Session unavailable");
+      const response = await API.post("/payment/paystack/confirm", null, {
+        params: { reference },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setStatus(response.data?.data?.paid ? "paid" : "pending");
+    } catch {
+      setStatus("error");
+    }
+  }, [reference]);
+
+  useEffect(() => {
+    void confirmPayment();
+  }, [confirmPayment]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -16,14 +47,23 @@ function PaystackCallbackContent() {
         <div className="h-1.5 bg-green-500" />
         <div className="flex flex-col items-center gap-5 p-8 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-50">
-            <CheckCircle2 className="h-9 w-9 text-green-500" />
+            {status === "confirming" ? (
+              <Loader2 className="h-9 w-9 animate-spin text-[#EF4217]" />
+            ) : (
+              <CheckCircle2 className={`h-9 w-9 ${status === "paid" ? "text-green-500" : "text-amber-500"}`} />
+            )}
           </div>
 
           <div>
-            <h1 className="text-xl font-bold text-[#141130]">Payment submitted</h1>
+            <h1 className="text-xl font-bold text-[#141130]">
+              {status === "paid" ? "Payment confirmed" : status === "confirming" ? "Confirming payment" : "Confirmation pending"}
+            </h1>
             <p className="mt-2 text-sm leading-relaxed text-gray-500">
-              Paystack has returned your payment to SlickHood. We&apos;re confirming it securely
-              before updating the invoice.
+              {status === "paid"
+                ? "Your invoice and subscription have been updated."
+                : status === "confirming"
+                  ? "SlickHood is verifying the payment directly with Paystack."
+                  : "The checkout returned successfully, but confirmation has not completed yet. You can retry safely."}
             </p>
           </div>
 
@@ -46,12 +86,14 @@ function PaystackCallbackContent() {
             </p>
           </div>
 
-          <Button
-            onClick={() => router.push("/dashboard/invoices")}
-            className="h-11 w-full bg-[#EF4217] text-white hover:bg-[#d63a13]"
-          >
-            View invoices
-            <ArrowRight className="ml-2 h-4 w-4" />
+          {status !== "paid" && status !== "confirming" && (
+            <Button onClick={() => void confirmPayment()} variant="outline" className="h-11 w-full">
+              Retry confirmation
+            </Button>
+          )}
+          <Button onClick={() => router.push("/dashboard/invoices")} disabled={status === "confirming"}
+                  className="h-11 w-full bg-[#EF4217] text-white hover:bg-[#d63a13]">
+            View invoices <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
       </div>
