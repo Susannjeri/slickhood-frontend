@@ -41,6 +41,8 @@ jobs:
           cat > .env.production <<'EOF'
           ${{ secrets.ENV_PRODUCTION }}
           EOF
+          test -n '${{ vars.GOOGLE_OAUTH_CLIENT_ID }}'
+          printf '\nNEXT_PUBLIC_CLIENT_ID=%s\n' '${{ vars.GOOGLE_OAUTH_CLIENT_ID }}' >> .env.production
 
       - name: Verify backend and public production prerequisites
         env:
