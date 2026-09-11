@@ -15,9 +15,12 @@ test("admin dashboard keeps metrics and sidebar functions without a duplicate di
   await expect(page.getByLabel("Find an admin function")).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Admin Panel", exact: true })).toHaveCount(0);
   await expect(page.getByText("Operational pulse", { exact: true })).toBeVisible();
+  const billing = page.getByRole("button", { name: "Billing", exact: true });
+  if (await billing.getAttribute("aria-expanded") !== "true") await billing.click();
+  await expect(billing).toHaveAttribute("aria-expanded", "true");
   for (const [name, href] of [
     ["Users & Staff", "/dashboard/users"],
-    ["Subscriptions", "/dashboard/subscriptions"],
+    ["Subscription & billing", "/dashboard/subscriptions"],
     ["Insurance Operations", "/dashboard/insurance/operations"],
   ]) {
     await expect(page.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
