@@ -422,7 +422,7 @@ export const sidebarLinks: SidebarLink[] = [
     label: "Notifications",
     href: "/dashboard/notifications",
     protected: true,
-    permissions: ["view_notifications", "view_my_notifications"],
+    permissions: [],
   },
   {
     icon: CircleHelp,

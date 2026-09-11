@@ -43,3 +43,29 @@ test("notification fetch errors do not masquerade as an empty inbox", async ({ c
   await page.getByRole("button", { name: "Try again" }).click();
   await expect(page.getByText("You are all caught up")).toBeVisible();
 });
+
+test("existing-user invitation is an actionable in-app notification", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: [] });
+  const inviteUrl = "http://127.0.0.1:3100/lease/onboard?token=existing-user-token";
+  await page.route("**/notification/mine?**", route => route.fulfill({ json: { ...envelope([
+    { id: 8, channel: "IN_APP", notificationType: "INVITE_RECEIVED", message: `You have a new tenant invitation. Review it securely: ${inviteUrl}`, delivered: true, read: false, createdOn: "2026-09-12T10:00:00+03:00" },
+  ]), totalElements: 1, totalPages: 1 } }));
+  await page.route("**/notification/mine/8/read", route => route.fulfill({ json: envelope({}) }));
+
+  await page.goto("/dashboard/notifications");
+
+  await expect(page.getByRole("link", { name: "Notifications" })).toBeVisible();
+  await expect(page.getByText("Available in SlickHood", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Review invitation" })).toHaveAttribute("href", inviteUrl);
+});
+
+test("in-app notification never exposes an off-site action link", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: ["view_my_notifications"] });
+  await page.route("**/notification/mine?**", route => route.fulfill({ json: { ...envelope([
+    { id: 9, channel: "IN_APP", notificationType: "INVITE_RECEIVED", message: "Review it securely: https://attacker.example/collect", delivered: true, read: false, createdOn: "2026-09-12T10:00:00+03:00" },
+  ]), totalElements: 1, totalPages: 1 } }));
+
+  await page.goto("/dashboard/notifications");
+
+  await expect(page.getByRole("link", { name: "Review invitation" })).toHaveCount(0);
+});
