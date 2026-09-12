@@ -642,6 +642,7 @@ export function useAuth() {
           success: true,
           requiresVerification: true,
           message: description || "Verify your email to continue.",
+          error_code: undefined,
           mfaEnabled: false,
           totpEnabled: false,
           token: undefined,
@@ -678,13 +679,14 @@ export function useAuth() {
         success,
         requiresVerification: false,
         message: description,
+        error_code: undefined,
         mfaEnabled,
         totpEnabled,
         token,
       };
     } catch (error: unknown) {
       console.log("Login error: ", error);
-      return { success: false, message: apiErrorMessage(error, "Login failed") };
+      return apiErrorDetails(error, "Login failed");
     }
   };
 

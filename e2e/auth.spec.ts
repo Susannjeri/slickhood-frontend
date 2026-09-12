@@ -127,6 +127,16 @@ test("a replaced single session explains why another sign in is required", async
 
 test("a bound staff invitation survives validation and offers sign-in before registration", async ({ page }) => {
   await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/inspect**", route => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      success: true,
+      code: "S00127",
+      description: "Link is valid.",
+      data: [{ type: "TEAM", expiresAt: "2026-10-01T00:00:00", validForSeconds: 86400 }],
+    }),
+  }));
   await page.route("**/invite/validate**", route => route.fulfill({
     status: 200,
     contentType: "application/json",
@@ -158,6 +168,10 @@ test("a bound staff invitation survives validation and offers sign-in before reg
 test("a tenant invitation survives sign-in and returns to lease initialization", async ({ page }) => {
   const jwt = testToken([{ title: "Tenant", permissions: ["create_new_lease"] }]);
   await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/inspect**", route => route.fulfill({ json: {
+    success: true, code: "S00127", description: "Link is valid.",
+    data: [{ type: "TENANT", expiresAt: "2026-10-01T00:00:00", validForSeconds: 86400 }],
+  } }));
   await page.route("**/invite/validate**", route => route.fulfill({ json: {
     success: true, code: "S0058", description: "Tenant invite",
     data: { unit: {
@@ -193,6 +207,77 @@ test("a tenant invitation survives sign-in and returns to lease initialization",
   await expect(page).toHaveURL(/\/lease\/initialize\?token=tenant-bound-token$/);
   const storedInvite = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state?.inviteToken);
   expect(storedInvite).toBe("tenant-bound-token");
+});
+
+test("an expired invitation is cleared before sign-in and no longer controls the login page", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/inspect**", route => route.fulfill({
+    status: 409,
+    contentType: "application/json",
+    body: JSON.stringify({ success: false, code: "S00128", description: "Link has expired or is invalid.", data: [] }),
+  }));
+  await page.addInitScript(() => {
+    localStorage.setItem("auth-storage", JSON.stringify({
+      state: { inviteToken: "expired-invite-token" },
+      version: 0,
+    }));
+  });
+
+  await page.goto("/login?invitation=ready&token=expired-invite-token&returnTo=%2Flease%2Finitialize");
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByTestId("invitation-ready")).toHaveCount(0);
+  await expect(page.getByText("This invitation has expired or is no longer available.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
+  await expect(page.getByRole("link", { name: "Forgot password?" })).toHaveAttribute("href", "/forgot-password");
+  await expect(page.getByRole("link", { name: "Sign up" })).toHaveAttribute("href", "/role");
+  const storedInvite = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state?.inviteToken);
+  expect(storedInvite).toBeNull();
+});
+
+test("a valid invitation alone enables the guided login state", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/inspect**", route => route.fulfill({ json: {
+    success: true, code: "S00127", description: "Link is valid.",
+    data: [{ type: "TENANT", expiresAt: "2026-10-01T00:00:00", validForSeconds: 86400 }],
+  } }));
+
+  await page.goto("/login?invitation=ready&token=valid-invite-token&returnTo=%2Flease%2Finitialize");
+
+  await expect(page.getByTestId("invitation-ready")).toContainText("Sign in with the invited email");
+  await expect(page.getByRole("link", { name: "Forgot password?" })).toHaveAttribute(
+    "href",
+    /\/forgot-password\?.*token=valid-invite-token.*returnTo=%2Flease%2Finitialize/,
+  );
+  await expect(page.getByRole("link", { name: "Sign up" })).toHaveAttribute(
+    "href",
+    /\/register\?.*token=valid-invite-token.*returnTo=%2Flease%2Finitialize/,
+  );
+});
+
+test("an invitation that expires during sign-in is cleared immediately", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/inspect**", route => route.fulfill({ json: {
+    success: true, code: "S00127", description: "Link is valid.",
+    data: [{ type: "TENANT", expiresAt: "2026-10-01T00:00:00", validForSeconds: 86400 }],
+  } }));
+  await page.route("**/auth/login", route => route.fulfill({
+    status: 409,
+    contentType: "application/json",
+    body: JSON.stringify({ success: false, code: "S00128", description: "Link has expired or is invalid.", data: [] }),
+  }));
+
+  await page.goto("/login?invitation=ready&token=just-expired-token&returnTo=%2Flease%2Finitialize");
+  await expect(page.getByTestId("invitation-ready")).toBeVisible();
+  await page.getByPlaceholder("you@example.com").fill("tenant@example.test");
+  await page.getByPlaceholder("••••••••").fill("ValidPass1!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByTestId("invitation-ready")).toHaveCount(0);
+  await expect(page.getByText("This invitation has expired or is no longer available.", { exact: false })).toBeVisible();
+  const storedInvite = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state?.inviteToken);
+  expect(storedInvite).toBeNull();
 });
 
 test("a new tenant can start registration directly from the unit invitation", async ({ page }) => {

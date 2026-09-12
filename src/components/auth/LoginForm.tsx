@@ -14,6 +14,19 @@ import {
 import Link from "next/link";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { invitationUrl, safeInvitationReturnTo } from "@/lib/invitation-navigation";
+import { inspectInviteToken } from "@/lib/api";
+import axios from "axios";
+
+type InvitationStatus = "none" | "checking" | "valid" | "invalid" | "unavailable";
+const EXPIRED_INVITATION_CODES = new Set(["S0020", "S00128", "S00129"]);
+
+function loginUrlWithoutInvitation() {
+  const current = new URL(window.location.href);
+  current.searchParams.delete("token");
+  current.searchParams.delete("invitation");
+  current.searchParams.delete("returnTo");
+  return `${current.pathname}${current.search}`;
+}
 
 const GoogleIcon = () => (
   <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
@@ -30,7 +43,13 @@ export default function LoginForm() {
   const [loading, setLoading]           = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [googleReady, setGoogleReady]   = useState(false);
+  const [invitationCheck, setInvitationCheck] = useState<{
+    token: string | null;
+    status: Exclude<InvitationStatus, "none" | "checking">;
+  }>({ token: null, status: "invalid" });
+  const [invitationCheckAttempt, setInvitationCheckAttempt] = useState(0);
   const googleBtnRef                    = useRef<HTMLDivElement>(null);
+  const validatedInviteRef              = useRef<string | null>(null);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -41,7 +60,13 @@ export default function LoginForm() {
   // or privacy extension must not turn a tenant/staff invitation into an
   // unscoped registration flow.
   const urlInviteToken = searchParams.get("token")?.trim() || null;
-  const effectiveInviteToken = urlInviteToken || inviteToken;
+  const candidateInviteToken = urlInviteToken || inviteToken;
+  const invitationStatus: InvitationStatus = !candidateInviteToken
+    ? "none"
+    : invitationCheck.token === candidateInviteToken
+      ? invitationCheck.status
+      : "checking";
+  const effectiveInviteToken = invitationStatus === "valid" ? candidateInviteToken : null;
   const invitationReturnTo = safeInvitationReturnTo(searchParams.toString());
 
   const form = useForm<LoginSchema>({
@@ -51,16 +76,64 @@ export default function LoginForm() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const invitationToken = params.get("token")?.trim();
-    if (invitationToken) setInviteToken(invitationToken);
     if (params.get("reason") === "session-ended") {
       setError("Your previous session ended or was replaced by a newer sign-in. Please sign in again.");
     }
-  }, [setInviteToken]);
+  }, []);
+
+  useEffect(() => {
+    if (!candidateInviteToken) return;
+
+    let cancelled = false;
+    let expiryTimer: number | undefined;
+
+    const expireInvitation = () => {
+      if (cancelled) return;
+      setInviteToken(null);
+      setInvitationCheck({ token: candidateInviteToken, status: "invalid" });
+      setError("This invitation has expired or is no longer available. Ask the sender for a new invitation, or sign in normally.");
+      router.replace(loginUrlWithoutInvitation(), { scroll: false });
+    };
+
+    void inspectInviteToken(candidateInviteToken)
+      .then((response) => {
+        if (cancelled) return;
+        const validForSeconds = response.data?.data?.[0]?.validForSeconds;
+        if (typeof validForSeconds !== "number" || validForSeconds <= 0) {
+          expireInvitation();
+          return;
+        }
+        setInviteToken(candidateInviteToken);
+        setInvitationCheck({ token: candidateInviteToken, status: "valid" });
+        setError(null);
+        expiryTimer = window.setTimeout(expireInvitation, Math.min(validForSeconds * 1000, 2_147_483_647));
+      })
+      .catch((requestError: unknown) => {
+        if (cancelled) return;
+        setInviteToken(null);
+        const status = axios.isAxiosError(requestError) ? requestError.response?.status : undefined;
+        const isInvalid = typeof status === "number" && status >= 400 && status < 500;
+        setInvitationCheck({ token: candidateInviteToken, status: isInvalid ? "invalid" : "unavailable" });
+        if (isInvalid) {
+          expireInvitation();
+        } else {
+          setError("We could not verify this invitation right now. Retry the check, or continue with normal sign-in.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      if (expiryTimer) window.clearTimeout(expiryTimer);
+    };
+  }, [candidateInviteToken, invitationCheckAttempt, router, setInviteToken]);
+
+  useEffect(() => {
+    validatedInviteRef.current = effectiveInviteToken;
+  }, [effectiveInviteToken]);
 
   const handleCredentialResponse = async (response: any) => {
     setLoading(true);
-    const pendingInvite = effectiveInviteToken;
+    const pendingInvite = validatedInviteRef.current;
     const returnTo = safeInvitationReturnTo(window.location.search);
     const result = await handleGoogleLogin(response.credential);
     if (result.success) {
@@ -74,7 +147,14 @@ export default function LoginForm() {
         ? invitationUrl(returnTo, pendingInvite)
         : "/continue-setup");
     } else {
-      setError(result.message);
+      if (pendingInvite && EXPIRED_INVITATION_CODES.has(result.error_code ?? "")) {
+        setInviteToken(null);
+        setInvitationCheck({ token: pendingInvite, status: "invalid" });
+        router.replace(loginUrlWithoutInvitation(), { scroll: false });
+        setError("This invitation has expired or is no longer available. Ask the sender for a new invitation, or sign in normally.");
+      } else {
+        setError(result.message);
+      }
     }
     setLoading(false);
   };
@@ -130,7 +210,14 @@ export default function LoginForm() {
     const returnTo = safeInvitationReturnTo(window.location.search);
     const result = await login(values.email, values.password);
     if (!result.success) {
-      setError(result.message || "Login failed");
+      if (pendingInvite && EXPIRED_INVITATION_CODES.has(result.error_code ?? "")) {
+        setInviteToken(null);
+        setInvitationCheck({ token: pendingInvite, status: "invalid" });
+        router.replace(loginUrlWithoutInvitation(), { scroll: false });
+        setError("This invitation has expired or is no longer available. Ask the sender for a new invitation, or sign in normally.");
+      } else {
+        setError(result.message || "Login failed");
+      }
       setLoading(false);
       return;
     }
@@ -174,7 +261,13 @@ export default function LoginForm() {
         <p className="text-base text-gray-500 dark:text-gray-400">Welcome back! Please enter your details.</p>
       </div>
 
-      {effectiveInviteToken && (
+      {invitationStatus === "checking" && (
+        <div role="status" className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700">
+          Checking that this invitation is still valid…
+        </div>
+      )}
+
+      {invitationStatus === "valid" && effectiveInviteToken && (
         <div data-testid="invitation-ready" role="status" className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-950">
           Invitation found. Sign in with the invited email, or choose Sign up below if you do not yet have a SlickHood account.
         </div>
@@ -260,14 +353,26 @@ export default function LoginForm() {
           {/* Feedback */}
           {success && <p className="text-green-600 text-sm text-center font-medium">{success}</p>}
           {error   && <p className="text-red-500  text-sm text-center font-medium">{error}</p>}
+          {invitationStatus === "unavailable" && (
+            <button
+              type="button"
+              className="mx-auto block text-sm font-semibold text-[#EF4217] underline-offset-4 hover:underline"
+              onClick={() => {
+                setInvitationCheck({ token: null, status: "unavailable" });
+                setInvitationCheckAttempt(attempt => attempt + 1);
+              }}
+            >
+              Retry invitation check
+            </button>
+          )}
 
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || invitationStatus === "checking"}
             className="w-full py-2.5 bg-[#EF4217] hover:bg-[#d63600] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
           >
-            {loading ? (
+            {loading || invitationStatus === "checking" ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Please wait...</>
             ) : (
               "Sign in"
@@ -301,7 +406,7 @@ export default function LoginForm() {
       </div>
 
       {/* Google button — visual overlay + real GSI button */}
-      <div className="relative mx-auto w-full max-w-[400px] h-11">
+      <div className={`relative mx-auto h-11 w-full max-w-[400px] ${invitationStatus === "checking" ? "pointer-events-none opacity-50" : ""}`}>
         <div className="absolute inset-0 flex items-center justify-center gap-2.5 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm font-semibold text-gray-700 dark:text-gray-300 pointer-events-none">
           <GoogleIcon />
           Continue with Google

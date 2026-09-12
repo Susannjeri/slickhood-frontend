@@ -992,6 +992,18 @@ export const validateInviteToken = (inviteToken: string, token?: string) => {
   return API.get(`/invite/validate?token=${encodeURIComponent(inviteToken)}`, { headers });
 }
 
+/** Validate invitation lifetime without accepting it or changing user access. */
+export interface InviteTokenInspection {
+  type: string;
+  expiresAt: string;
+  validForSeconds: number;
+}
+
+export const inspectInviteToken = (inviteToken: string) =>
+  API.get<{ data?: InviteTokenInspection[] }>(`/invite/inspect?token=${encodeURIComponent(inviteToken)}`, {
+    headers: { "Content-Type": "application/json" },
+  });
+
 export interface PendingTenantInvite {
   inviteId: number;
   token: string;
