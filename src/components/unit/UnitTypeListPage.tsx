@@ -21,6 +21,7 @@ import { useAuthStore } from "@/store/authStore";
 import Can from "@/components/auth/Can";
 import CanProperty from "@/components/auth/CanProperty";
 import { originFromLeaseMode } from "@/lib/unitNavigation";
+import { usePagedBusinessProperties } from "@/hooks/usePagedBusinessOptions";
 
 // ─── Types ──────────────────────────────────────────────────────────────
 type LeaseMode = "SALE" | "RENT" | "SERVICE_CHARGE";
@@ -53,6 +54,9 @@ interface UnitTypeListPageProps {
   // e.g. "Bulk Invoice" for SERVICE_CHARGE — accepted for a future toolbar
   // action, not yet rendered anywhere.
   bulkActionLabel?: string;
+  /** Limit the property picker to properties that actually contain this unit use. */
+  scopePropertiesToUnitMode?: boolean;
+  allPropertiesLabel?: string;
 }
 
 // ─── Copy config per leaseMode (labels only — no business logic) ───────
@@ -68,8 +72,8 @@ const MODE_COPY: Record<LeaseMode, { empty: string; emptyAll: string; addCta: st
     addCta: "Add Rental Unit",
   },
   SERVICE_CHARGE: {
-    empty: "No homeowners found for this property.",
-    emptyAll: "No homeowners found across your properties.",
+    empty: "No homeowner units found for this estate.",
+    emptyAll: "No homeowner units found across your estates.",
     addCta: "Add Home",
   },
 };
@@ -79,6 +83,8 @@ export default function UnitTypeListPage({
   title,
   description,
   bulkActionLabel,
+  scopePropertiesToUnitMode = false,
+  allPropertiesLabel = "All Properties",
 }: UnitTypeListPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -87,10 +93,17 @@ export default function UnitTypeListPage({
 
   const propertyIds = useAuthStore((s) => s.propertyIds);
   const propertyNames = useAuthStore((s) => s.propertyNames);
+  const token = useAuthStore((s) => s.token);
 
-  const properties: PropertyOption[] = propertyIds.map((id, i) => ({
+  const scopedProperties: PropertyOption[] = propertyIds.map((id, i) => ({
   id, name: propertyNames[i] ?? `Property #${id}`,
   }));
+  const propertyOptions = usePagedBusinessProperties(
+    scopePropertiesToUnitMode && Boolean(token), undefined, [], leaseMode,
+  );
+  const properties: PropertyOption[] = scopePropertiesToUnitMode
+    ? propertyOptions.items
+    : scopedProperties;
 
   // Every "view unit"/"add unit" link from this page must say where it came
   // from, since Unit Details/Create no longer have a single hardcoded return
@@ -306,7 +319,7 @@ export default function UnitTypeListPage({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Properties</SelectItem>
+              <SelectItem value="all">{allPropertiesLabel}</SelectItem>
               {properties.map((p) => (
                 <SelectItem key={p.id} value={String(p.id)}>
                   {p.name}
@@ -316,6 +329,23 @@ export default function UnitTypeListPage({
           </Select>
           {propertyLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
         </div>
+
+        {scopePropertiesToUnitMode && (
+          <div className="flex w-full gap-2 sm:w-auto">
+            <Input
+              aria-label="Search estates with homeowner units"
+              placeholder="Search homeowner estates..."
+              value={propertyOptions.search}
+              onChange={(event) => propertyOptions.setSearch(event.target.value)}
+              className="sm:w-[240px]"
+            />
+            {propertyOptions.hasMore && (
+              <Button type="button" variant="outline" onClick={propertyOptions.loadMore} disabled={propertyOptions.loading}>
+                More
+              </Button>
+            )}
+          </div>
+        )}
 
         <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -384,7 +414,9 @@ export default function UnitTypeListPage({
               ) : units.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-16 text-gray-400">
-                    {selectedPropertyId ? copy.empty : copy.emptyAll}
+                    {propertyOptions.error && scopePropertiesToUnitMode
+                      ? "The homeowner-estate filter could not be loaded. Refresh and try again."
+                      : selectedPropertyId ? copy.empty : copy.emptyAll}
                   </TableCell>
                 </TableRow>
               ) : (

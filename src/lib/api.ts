@@ -315,6 +315,8 @@ export interface UserListParams {
 
 export interface PropertyListParams extends UserListParams {
   managementMode?: "RENTAL" | "SALE" | "SERVICE_CHARGE";
+  /** Return only properties containing at least one active unit in this commercial use. */
+  unitLeaseMode?: "RENT" | "SALE" | "SERVICE_CHARGE";
 }
 
 export interface UnitListParams {
@@ -411,10 +413,11 @@ export const fetchPropertyList = (
   },config: object = {}
 ) => {
   // Destructure the parameters, which will use the defaults if not provided by the caller
-  const { sort, page, size, search, role, managementMode } = params;
+  const { sort, page, size, search, role, managementMode, unitLeaseMode } = params;
   const roleParam = role ? `&role=${encodeURIComponent(role)}` : "";
   const modeParam = managementMode ? `&managementMode=${encodeURIComponent(managementMode)}` : "";
-  const queryString = `?sort=${encodeURIComponent(sort ?? "id,desc")}&page=${page ?? 0}&size=${size ?? 14}&search=${encodeURIComponent(search ?? "")}${roleParam}${modeParam}`;
+  const unitModeParam = unitLeaseMode ? `&unitLeaseMode=${encodeURIComponent(unitLeaseMode)}` : "";
+  const queryString = `?sort=${encodeURIComponent(sort ?? "id,desc")}&page=${page ?? 0}&size=${size ?? 14}&search=${encodeURIComponent(search ?? "")}${roleParam}${modeParam}${unitModeParam}`;
    return API.get(`/property/list${queryString}`, 
     config
 );

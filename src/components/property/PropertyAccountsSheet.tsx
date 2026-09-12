@@ -44,6 +44,8 @@ interface PropertyAccountsSheetProps {
   propertyName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  allowedCategories?: AccountCategory[];
+  createAccountHref?: string;
 }
 
 // Presigned channel icon URLs expire in ~1h (see account-module.md gotchas) —
@@ -83,7 +85,7 @@ function AccountBadges({ account }: { account: Account }) {
         )}
       >
         {account.verified ? <ShieldCheck className="w-2.5 h-2.5" /> : <Shield className="w-2.5 h-2.5" />}
-        {account.verified ? "Verified" : "Unverified"}
+        {account.verified ? "Ready for payments" : "Setup incomplete"}
       </span>
       <span
         className={cn(
@@ -114,6 +116,8 @@ export default function PropertyAccountsSheet({
   propertyName,
   open,
   onOpenChange,
+  allowedCategories = ["LANDLORD", "ESTATE_MANAGEMENT", "PROPERTY_SALES"],
+  createAccountHref = "/dashboard/accounts",
 }: PropertyAccountsSheetProps) {
   const { handleListPropertyAccounts, handleListAccounts, handleAttachAccount, handleDetachAccount } =
     useApi();
@@ -148,7 +152,7 @@ export default function PropertyAccountsSheet({
       setAttachedError(null);
       const res = await handleListPropertyAccounts(propertyId);
       if (res?.success && res.data) {
-        setAttached(res.data);
+        setAttached(res.data.filter((account: Account) => allowedCategories.includes(account.category)));
       }
     } catch (err: any) {
       console.error("Error loading property accounts:", err);
@@ -163,9 +167,7 @@ export default function PropertyAccountsSheet({
       setPickerLoading(true);
       const res = await handleListAccounts({ byLandlord: true });
       if (res?.success && res.data) {
-        setLandlordAccounts(res.data.filter((account: Account) =>
-          (["LANDLORD", "ESTATE_MANAGEMENT", "PROPERTY_SALES"] as AccountCategory[]).includes(account.category)
-        ));
+        setLandlordAccounts(res.data.filter((account: Account) => allowedCategories.includes(account.category)));
       }
       setPickerLoaded(true);
     } catch (err: any) {
@@ -276,10 +278,10 @@ export default function PropertyAccountsSheet({
                   ) : landlordAccounts.length === 0 ? (
                     <div className="text-center py-6 px-2">
                       <p className="text-sm text-gray-600">
-                        You don&apos;t have any rental, estate, or property-sale payment accounts yet.
+                        You don&apos;t have a matching payment account ready to attach yet.
                       </p>
                       <Link
-                        href="/dashboard/accounts"
+                        href={createAccountHref}
                         className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-[#EF4217] hover:underline"
                       >
                         Create a payment account first

@@ -324,13 +324,6 @@ export const sidebarLinks: SidebarLink[] = [
         protected: true,
       },
       {
-        label: "Homeowners",
-        href: "/dashboard/homeowners",
-        permissions: ["view_estate"],
-        subscriptionFeatures: ["ESTATE_AND_HOMEOWNER_MANAGEMENT"],
-        protected: true,
-      },
-      {
         label: "Rentals",
         href: "/dashboard/property/rentals",
         permissions: ["create_property", "view_property"],
@@ -375,12 +368,34 @@ export const sidebarLinks: SidebarLink[] = [
   {
     icon: Building,
     label: "Estate Management",
-    href: "/dashboard/estate",
     permissions: ["view_estate"],
     roles: ["EstateManager", "EstateOperationsManager", "WorkspaceAdmin", "WorkspaceViewer", "PropertyAccountant", "SecuritySupervisor"],
     subscriptionFeatures: ["ESTATE_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT"],
     protected: true,
     description: "Homeowners, ownership history, service charges and estate operations.",
+    subLinks: [
+      {
+        label: "Overview & onboarding",
+        href: "/dashboard/estate",
+        permissions: ["view_estate"],
+        subscriptionFeatures: ["ESTATE_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT"],
+        protected: true,
+      },
+      {
+        label: "Homeowner Units",
+        href: "/dashboard/estate/homeowner-units",
+        permissions: ["view_estate"],
+        subscriptionFeatures: ["ESTATE_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT"],
+        protected: true,
+      },
+      {
+        label: "Receiving Accounts",
+        href: "/dashboard/estate/accounts",
+        permissions: ["view_account"],
+        subscriptionFeatures: ["ESTATE_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT"],
+        protected: true,
+      },
+    ],
   },
   {
     icon: Building,
