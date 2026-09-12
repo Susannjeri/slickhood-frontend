@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/api-error";
-import { MyNotification, notificationService } from "@/services/notification.service";
+import { MyNotification, NOTIFICATIONS_CHANGED_EVENT, notificationService } from "@/services/notification.service";
 import { deliveryLabel, notificationActionUrl, notificationText } from "@/lib/notification-display";
 
 const PAGE_SIZE = 10;
@@ -48,6 +48,7 @@ export function MyNotifications() {
     try {
       await notificationService.markRead(item.id);
       setItems(current => current.map(value => value.id === item.id ? { ...value, read: true } : value));
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     } catch (error: unknown) {
       toast.error(apiErrorMessage(error, "Could not mark this notification as read."));
     } finally {

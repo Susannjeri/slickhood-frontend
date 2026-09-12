@@ -1,6 +1,19 @@
 import { expect, test } from "@playwright/test";
 import { authenticated, envelope } from "./support";
 
+test("shared profile header alerts the signed-in user to unread notifications", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: [] });
+  await page.route("**/notification/mine/unread-count", route => route.fulfill({ json: envelope({ count: 3 }) }));
+
+  await page.goto("/dashboard");
+
+  const alertLink = page.getByRole("link", { name: "Open alerts, 3 unread" });
+  await expect(alertLink).toBeVisible();
+  await expect(page.getByTestId("notification-unread-count")).toHaveText("3");
+  await alertLink.click();
+  await expect(page).toHaveURL(/\/dashboard\/notifications$/);
+});
+
 test("admin delivery records distinguish SMTP acceptance from unconfirmed delivery", async ({ context, page }) => {
   await authenticated(context, page, { title: "Superadmin", permissions: ["view_notifications"] });
   const common = { currency: "KES", description: null, createdOn: "2026-09-07T08:00:00+03:00", retry: true, status: null, recipient: "recipient@example.test", network: null, cost: 0, notificationType: "RENT_PAYMENT_REMINDER_EMAIL", retryCount: 0, callbackIP: null, lastUpdateOn: "2026-09-07T08:00:00+03:00" };
@@ -54,7 +67,7 @@ test("existing-user invitation is an actionable in-app notification", async ({ c
 
   await page.goto("/dashboard/notifications");
 
-  await expect(page.getByRole("link", { name: "Notifications" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Notifications", exact: true })).toBeVisible();
   await expect(page.getByText("Available in SlickHood", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Review invitation" })).toHaveAttribute("href", inviteUrl);
 });

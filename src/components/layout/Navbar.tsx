@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { SidebarTrigger } from "../ui/sidebar";
 import { sidebarLinks } from "@/config/sidebarConfig";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export function Navbar() {
     const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -90,6 +91,7 @@ export function Navbar() {
 
                 {/* Right side */}
                 <div className="flex items-center gap-2 ml-auto pr-3">
+                    <NotificationBell />
                     <div className="relative" ref={dropdownRef}>
                         <button
                             onClick={() => setDropdownOpen((prev) => !prev)}
