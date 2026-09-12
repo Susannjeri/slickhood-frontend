@@ -50,7 +50,7 @@ test("manager termination requires a reason and sends the structured request", a
   expect(request.postDataJSON().endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 });
 
-test("manager homeowner assignment starts from an estate-scoped home", async ({ context, page }) => {
+test("manager onboards a homeowner directly from the homeowner-unit list", async ({ context, page }) => {
   await authenticated(context, page, {
     title: "EstateOperationsManager",
     permissions: ["view_estate", "manage_estate", "view_service_charge"],
@@ -60,21 +60,22 @@ test("manager homeowner assignment starts from an estate-scoped home", async ({ 
   await page.route("**/estate/ownership**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/estate/service-charges**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/property/unit/list**", route => route.fulfill({ json: envelope([{
-    unitId: 77, propertyId: 11, ref: "A-101", currency: "KES", leaseMode: "SERVICE_CHARGE",
+    unitId: 77, propertyId: 11, ref: "A-101", unitType: "APARTMENT", size: 120,
+    measurementUnits: { id: 1, name: "sqm" }, currency: "KES", price: 7500, leaseMode: "SERVICE_CHARGE",
   }]) }));
   await page.route("**/estate/operations/properties/11/**", route => route.fulfill({ json: envelope([]) }));
 
   await page.goto("/dashboard/homeowners?propertyId=11");
   await page.getByRole("combobox").nth(1).click();
-  await page.getByRole("option", { name: "A-101" }).click();
-  await page.getByRole("button", { name: "Open home & invite" }).click();
-
-  await expect(page).toHaveURL("/dashboard/unit/details/77?p=11&from=homeowners");
-  await expect(page.getByText("No utilities included in this unit.")).toBeVisible();
-  await page.getByRole("button", { name: "Assign Homeowner", exact: true }).click();
+  await page.getByRole("option", { name: /Silverwood Estate \/ A-101/ }).click();
+  await expect(page.getByText("Selected homeowner unit")).toBeVisible();
+  await expect(page.getByText("120 sqm").first()).toBeVisible();
   await page.getByLabel("Homeowner email", { exact: true }).fill("resident@example.test");
   await page.route("**/invite/email", route => route.fulfill({ json: envelope([]) }));
   const sent = page.waitForRequest(request => request.url().endsWith("/invite/email") && request.method() === "POST");
-  await page.getByRole("button", { name: "Send invitation", exact: true }).click();
-  expect((await sent).postDataJSON()).toMatchObject({ inviteType: "HOMEOWNER", entityId: 77, email: "resident@example.test" });
+  await page.getByRole("button", { name: "Send invitation & agreement", exact: true }).click();
+  expect((await sent).postDataJSON()).toMatchObject({ inviteType: "HOMEOWNER", entityId: 77, email: "resident@example.test", leaseStartDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
+  await expect(page.getByText("Homeowner units", { exact: true })).toBeVisible();
+  await expect(page.getByText("Available", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open home & invite" })).toHaveCount(0);
 });

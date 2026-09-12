@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { usePagedEstateRecords } from "@/hooks/usePagedEstateRecords";
 import { estateService } from "@/services/business-workflows.service";
 import { useAuthStore } from "@/store/authStore";
 import { EstateServiceCharge, PropertyOwnership } from "@/types/business-workflows";
+import { createEmailOccupantInvite } from "@/lib/api";
 
 const estateRoles = ["EstateManager", "EstateOperationsManager", "WorkspaceAdmin", "PropertyAccountant", "WorkspaceViewer", "SecuritySupervisor", "Homeowner"];
 function today() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Nairobi", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()); }
@@ -32,7 +33,6 @@ export default function EstatePage() {
   </RequireRole>;
 }
 function EstateWorkspace() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const permissions = useAuthStore(state => state.permissions);
   const token = useAuthStore(state => state.token);
@@ -51,6 +51,8 @@ function EstateWorkspace() {
   const [propertyFilter, setPropertyFilter] = useState(initialPropertyId);
   const [ownershipSearch, setOwnershipSearch] = useState("");
   const [assignmentUnitId, setAssignmentUnitId] = useState("");
+  const [homeownerEmail, setHomeownerEmail] = useState("");
+  const [agreementEffectiveDate, setAgreementEffectiveDate] = useState(today());
   const [busy, setBusy] = useState(false);
   const [endingOwnership, setEndingOwnership] = useState<PropertyOwnership | null>(null);
   const [endDate, setEndDate] = useState(today());
@@ -65,7 +67,7 @@ function EstateWorkspace() {
     scopedPropertyIds.map((id, index) => ({ id, name: scopedPropertyNames[index] ?? `Estate ${id}`, managementMode: "SERVICE_CHARGE" })));
   const properties = propertyOptions.items;
   const propertiesLoading = propertyOptions.loading;
-  const unitOptions = usePagedBusinessUnits(canManage, propertyFilter === "all" ? null : Number(propertyFilter), "SERVICE_CHARGE");
+  const unitOptions = usePagedBusinessUnits(canManage, propertyFilter === "all" ? null : Number(propertyFilter), "SERVICE_CHARGE", true);
   const units = unitOptions.items;
 
   useEffect(() => { if (propertyOptions.error) toast.error(apiErrorMessage(propertyOptions.error, "Could not load your estate properties.")); }, [propertyOptions.error]);
@@ -87,7 +89,30 @@ function EstateWorkspace() {
   async function load() { await Promise.all([registry.reload(), current.reload(), billing.reload()]); }
   function changeEstate(value: string) {
     setPropertyFilter(value); setAssignmentUnitId(""); setChargeOwnershipId("");
+    setHomeownerEmail(""); setAgreementEffectiveDate(today());
     setChargeAmount(""); setEndingOwnership(null); setEndReason("");
+  }
+
+  async function inviteHomeowner(event: FormEvent) {
+    event.preventDefault();
+    const selectedUnit = units.find(unit => unit.unitId === Number(assignmentUnitId));
+    if (!token || !selectedUnit || !homeownerEmail.trim() || !agreementEffectiveDate) return;
+    setBusy(true);
+    try {
+      await createEmailOccupantInvite({
+        inviteType: "HOMEOWNER",
+        entityId: selectedUnit.unitId,
+        email: homeownerEmail.trim(),
+        leaseStartDate: agreementEffectiveDate,
+      }, token);
+      toast.success("Homeowner invitation sent. The secure link works for both new and existing SlickHood users.");
+      setHomeownerEmail("");
+      setAssignmentUnitId("");
+      setAgreementEffectiveDate(today());
+      await load();
+    } catch (error: unknown) {
+      toast.error(apiErrorMessage(error, "Could not send the homeowner invitation."));
+    } finally { setBusy(false); }
   }
 
 
@@ -123,6 +148,8 @@ function EstateWorkspace() {
   }
 
   const currentOwnerships = current.items.filter(item => item.active);
+  const selectedAssignmentUnit = units.find(unit => unit.unitId === Number(assignmentUnitId));
+  const ownershipByUnit = new Map(currentOwnerships.filter(item => item.unitId).map(item => [item.unitId, item]));
   const overdue = charges.filter(charge => charge.status === "OVERDUE");
   const outstandingByCurrency = Object.entries(charges.filter(charge => !charge.paid).reduce<Record<string, number>>((totals, charge) => {
     totals[charge.currency] = (totals[charge.currency] ?? 0) + charge.pendingAmount;
@@ -143,7 +170,9 @@ function EstateWorkspace() {
 
     {canManage && <Card className="border-orange-200"><CardHeader><CardTitle>First-time homeowner setup</CardTitle><CardDescription>Set the estate foundation once, then every homeowner invitation follows the same secure agreement journey.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><div className="rounded-lg border bg-white p-4"><p className="font-semibold">1. Estate agreement</p><p className="mt-1 text-sm text-muted-foreground">Review the approved agreement standard. SlickHood freezes it when the invitation is sent.</p><Button className="mt-3" size="sm" variant="outline" asChild><Link href="/dashboard/documents?type=ESTATE_RESIDENTIAL_AGREEMENT">Review agreement</Link></Button></div><div className="rounded-lg border bg-white p-4"><p className="font-semibold">2. Receiving account</p><p className="mt-1 text-sm text-muted-foreground">Choose the provider-verified account that receives service charges for this estate.</p><Button className="mt-3" size="sm" variant="outline" asChild><Link href="/dashboard/estate/accounts">Configure receiving account</Link></Button></div><div className="rounded-lg border bg-white p-4"><p className="font-semibold">3. Invite homeowner</p><p className="mt-1 text-sm text-muted-foreground">Choose a home below. New users register; existing users sign in with the invited email.</p></div></CardContent></Card>}
 
-    {canManage && <Card><CardHeader><CardTitle>Assign a homeowner</CardTitle><CardDescription>Select an estate and home, then send its secure, email-bound invitation. The approved estate agreement is generated automatically when the invited homeowner accepts.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4 sm:flex-row sm:items-end"><div className="min-w-0 flex-1"><Label id="assignment-home-label" htmlFor="assignment-home">Home</Label><Input className="mb-2" value={unitOptions.search} onChange={event=>unitOptions.setSearch(event.target.value)} placeholder="Search homes…" disabled={propertyFilter==="all"}/><Select value={assignmentUnitId} onValueChange={setAssignmentUnitId} disabled={propertyFilter === "all"||(unitOptions.loading&&units.length===0)}><SelectTrigger id="assignment-home" aria-labelledby="assignment-home-label"><SelectValue placeholder={propertyFilter === "all" ? "Select an estate first" : unitOptions.loading?"Loading homes…":"Select a home"} /></SelectTrigger><SelectContent>{units.map(unit => <SelectItem key={unit.unitId} value={String(unit.unitId)}>{unit.ref}</SelectItem>)}</SelectContent></Select>{unitOptions.hasMore&&<Button type="button" size="sm" variant="outline" className="mt-2" onClick={unitOptions.loadMore} disabled={unitOptions.loading}>Load more homes</Button>}</div><Button className="bg-[#EF4217]" disabled={!assignmentUnitId} onClick={() => router.push(`/dashboard/unit/details/${assignmentUnitId}?p=${propertyFilter}&from=homeowners`)}>Open home & invite</Button></CardContent></Card>}
+    {canManage && <Card id="onboard-homeowner"><CardHeader><CardTitle>Onboard a homeowner</CardTitle><CardDescription>Choose the home, enter the homeowner&apos;s email and agreement date, then send. There is no second unit-details step. Existing users sign in; new users register and complete KYC from the same secure link.</CardDescription></CardHeader><CardContent><form onSubmit={inviteHomeowner} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"><div className="space-y-2"><Label id="assignment-home-label" htmlFor="assignment-home">Homeowner unit</Label><Input value={unitOptions.search} onChange={event=>unitOptions.setSearch(event.target.value)} placeholder="Search home reference…"/><Select value={assignmentUnitId} onValueChange={setAssignmentUnitId} disabled={unitOptions.loading&&units.length===0}><SelectTrigger id="assignment-home" aria-labelledby="assignment-home-label"><SelectValue placeholder={unitOptions.loading?"Loading homeowner units…":"Select a homeowner unit"} /></SelectTrigger><SelectContent>{units.map(unit => <SelectItem key={unit.unitId} value={String(unit.unitId)} disabled={ownershipByUnit.has(unit.unitId)}>{properties.find(property=>property.id===unit.propertyId)?.name??`Estate #${unit.propertyId}`} / {unit.ref}{ownershipByUnit.has(unit.unitId)?" · Assigned":""}</SelectItem>)}</SelectContent></Select>{unitOptions.hasMore&&<Button type="button" size="sm" variant="outline" className="mt-2" onClick={unitOptions.loadMore} disabled={unitOptions.loading}>Load more homes</Button>}{!unitOptions.loading&&units.length===0&&<p className="text-sm text-amber-700">No homeowner units are configured. Create or change a unit to Homeowner / Service Charge first.</p>}</div><div className="space-y-2"><Label htmlFor="homeowner-email">Homeowner email</Label><Input id="homeowner-email" required type="email" autoComplete="email" maxLength={254} value={homeownerEmail} onChange={event=>setHomeownerEmail(event.target.value)} placeholder="homeowner@example.com"/></div><div className="space-y-2"><Label htmlFor="agreement-effective-date">Agreement effective date</Label><Input id="agreement-effective-date" required type="date" max={today()} value={agreementEffectiveDate} onChange={event=>setAgreementEffectiveDate(event.target.value)}/></div><div className="flex items-end"><Button type="submit" className="w-full bg-[#EF4217]" disabled={busy||!selectedAssignmentUnit||!homeownerEmail.trim()||!agreementEffectiveDate}>{busy?"Sending…":"Send invitation & agreement"}</Button></div>{selectedAssignmentUnit&&<div className="rounded-lg border border-blue-200 bg-blue-50 p-4 md:col-span-2 lg:col-span-4"><p className="font-semibold">Selected homeowner unit</p><div className="mt-2 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4"><p><span className="text-muted-foreground">Estate</span><br/><strong>{properties.find(property=>property.id===selectedAssignmentUnit.propertyId)?.name??`Estate #${selectedAssignmentUnit.propertyId}`}</strong></p><p><span className="text-muted-foreground">Home</span><br/><strong>{selectedAssignmentUnit.ref}</strong></p><p><span className="text-muted-foreground">Type and size</span><br/><strong>{selectedAssignmentUnit.unitType?.toLowerCase().replaceAll("_"," ")??"Not recorded"}{selectedAssignmentUnit.size?` · ${selectedAssignmentUnit.size.toLocaleString()} ${selectedAssignmentUnit.measurementUnits?.name??""}`:""}</strong></p><p><span className="text-muted-foreground">Service charge basis</span><br/><strong>{selectedAssignmentUnit.currency??"KES"} {selectedAssignmentUnit.price?.toLocaleString()??"Not set"}</strong></p></div></div>}</form></CardContent></Card>}
+
+    {canManage && <Card><CardHeader><CardTitle>Homeowner units</CardTitle><CardDescription>All homes configured for estate management in this workspace. Filter by estate above or search by unit reference, then invite an unassigned homeowner directly.</CardDescription></CardHeader><CardContent className="space-y-3">{unitOptions.loading&&<p role="status">Loading homeowner units…</p>}{Boolean(unitOptions.error)&&<p role="alert" className="text-red-700">{apiErrorMessage(unitOptions.error,"Could not load homeowner units.")}</p>}{unitOptions.hasMore&&<Button type="button" variant="outline" disabled={unitOptions.loading} onClick={unitOptions.loadMore}>Load more homeowner units</Button>}{!unitOptions.loading&&!unitOptions.error&&units.length===0&&<p className="py-6 text-center text-muted-foreground">No homeowner units match this scope.</p>}{units.map(unit=>{const owner=ownershipByUnit.get(unit.unitId);return <div key={unit.unitId} className="flex flex-col justify-between gap-3 rounded-lg border p-4 sm:flex-row sm:items-center"><div><div className="flex flex-wrap items-center gap-2"><strong>{properties.find(property=>property.id===unit.propertyId)?.name??`Estate #${unit.propertyId}`} / {unit.ref}</strong><Badge variant={owner?"default":"outline"}>{owner?"Assigned":"Available"}</Badge></div><p className="text-sm text-muted-foreground">{unit.unitType?.toLowerCase().replaceAll("_"," ")??"Home"}{unit.size?` · ${unit.size.toLocaleString()} ${unit.measurementUnits?.name??""}`:""}{owner?` · ${owner.homeownerName||owner.homeownerEmail}`:""}</p></div>{owner?<Button size="sm" variant="outline" asChild><Link href={`/dashboard/documents?propertyId=${owner.propertyId}&unitId=${unit.unitId}&type=ESTATE_RESIDENTIAL_AGREEMENT`}>View agreement</Link></Button>:<Button size="sm" variant="outline" onClick={()=>{setAssignmentUnitId(String(unit.unitId));document.getElementById("onboard-homeowner")?.scrollIntoView({behavior:"smooth",block:"start"});}}>Invite homeowner</Button>}</div>})}</CardContent></Card>}
 
     <Card><CardHeader><CardTitle>{isHomeowner ? "My homes" : "Homeowners"}</CardTitle><CardDescription>{isHomeowner ? "Your current and previous homes, agreements and billing in one place." : "Search the homeowner directory. Current and historical ownership records remain available for audit and financial continuity."}</CardDescription></CardHeader><CardContent className="space-y-3">{!isHomeowner && <div className="flex max-w-xl gap-2"><Input aria-label="Search homeowners" value={ownershipSearch} onChange={event => setOwnershipSearch(event.target.value)} placeholder="Search name, email, estate or home…"/><Button type="button" variant="outline" onClick={() => setOwnershipSearch("")} disabled={!ownershipSearch}>Clear</Button></div>}{!registry.loading && !registry.error && items.length === 0 && <p className="py-8 text-center text-muted-foreground">{ownershipSearch ? "No homeowners match your search." : "No ownership records in this scope."}</p>}<RecordControls feed={registry} label="ownership records" />{items.map(item => <div key={item.id} className="flex flex-col justify-between gap-3 rounded-lg border p-4 sm:flex-row sm:items-center"><div><div className="flex flex-wrap items-center gap-2"><strong>{isHomeowner ? `${item.propertyName}${item.unitRef ? ` / ${item.unitRef}` : ""}` : item.homeownerName || item.homeownerEmail}</strong><Badge variant={item.active ? "default" : "outline"}>{item.active ? "Current" : "Historical"}</Badge></div><p className="text-sm text-muted-foreground">{!isHomeowner && `${item.homeownerEmail} · `}{item.propertyName}{item.unitRef ? ` / ${item.unitRef}` : ""} · {item.ownershipStart}{item.ownershipEnd ? ` to ${item.ownershipEnd}` : " to present"}</p>{item.terminationReason && <p className="mt-1 text-sm text-muted-foreground">Reason: {item.terminationReason}</p>}</div><div className="flex flex-wrap gap-2">{permissions.includes("view_lease_document") && <Button size="sm" variant="outline" asChild><Link href={`/dashboard/documents?propertyId=${item.propertyId}${item.unitId ? `&unitId=${item.unitId}` : ""}&type=ESTATE_RESIDENTIAL_AGREEMENT`}>View agreement</Link></Button>}{isHomeowner && canViewInvoices && <Button size="sm" asChild><Link href={`/dashboard/invoices?propertyId=${item.propertyId}${item.unitId ? `&unitId=${item.unitId}` : ""}`}>Bills & payments</Link></Button>}{canManage && item.active && <>{permissions.includes("create_lease_document") && <Button size="sm" asChild><Link href={`/dashboard/documents?propertyId=${item.propertyId}&recipientUserId=${item.homeownerUserId}&ownershipId=${item.id}${item.unitId ? `&unitId=${item.unitId}` : ""}&effectiveDate=${item.ownershipStart}&type=ESTATE_RESIDENTIAL_AGREEMENT`}>Prepare agreement</Link></Button>}<Button size="sm" variant="outline" onClick={() => { setEndingOwnership(item); setEndDate(today()); }}>End ownership</Button></>}</div></div>)}</CardContent></Card>
 

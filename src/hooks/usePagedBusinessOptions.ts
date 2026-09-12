@@ -4,7 +4,20 @@ import { useEffect, useRef, useState } from "react";
 import { fetchPropertyList, fetchUnitList } from "@/lib/api";
 
 export type BusinessPropertyOption = { id: number; name: string; managementMode?: string };
-export type BusinessUnitOption = { unitId: number; propertyId: number; ref: string; currency?: string; price?: number; leaseMode?: string };
+export type BusinessUnitOption = {
+  unitId: number;
+  propertyId: number;
+  ref: string;
+  unitType?: string;
+  propertyType?: string;
+  size?: number;
+  measurementUnits?: { id?: number; name?: string };
+  currency?: string;
+  price?: number;
+  leaseMode?: string;
+  occupied?: boolean;
+  advertise?: boolean;
+};
 
 function mergeById<T>(current: T[], incoming: T[], id: (item: T) => number) {
   const values = new Map(current.map(item => [id(item), item]));
@@ -49,22 +62,28 @@ export function usePagedBusinessProperties(
   return { items, search, setSearch, loading, error, hasMore: page + 1 < totalPages, loadMore: () => setPage(value => value + 1) };
 }
 
-export function usePagedBusinessUnits(enabled: boolean, propertyId: number | null, leaseMode: "RENT" | "SALE" | "SERVICE_CHARGE") {
+export function usePagedBusinessUnits(
+  enabled: boolean,
+  propertyId: number | null,
+  leaseMode: "RENT" | "SALE" | "SERVICE_CHARGE",
+  allowAllProperties = false,
+) {
   const [search, setSearchState] = useState("");
   const [page, setPage] = useState(0);
   const [items, setItems] = useState<BusinessUnitOption[]>([]);
   const [totalPages, setTotalPages] = useState(0);
-  const [loading, setLoading] = useState(Boolean(enabled && propertyId));
+  const canLoad = Boolean(enabled && (propertyId || allowAllProperties));
+  const [loading, setLoading] = useState(canLoad);
   const [error, setError] = useState<unknown>(null);
   const requestId = useRef(0);
 
   useEffect(() => { setPage(0); setItems([]); setSearchState(""); }, [propertyId]);
   useEffect(() => {
-    if (!enabled || !propertyId) { requestId.current += 1; setLoading(false); return; }
+    if (!canLoad) { requestId.current += 1; setLoading(false); return; }
     const currentRequestId = ++requestId.current;
     setLoading(true);
     const timer = window.setTimeout(() => {
-      void fetchUnitList({ page, size: 25, sort: "ref,asc", search, propertyId, leaseMode })
+      void fetchUnitList({ page, size: 25, sort: "ref,asc", search, propertyId: propertyId ?? undefined, leaseMode })
         .then(response => {
           if (requestId.current !== currentRequestId) return;
           const incoming = ((response.data?.data ?? []) as BusinessUnitOption[])
@@ -77,8 +96,8 @@ export function usePagedBusinessUnits(enabled: boolean, propertyId: number | nul
         .finally(() => { if (requestId.current === currentRequestId) setLoading(false); });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [enabled, leaseMode, page, propertyId, search]);
+  }, [canLoad, leaseMode, page, propertyId, search]);
 
-  const setSearch = (value: string) => { setLoading(Boolean(enabled && propertyId)); setSearchState(value); setPage(0); setItems([]); };
+  const setSearch = (value: string) => { setLoading(canLoad); setSearchState(value); setPage(0); setItems([]); };
   return { items, search, setSearch, loading, error, hasMore: page + 1 < totalPages, loadMore: () => setPage(value => value + 1) };
 }
