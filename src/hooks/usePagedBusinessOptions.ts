@@ -30,6 +30,7 @@ export function usePagedBusinessProperties(
   managementMode?: "RENTAL" | "SALE" | "SERVICE_CHARGE",
   initialItems: BusinessPropertyOption[] = [],
   unitLeaseMode?: "RENT" | "SALE" | "SERVICE_CHARGE",
+  propertyId?: number,
 ) {
   const [search, setSearchState] = useState("");
   const [page, setPage] = useState(0);
@@ -44,7 +45,7 @@ export function usePagedBusinessProperties(
     const currentRequestId = ++requestId.current;
     setLoading(true);
     const timer = window.setTimeout(() => {
-      void fetchPropertyList({ page, size: 25, sort: "name,asc", search, managementMode, unitLeaseMode })
+      void fetchPropertyList({ page, size: 25, sort: "name,asc", search, propertyId, managementMode, unitLeaseMode })
         .then(response => {
           if (requestId.current !== currentRequestId) return;
           const incoming = ((response.data?.data ?? []) as BusinessPropertyOption[])
@@ -57,7 +58,7 @@ export function usePagedBusinessProperties(
         .finally(() => { if (requestId.current === currentRequestId) setLoading(false); });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [enabled, managementMode, page, search, unitLeaseMode]);
+  }, [enabled, managementMode, page, propertyId, search, unitLeaseMode]);
 
   const setSearch = (value: string) => { setLoading(enabled); setSearchState(value); setPage(0); setItems([]); };
   return { items, search, setSearch, loading, error, hasMore: page + 1 < totalPages, loadMore: () => setPage(value => value + 1) };
@@ -68,6 +69,7 @@ export function usePagedBusinessUnits(
   propertyId: number | null,
   leaseMode: "RENT" | "SALE" | "SERVICE_CHARGE",
   allowAllProperties = false,
+  unitId?: number,
 ) {
   const [search, setSearchState] = useState("");
   const [page, setPage] = useState(0);
@@ -84,7 +86,7 @@ export function usePagedBusinessUnits(
     const currentRequestId = ++requestId.current;
     setLoading(true);
     const timer = window.setTimeout(() => {
-      void fetchUnitList({ page, size: 25, sort: "ref,asc", search, propertyId: propertyId ?? undefined, leaseMode })
+      void fetchUnitList({ page, size: 25, sort: "ref,asc", search, propertyId: propertyId ?? undefined, unitId, leaseMode })
         .then(response => {
           if (requestId.current !== currentRequestId) return;
           const incoming = ((response.data?.data ?? []) as BusinessUnitOption[])
@@ -97,7 +99,7 @@ export function usePagedBusinessUnits(
         .finally(() => { if (requestId.current === currentRequestId) setLoading(false); });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [canLoad, leaseMode, page, propertyId, search]);
+  }, [canLoad, leaseMode, page, propertyId, search, unitId]);
 
   const setSearch = (value: string) => { setLoading(canLoad); setSearchState(value); setPage(0); setItems([]); };
   return { items, search, setSearch, loading, error, hasMore: page + 1 < totalPages, loadMore: () => setPage(value => value + 1) };

@@ -992,7 +992,7 @@ export default function ViewUnitPage() {
               )}
               <Can permissions={isHomeownerUnit ? ["manage_estate"] : ["create_invite"]}>
                 {!unit.occupied && tenants.length === 0 && (
-                  <Button onClick={() => setCreateInviteOpen(true)} variant="outline">
+                  <Button onClick={() => isHomeownerUnit ? router.push(`/dashboard/estate?propertyId=${propertyId}&unitId=${unitId}#onboard-homeowner`) : setCreateInviteOpen(true)} variant="outline">
                     <UserPlus className="w-4 h-4 mr-2" />Assign {occupantLabel}
                   </Button>
                 )}
@@ -1190,8 +1190,8 @@ export default function ViewUnitPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
               {isHomeownerUnit && <Card><CardHeader className="pb-3"><CardTitle className="text-base">Homeowner & agreement</CardTitle></CardHeader><CardContent className="space-y-3">
                 <p className="text-sm text-gray-500">Invite the homeowner by email. Ownership history and agreement preparation are managed in Estate Management, not a rental lease.</p>
-                <CanProperty propertyId={Number(propertyId)} permissions={["create_invite"]}><Button size="sm" onClick={() => setCreateInviteOpen(true)}>Assign Homeowner</Button></CanProperty>
-                <CanProperty propertyId={Number(propertyId)} permissions={["view_homeowners"]}><Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/estate?propertyId=${propertyId}`)}>Ownership & agreements</Button></CanProperty>
+                <CanProperty propertyId={Number(propertyId)} permissions={["create_invite"]}><Button size="sm" onClick={() => router.push(`/dashboard/estate?propertyId=${propertyId}&unitId=${unitId}#onboard-homeowner`)}>Assign Homeowner</Button></CanProperty>
+                <CanProperty propertyId={Number(propertyId)} permissions={["view_homeowners"]}><Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/estate?propertyId=${propertyId}&unitId=${unitId}`)}>Ownership & agreements</Button></CanProperty>
                 <CanProperty propertyId={Number(propertyId)} permissions={["view_lease_document"]}><Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/documents?propertyId=${propertyId}&type=ESTATE_RESIDENTIAL_AGREEMENT`)}>View agreements</Button></CanProperty>
               </CardContent></Card>}
               {isSaleUnit && <Card><CardHeader className="pb-3"><CardTitle className="text-base">Offer & sale agreement</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-gray-500">Use the sales pipeline for the buyer invitation, letter of offer, signatures and completion evidence.</p><CanProperty propertyId={Number(propertyId)} permissions={["view_sale_pipeline"]}><Button size="sm" onClick={() => router.push(`/dashboard/sales?propertyId=${propertyId}&unitId=${unitId}`)}>Open property sale</Button></CanProperty></CardContent></Card>}

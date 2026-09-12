@@ -4,7 +4,7 @@ import { authenticated, envelope } from "./support";
 test.beforeEach(async ({ context, page }) => {
   await authenticated(context, page, {
     title: "EstateManager",
-    permissions: ["view_unit", "view_invite_list", "create_invite", "share_invite", "create_similar_unit"],
+    permissions: ["view_unit", "view_invite_list", "create_invite", "share_invite", "create_similar_unit", "view_estate", "manage_estate", "view_service_charge"],
     propertyIds: [11],
   });
   await page.route("**/property/type**", route => route.fulfill({ json: envelope([{ id: "APARTMENT", name: "Apartment" }]) }));
@@ -36,24 +36,35 @@ test.beforeEach(async ({ context, page }) => {
   await page.route("**/lease/documents**", route => route.fulfill({ json: envelope([]) }));
 });
 
-test("service-charge unit sends an email-bound homeowner invite rather than exposing a raw link", async ({ page }) => {
+test("service-charge unit opens a prefilled two-field homeowner invitation", async ({ page }) => {
   await page.goto("/dashboard/unit/details/77?p=11&from=homeowners");
 
-  await expect(page.getByRole("button", { name: "Assign Homeowner" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Assign Homeowner" }).first()).toBeVisible();
   await expect(page.getByRole("tab", { name: "Tenant", exact: true })).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Lease", exact: true })).toHaveCount(0);
   await expect(page.getByText("No Active Lease", { exact: true })).toHaveCount(0);
-  await page.getByRole("button", { name: "Assign Homeowner" }).click();
-  await expect(page.getByRole("heading", { name: "Create Homeowner Invite" })).toBeVisible();
-
+  await page.route("**/property/list**", route => route.fulfill({ json: envelope([{ id: 11, name: "Silverwood Estate" }]) }));
+  await page.route("**/property/unit/list**", route => route.fulfill({ json: envelope([{
+    unitId: 77, propertyId: 11, ref: "A-101", unitType: "APARTMENT", size: 85,
+    measurementUnits: { id: 1, name: "sqm" }, currency: "KES", price: 7500, leaseMode: "SERVICE_CHARGE",
+  }]) }));
+  await page.route("**/estate/ownership**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/estate/service-charges**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/estate/operations/properties/11/**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/invite/email", route => route.fulfill({
     status: 200,
     json: envelope([]),
   }));
+  await page.getByRole("button", { name: "Assign Homeowner" }).first().click();
+  await expect(page).toHaveURL(/\/dashboard\/estate\?propertyId=11&unitId=77/);
+  await expect(page.getByText("Selected homeowner unit")).toBeVisible();
+  await expect(page.getByText("Silverwood Estate").last()).toBeVisible();
+  await expect(page.getByText("A-101", { exact: true }).last()).toBeVisible();
+  await expect(page.getByLabel("Homeowner unit")).toHaveCount(0);
   await page.getByLabel("Homeowner email").fill("owner@example.com");
   await page.getByLabel("Agreement effective date").fill("2026-09-01");
   const requestPromise = page.waitForRequest(request => request.url().includes("/invite/email") && request.method() === "POST");
-  await page.getByRole("button", { name: "Send invitation" }).click();
+  await page.getByRole("button", { name: "Send invitation & agreement" }).click();
   const request = await requestPromise;
 
   expect(request.postDataJSON()).toEqual({
@@ -62,7 +73,6 @@ test("service-charge unit sends an email-bound homeowner invite rather than expo
     email: "owner@example.com",
     leaseStartDate: "2026-09-01",
   });
-  await expect(page.getByText(/invitation sent to owner@example.com/i)).toBeVisible();
   await expect(page.getByText("Generated Invite Link")).toHaveCount(0);
 });
 

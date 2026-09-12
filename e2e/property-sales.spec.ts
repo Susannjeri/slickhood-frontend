@@ -36,6 +36,41 @@ test("sales owner starts an email-bound sale from scoped property and unit selec
  expect(body.buyerUserId).toBeUndefined();
 });
 
+test("selected sale unit opens a prefilled two-field buyer invitation",async({context,page})=>{
+ await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline","view_property","view_unit","view_account"],propertyIds:[11],propertyNames:["Acacia Court"]});
+ let propertyQuery="",unitQuery="";
+ await page.route("**/property/list**",route=>{propertyQuery=route.request().url();return route.fulfill({json:pageEnvelope([{id:11,name:"Acacia Court",managementMode:"SALE"}])})});
+ await page.route("**/property/unit/list**",route=>{unitQuery=route.request().url();return route.fulfill({json:pageEnvelope([{unitId:77,propertyId:11,ref:"A-07",unitType:"TWO_BEDROOM",size:88,measurementUnits:{name:"sqm"},currency:"KES",price:15000000,leaseMode:"SALE"}])})});
+ await page.route("**/account/list**",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:81,name:"Sales collections",channel:"MPESA",category:"PROPERTY_SALES",active:true,verified:true}]}}));
+ await page.route("**/lease/documents/templates",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:9,documentType:"PROPERTY_SALE_LETTER_OF_OFFER",legalReviewRequired:false,legalReviewedAt:"2026-09-01T10:00:00"}]}}));
+ await page.route("**/sales**",async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path!=="/sales"&&path!=="/api/sales"){await route.continue();return}
+  if(route.request().method()==="POST"){await route.fulfill({json:{success:true,code:"S00290",description:"Sale workflow created.",data:[]}});return}
+  await route.fulfill({json:pageEnvelope([])});
+ });
+
+ await page.goto("/dashboard/sales?propertyId=11&unitId=77");
+ await expect(page.getByText("Selected sale unit")).toBeVisible();
+ await expect(page.getByText("Acacia Court").last()).toBeVisible();
+ await expect(page.getByText("A-07",{exact:true})).toBeVisible();
+ await expect(page.getByText("KES 15,000,000")).toBeVisible();
+ expect(new URL(propertyQuery).searchParams.get("propertyId")).toBe("11");
+ expect(new URL(unitQuery).searchParams.get("unitId")).toBe("77");
+ await expect(page.getByLabel("Property filter (optional)")).toHaveCount(0);
+ await expect(page.getByLabel("Sale unit")).toHaveCount(0);
+ await expect(page.getByLabel("Asking price from unit")).toHaveCount(0);
+ await expect(page.getByLabel("Agreed offer amount")).toHaveCount(0);
+ await expect(page.getByLabel("Currency from unit")).toHaveCount(0);
+ await expect(page.getByLabel("Internal notes")).toHaveCount(0);
+
+ await page.getByLabel("Buyer email").fill("selected-buyer@example.com");
+ await page.getByLabel("Buyer response due").fill("2026-09-30");
+ const requestPromise=page.waitForRequest(request=>request.url().includes("/sales")&&request.method()==="POST");
+ await page.getByRole("button",{name:"Send invitation and Letter of Offer"}).click();
+ expect((await requestPromise).postDataJSON()).toMatchObject({propertyId:11,unitId:77,buyerEmail:"selected-buyer@example.com",askingPrice:15000000,offerAmount:15000000,responseDueDate:"2026-09-30",currency:"KES"});
+});
+
 test("sales owner sees how to resolve an existing active sale before inviting again",async({context,page})=>{
  await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline","view_property","view_unit","view_account"]});
  await page.route("**/property/list**",route=>route.fulfill({json:pageEnvelope([{id:11,name:"Acacia Court",managementMode:"SALE"}])}));

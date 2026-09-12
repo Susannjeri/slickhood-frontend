@@ -314,6 +314,7 @@ export interface UserListParams {
 }
 
 export interface PropertyListParams extends UserListParams {
+  propertyId?: number;
   managementMode?: "RENTAL" | "SALE" | "SERVICE_CHARGE";
   /** Return only properties containing at least one active unit in this commercial use. */
   unitLeaseMode?: "RENT" | "SALE" | "SERVICE_CHARGE";
@@ -326,6 +327,7 @@ export interface UnitListParams {
   size?: number;
   search?: string;
   propertyId?: number;
+  unitId?: number;
   leaseMode?: 'RENT' | 'SALE' | 'SERVICE_CHARGE' | ''; // Optional leaseMode
 }
 
@@ -413,11 +415,12 @@ export const fetchPropertyList = (
   },config: object = {}
 ) => {
   // Destructure the parameters, which will use the defaults if not provided by the caller
-  const { sort, page, size, search, role, managementMode, unitLeaseMode } = params;
+  const { sort, page, size, search, role, propertyId, managementMode, unitLeaseMode } = params;
   const roleParam = role ? `&role=${encodeURIComponent(role)}` : "";
+  const propertyIdParam = propertyId ? `&propertyId=${propertyId}` : "";
   const modeParam = managementMode ? `&managementMode=${encodeURIComponent(managementMode)}` : "";
   const unitModeParam = unitLeaseMode ? `&unitLeaseMode=${encodeURIComponent(unitLeaseMode)}` : "";
-  const queryString = `?sort=${encodeURIComponent(sort ?? "id,desc")}&page=${page ?? 0}&size=${size ?? 14}&search=${encodeURIComponent(search ?? "")}${roleParam}${modeParam}${unitModeParam}`;
+  const queryString = `?sort=${encodeURIComponent(sort ?? "id,desc")}&page=${page ?? 0}&size=${size ?? 14}&search=${encodeURIComponent(search ?? "")}${roleParam}${propertyIdParam}${modeParam}${unitModeParam}`;
    return API.get(`/property/list${queryString}`, 
     config
 );
@@ -538,7 +541,7 @@ export const fetchUnitList = (
   },config: object = {}
 ) => {
   // Destructure the parameters, which will use the defaults if not provided by the caller
-  const { sort, page, size, propertyId, search, leaseMode } = params;
+  const { sort, page, size, propertyId, unitId, search, leaseMode } = params;
   // propertyId is omitted entirely (not sent as 0) when absent — this is
   // what drives the "all properties for this leaseMode" view. Sending a
   // literal propertyId=0 risks the backend treating it as a real property
@@ -546,7 +549,8 @@ export const fetchUnitList = (
   // convention for an optional filter (unverified live, but consistent
   // with how other optional list filters in this codebase are handled).
   const propertyIdParam = propertyId ? `&propertyId=${propertyId}` : '';
-  const queryString = `?sort=${encodeURIComponent(sort ?? "id,desc")}&page=${page ?? 0}&size=${size ?? 14}${propertyIdParam}&search=${encodeURIComponent(search || '')}&leaseMode=${encodeURIComponent(leaseMode || '')}`;
+  const unitIdParam = unitId ? `&unitId=${unitId}` : '';
+  const queryString = `?sort=${encodeURIComponent(sort ?? "id,desc")}&page=${page ?? 0}&size=${size ?? 14}${propertyIdParam}${unitIdParam}&search=${encodeURIComponent(search || '')}&leaseMode=${encodeURIComponent(leaseMode || '')}`;
    return API.get(`/property/unit/list${queryString}`,
     config
 );
