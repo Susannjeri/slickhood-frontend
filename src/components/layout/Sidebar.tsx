@@ -52,7 +52,7 @@ import { ChevronUp, User, Briefcase, ChevronDown, Power, Check, UserCog, UserPlu
 import { FaUserTie, FaBuilding, FaTools, FaHandshake } from "react-icons/fa";
 import JobsDrawer from "@/components/JobsDrawer";
 import { cn } from "@/lib/utils";
-import { businessAreaForRoleTitle, roleDisplayName, workspaceHrefForRole } from "@/config/businessAreas";
+import { businessAreaForRoleTitle, PROFILE_DASHBOARD_HREF, roleDisplayName } from "@/config/businessAreas";
 import { getSubscriptionOverview, subscriptionRoleForTitle } from "@/services/subscription.service";
 import { getTeamWorkspaces, TeamWorkspaceOption } from "@/lib/api";
 
@@ -177,7 +177,7 @@ export default function AppSidebar() {
       setActiveRole(role);
       setSelectedBusinessAreaId(businessAreaForRoleTitle(role.title)?.id ?? null);
       setActiveWorkspaceId(null);
-      router.push(workspaceHrefForRole(role.title));
+      router.push(PROFILE_DASHBOARD_HREF);
       setTimeout(() => setSwitching(false), 500);
     }, 50);
   };
@@ -308,8 +308,9 @@ export default function AppSidebar() {
                 onChange={event => {
                   setActiveWorkspaceId(Number(event.target.value));
                   // A workspace switch changes the authorization boundary for every open panel.
-                  // Reload so no data fetched for the previous workspace remains on screen.
-                  window.location.reload();
+                  // Enter through a fresh dashboard request so data from the previous workspace
+                  // cannot remain visible and the new workspace starts from its overview.
+                  window.location.assign(PROFILE_DASHBOARD_HREF);
                 }}
                 className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-[#08184A]"
               >

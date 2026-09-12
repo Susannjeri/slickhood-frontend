@@ -1,4 +1,4 @@
-import { businessAreas, normalizedRoleTitle } from "@/config/businessAreas";
+import { businessAreas, normalizedRoleTitle, PROFILE_DASHBOARD_HREF } from "@/config/businessAreas";
 import { getCurrentSubscription } from "@/services/subscription.service";
 import type { Role } from "@/store/authStore";
 import { getCurrentKyc } from "@/services/kyc.service";
@@ -26,18 +26,18 @@ export async function resolveOnboardingContinuation(
   const normalizedRole = normalizedRoleTitle(activeRole.title);
   const internalRoles = ["superadmin", "support", "salesmarketing", "finance", "insuranceadviser", "insurancemanager", "guard", "propertymanager"];
   if (normalizedRole === "superadmin") {
-    return { complete: true, destination: "/dashboard", message: "Your workspace is ready." };
+    return { complete: true, destination: PROFILE_DASHBOARD_HREF, message: "Your workspace is ready." };
   }
   if (normalizedRole === "insuranceadviser" || normalizedRole === "insurancemanager") {
     return {
       complete: true,
-      destination: "/dashboard/insurance",
+      destination: PROFILE_DASHBOARD_HREF,
       areaTitle: "Insurance Operations",
       message: "Your Insurance Operations workspace is ready.",
     };
   }
   if (internalRoles.includes(normalizedRole)) {
-    return { complete: true, destination: "/dashboard", message: "Your assigned staff workspace is ready." };
+    return { complete: true, destination: PROFILE_DASHBOARD_HREF, message: "Your assigned staff workspace is ready." };
   }
 
   const kyc = await getCurrentKyc();
@@ -54,7 +54,7 @@ export async function resolveOnboardingContinuation(
   if (normalizedRole === "homeowner") {
     return {
       complete: true,
-      destination: "/dashboard/homeowners?onboarding=agreement",
+      destination: PROFILE_DASHBOARD_HREF,
       areaTitle: "My Home",
       message: "Your homeowner workspace is ready. Review your assigned home and estate agreement.",
     };
@@ -62,7 +62,7 @@ export async function resolveOnboardingContinuation(
   if (normalizedRole === "buyer") {
     return {
       complete: true,
-      destination: "/dashboard/sales?onboarding=offer",
+      destination: PROFILE_DASHBOARD_HREF,
       areaTitle: "My Property Purchase",
       message: "Your buyer workspace is ready. Review the invited property and its Letter of Offer.",
     };
@@ -73,7 +73,7 @@ export async function resolveOnboardingContinuation(
     : undefined;
   const area = selectedArea ?? businessAreas.find(item => item.roleTitles.includes(normalizedRole));
   if (!area) {
-    return { complete: true, destination: "/dashboard", message: "Your assigned workspace is ready." };
+    return { complete: true, destination: PROFILE_DASHBOARD_HREF, message: "Your assigned workspace is ready." };
   }
 
   const response = await getCurrentSubscription(token, area.subscriptionRole);
@@ -89,7 +89,7 @@ export async function resolveOnboardingContinuation(
 
   return {
     complete: true,
-    destination: area.workspaceHref,
+    destination: PROFILE_DASHBOARD_HREF,
     areaTitle: area.title,
     message: `Your ${area.title} workspace is ready.`,
   };

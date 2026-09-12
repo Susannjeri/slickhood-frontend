@@ -128,7 +128,7 @@ test("same-role staff explicitly select a workspace and subsequent requests carr
   expect(persisted.activeWorkspaceId).toBe(32);
 });
 
-test("switching a primary business role selects its product and opens its own workspace", async ({ context, page }) => {
+test("switching a primary business role selects its product and opens its dashboard", async ({ context, page }) => {
   const landlord = { title: "Landlord", permissions: ["view_property"] };
   const estateManager = { title: "EstateManager", permissions: ["view_estate", "manage_estate"] };
   const token = testToken([landlord, estateManager]);
@@ -142,12 +142,12 @@ test("switching a primary business role selects its product and opens its own wo
   }, { roles: [landlord, estateManager], token });
   await page.route("**/browser-session/get-token", route => route.fulfill({ json: { data: { jwt: token } } }));
   await page.route("**/kyc/current", route => route.fulfill({ json: { success: true, data: [{ status: "APPROVED", accountStatus: "ACTIVE", phoneVerified: true, requirements: [], missingRequirements: [], documents: [] }] } }));
-  let estateRequestRole: string | undefined;
-  await page.route("**/estate/ownership**", route => {
-    estateRequestRole = route.request().headers()["x-slickhood-role"];
-    return route.fulfill({ json: { success: true, data: [] } });
+  let dashboardRequestRole: string | undefined;
+  await page.route("**/dash/totals**", route => {
+    dashboardRequestRole = route.request().headers()["x-slickhood-role"];
+    return route.fulfill({ json: { success: true, data: [{ role: "ESTATE_MANAGER", primaryCount: 0, secondaryCount: 0, pendingActions: 0, completedCount: 0 }] } });
   });
-  await page.route("**/estate/service-charges**", route => route.fulfill({ json: { success: true, data: [] } }));
+  await page.route("**/reports/catalog**", route => route.fulfill({ json: { success: true, data: [] } }));
 
   // Use a role-neutral dashboard page so unrelated dashboard data calls cannot
   // invalidate the deliberately synthetic multi-role browser session.
@@ -155,12 +155,30 @@ test("switching a primary business role selects its product and opens its own wo
   await page.getByRole("button", { name: /Active Role.*Landlord/i }).click();
   await page.getByRole("button", { name: /Estate Management/ }).click();
 
-  await expect(page).toHaveURL(/\/dashboard\/estate$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole("heading", { name: "Estate Management dashboard" })).toBeVisible();
   const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state);
   expect(persisted.activeRole.title).toBe("EstateManager");
   expect(persisted.selectedBusinessAreaId).toBe("estate-management");
-  expect(estateRequestRole).toBe("EstateManager");
+  expect(dashboardRequestRole).toBe("EstateManager");
 });
+
+for (const profile of [
+  { title: "Tenant", dashboard: "Tenant dashboard" },
+  { title: "Buyer", dashboard: "Property Buyer dashboard" },
+  { title: "Homeowner", dashboard: "Homeowner dashboard" },
+]) {
+  test(`${profile.title} normal sign-in continuation opens the dashboard`, async ({ context, page }) => {
+    await authenticated(context, page, { title: profile.title, permissions: [] });
+    await page.route("**/dash/totals**", route => route.fulfill({ json: { success: true, data: [{ role: profile.title.toUpperCase(), primaryCount: 0, secondaryCount: 0, pendingActions: 0, completedCount: 0 }] } }));
+    await page.route("**/reports/catalog**", route => route.fulfill({ json: { success: true, data: [] } }));
+
+    await page.goto("/continue-setup");
+
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByRole("heading", { name: profile.dashboard })).toBeVisible();
+  });
+}
 
 for (const participant of ["Tenant", "Buyer", "Homeowner"]) {
   test(`${participant} cannot open owner subscription controls`, async ({ context, page }) => {

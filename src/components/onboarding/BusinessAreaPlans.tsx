@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Loader2, ShieldCheck, Sparkl
 import { toast } from "sonner";
 import axios from "axios";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { businessAreas, normalizedRoleTitle } from "@/config/businessAreas";
+import { businessAreas, normalizedRoleTitle, PROFILE_DASHBOARD_HREF } from "@/config/businessAreas";
 import {
   CurrentSubscription,
   getCurrentSubscription,
@@ -102,8 +102,8 @@ export default function BusinessAreaPlans() {
   if (loading) return <main className="flex min-h-screen items-center justify-center bg-slate-50"><Loader2 className="h-9 w-9 animate-spin text-[#ff4b1f]" /></main>;
   if (!selectedRole || !subscriptionRole) return <main className="flex min-h-screen items-center justify-center bg-slate-50 px-5"><div className="max-w-lg rounded-3xl bg-white p-10 text-center"><h1 className="text-2xl font-bold text-[#071744]">Role required</h1><p className="mt-3 text-slate-500">This business area is not attached to one of your roles.</p><button onClick={() => router.replace("/business-areas")} className="mt-6 rounded-xl bg-[#071744] px-6 py-3 font-bold text-white">Back</button></div></main>;
 
-  const workspaceHref = area.workspaceHref;
-  if (current) return <main className="min-h-screen bg-slate-50 px-5 py-16"><div className="mx-auto max-w-2xl rounded-[32px] border border-emerald-200 bg-white p-10 text-center shadow-xl"><ShieldCheck className="mx-auto h-16 w-16 text-emerald-500" /><p className="mt-5 text-sm font-bold uppercase tracking-[0.2em] text-emerald-600">Subscription active for {selectedRole.title}</p><h1 className="mt-2 text-4xl font-bold text-[#071744]">{current.planDetails.displayName}</h1><p className="mt-3 text-slate-500">This role has its own subscription. Changing role will load that role&apos;s separate plan.</p><p className="mt-5 rounded-2xl bg-orange-50 p-4 font-semibold text-[#ff4b1f]">Current term ends {current.endAt ? new Date(current.endAt).toLocaleDateString("en-KE", { dateStyle: "long" }) : "without expiry"}</p><button onClick={() => router.push(workspaceHref)} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#ff4b1f] px-7 py-3 font-bold text-white">Enter {area.title}<ArrowRight className="h-4 w-4" /></button></div></main>;
+  const profileLandingHref = PROFILE_DASHBOARD_HREF;
+  if (current) return <main className="min-h-screen bg-slate-50 px-5 py-16"><div className="mx-auto max-w-2xl rounded-[32px] border border-emerald-200 bg-white p-10 text-center shadow-xl"><ShieldCheck className="mx-auto h-16 w-16 text-emerald-500" /><p className="mt-5 text-sm font-bold uppercase tracking-[0.2em] text-emerald-600">Subscription active for {selectedRole.title}</p><h1 className="mt-2 text-4xl font-bold text-[#071744]">{current.planDetails.displayName}</h1><p className="mt-3 text-slate-500">This role has its own subscription. Changing role will load that role&apos;s separate plan.</p><p className="mt-5 rounded-2xl bg-orange-50 p-4 font-semibold text-[#ff4b1f]">Current term ends {current.endAt ? new Date(current.endAt).toLocaleDateString("en-KE", { dateStyle: "long" }) : "without expiry"}</p><button onClick={() => router.push(profileLandingHref)} className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[#ff4b1f] px-7 py-3 font-bold text-white">Enter {area.title}<ArrowRight className="h-4 w-4" /></button></div></main>;
 
   return (
     <main className="min-h-screen bg-[#f4f5f7] px-5 py-10 text-[#071744] sm:py-14">

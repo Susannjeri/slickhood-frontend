@@ -13,6 +13,8 @@ export interface BusinessArea {
   highlights: string[];
 }
 
+export const PROFILE_DASHBOARD_HREF = "/dashboard";
+
 export const businessAreas: BusinessArea[] = [
   {
     id: "property-management",
