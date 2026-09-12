@@ -29,6 +29,10 @@ jobs:
           node --test scripts/validate-build-env.test.mjs
           npm run lint:ci
       - name: Production build
+        env:
+          # CI verifies the deployable bundle without production credentials.
+          # The deployment workflow supplies and validates the real production URL.
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8080
         run: npm run build
       - name: Install browser runtime
         run: npx playwright install --with-deps chromium
