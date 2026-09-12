@@ -255,6 +255,75 @@ test("a valid invitation alone enables the guided login state", async ({ page })
   );
 });
 
+test("an existing invited user can recover access without losing the invitation", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/inspect**", route => route.fulfill({ json: {
+    success: true, code: "S00127", description: "Link is valid.",
+    data: [{ type: "BUYER", expiresAt: "2026-10-01T00:00:00", validForSeconds: 86400 }],
+  } }));
+  await page.route("**/auth/login", route => route.fulfill({
+    status: 401,
+    contentType: "application/json",
+    body: JSON.stringify({ success: false, code: "S0005", description: "Incorrect credentials.", data: [] }),
+  }));
+
+  await page.goto("/login?invitation=ready&token=buyer-token&returnTo=%2Flease%2Finitialize");
+  await page.getByPlaceholder("you@example.com").fill("buyer@example.test");
+  await page.getByPlaceholder("••••••••").fill("WrongPass1!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page.getByTestId("login-form").getByRole("alert")).toContainText("Your invitation is still safe");
+  await expect(page.getByRole("link", { name: "Reset password" })).toHaveAttribute(
+    "href",
+    /\/forgot-password\?.*token=buyer-token.*returnTo=%2Flease%2Finitialize/,
+  );
+  await expect(page.getByRole("link", { name: "Sign in without this invitation" })).toHaveAttribute("href", "/login");
+});
+
+test("an invitation attachment problem does not trap an existing user", async ({ page }) => {
+  const jwt = testToken([{ title: "Buyer", permissions: [] }]);
+  let loginAttempts = 0;
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/inspect**", route => route.fulfill({ json: {
+    success: true, code: "S00127", description: "Link is valid.",
+    data: [{ type: "BUYER", expiresAt: "2026-10-01T00:00:00", validForSeconds: 86400 }],
+  } }));
+  await page.route("**/auth/login", route => {
+    loginAttempts += 1;
+    const payload = route.request().postDataJSON();
+    if (loginAttempts === 1) {
+      expect(payload.token).toBe("buyer-token");
+      return route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ success: false, code: "S00175", description: "Invalid user details found.", data: [] }),
+      });
+    }
+    expect(payload.token).toBeUndefined();
+    return route.fulfill({ json: envelope([{
+      jwt, refreshToken: "buyer-refresh-token-long-enough", totpEnabled: false, mfaSetup: true,
+    }]) });
+  });
+  await page.route("**/kyc/current", route => route.fulfill({ json: envelope([{
+    status: "APPROVED", accountStatus: "ACTIVE", phoneVerified: true,
+    requirements: [], missingRequirements: [], documents: [],
+  }]) }));
+  await page.route("**/subscription/current**", route => route.fulfill({ json: envelope([]) }));
+
+  await page.goto("/login?invitation=ready&token=buyer-token&returnTo=%2Flease%2Finitialize");
+  await page.getByPlaceholder("you@example.com").fill("buyer@example.test");
+  await page.getByPlaceholder("••••••••").fill("ValidPass1!");
+  await page.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(page.getByTestId("login-form").getByRole("alert")).toContainText("Your account was found");
+  await expect(page.getByText("Invalid user details found.")).toHaveCount(0);
+  await page.getByRole("button", { name: "Open my SlickHood account" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  expect(loginAttempts).toBe(2);
+  const storedInvite = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state?.inviteToken);
+  expect(storedInvite).toBeNull();
+});
+
 test("an invitation that expires during sign-in is cleared immediately", async ({ page }) => {
   await page.route("https://accounts.google.com/**", route => route.abort());
   await page.route("**/invite/inspect**", route => route.fulfill({ json: {

@@ -18,7 +18,10 @@ import { inspectInviteToken } from "@/lib/api";
 import axios from "axios";
 
 type InvitationStatus = "none" | "checking" | "valid" | "invalid" | "unavailable";
+type InvitationSignInProblem = "credentials" | "attachment" | null;
 const EXPIRED_INVITATION_CODES = new Set(["S0020", "S00128", "S00129"]);
+const CREDENTIAL_RECOVERY_CODES = new Set(["S0004", "S0005", "S0031", "S0036"]);
+const INVITATION_ATTACHMENT_CODES = new Set(["S00175", "S0023"]);
 
 function loginUrlWithoutInvitation() {
   const current = new URL(window.location.href);
@@ -43,6 +46,7 @@ export default function LoginForm() {
   const [loading, setLoading]           = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [googleReady, setGoogleReady]   = useState(false);
+  const [invitationSignInProblem, setInvitationSignInProblem] = useState<InvitationSignInProblem>(null);
   const [invitationCheck, setInvitationCheck] = useState<{
     token: string | null;
     status: Exclude<InvitationStatus, "none" | "checking">;
@@ -133,6 +137,8 @@ export default function LoginForm() {
 
   const handleCredentialResponse = async (response: any) => {
     setLoading(true);
+    setError(null);
+    setInvitationSignInProblem(null);
     const pendingInvite = validatedInviteRef.current;
     const returnTo = safeInvitationReturnTo(window.location.search);
     const result = await handleGoogleLogin(response.credential);
@@ -152,6 +158,11 @@ export default function LoginForm() {
         setInvitationCheck({ token: pendingInvite, status: "invalid" });
         router.replace(loginUrlWithoutInvitation(), { scroll: false });
         setError("This invitation has expired or is no longer available. Ask the sender for a new invitation, or sign in normally.");
+      } else if (pendingInvite && INVITATION_ATTACHMENT_CODES.has(result.error_code ?? "")) {
+        setInvitationSignInProblem("attachment");
+        setError(result.error_code === "S0023"
+          ? "This invitation cannot be accepted by the same account that sent it. You can still open your existing SlickHood account below."
+          : "Google sign-in found your account, but this invitation could not be linked to it. You can still sign in without the invitation and ask the sender to resend it.");
       } else {
         setError(result.message);
       }
@@ -205,6 +216,7 @@ export default function LoginForm() {
   async function onSubmit(values: LoginSchema) {
     setError(null);
     setSuccess(null);
+    setInvitationSignInProblem(null);
     setLoading(true);
     const pendingInvite = effectiveInviteToken;
     const returnTo = safeInvitationReturnTo(window.location.search);
@@ -215,6 +227,14 @@ export default function LoginForm() {
         setInvitationCheck({ token: pendingInvite, status: "invalid" });
         router.replace(loginUrlWithoutInvitation(), { scroll: false });
         setError("This invitation has expired or is no longer available. Ask the sender for a new invitation, or sign in normally.");
+      } else if (pendingInvite && CREDENTIAL_RECOVERY_CODES.has(result.error_code ?? "")) {
+        setInvitationSignInProblem("credentials");
+        setError("We could not sign you in with those details. Your invitation is still safe. Check your password, reset it, or use the matching Google account.");
+      } else if (pendingInvite && INVITATION_ATTACHMENT_CODES.has(result.error_code ?? "")) {
+        setInvitationSignInProblem("attachment");
+        setError(result.error_code === "S0023"
+          ? "This invitation cannot be accepted by the same account that sent it. You can still open your existing SlickHood account below."
+          : "Your account was found, but this invitation could not be linked to it. You can still open your existing SlickHood account and ask the sender to resend the invitation.");
       } else {
         setError(result.message || "Login failed");
       }
@@ -242,12 +262,55 @@ export default function LoginForm() {
     if (returnTo && pendingInvite) setInviteToken(pendingInvite);
     setSuccess("Welcome back — checking where you left off...");
     setLoading(false);
-    // The secure session cookie is created immediately before this hand-off.
-    // Force a fresh document request so Next cannot reuse an unauthenticated
-    // prefetched response for the protected continuation route.
-    window.location.replace(returnTo && pendingInvite
+    // Keep the in-memory access token while Next requests the protected route
+    // with the secure cookie created above. A full browser reload loses the
+    // deliberately non-persisted token and can send a valid existing user back
+    // to sign-in before invitation acceptance finishes.
+    const destination = returnTo && pendingInvite
       ? invitationUrl(returnTo, pendingInvite)
-      : "/continue-setup");
+      : "/continue-setup";
+    router.replace(destination);
+    router.refresh();
+  }
+
+  async function openExistingAccountWithoutInvitation() {
+    const values = form.getValues();
+    const pendingInvite = effectiveInviteToken;
+    setError(null);
+    setLoading(true);
+    // Remove the invitation before the second request. This authenticates the
+    // existing account only; it cannot grant the invited role or entity access.
+    setInviteToken(null);
+    const result = await login(values.email, values.password);
+    if (!result.success) {
+      if (pendingInvite) setInviteToken(pendingInvite);
+      setInvitationSignInProblem("attachment");
+      setError("We still could not open your account. Reset your password, use Google, or contact support if the problem continues.");
+      setLoading(false);
+      return;
+    }
+    if (result.requiresVerification) {
+      setEmail(values.email);
+      setStep("verify");
+      setLoading(false);
+      router.replace("/verify-code");
+      return;
+    }
+    if (!result.token) {
+      if (pendingInvite) setInviteToken(pendingInvite);
+      setInvitationSignInProblem("attachment");
+      setError("Your account sign-in could not be completed. Please try again.");
+      setLoading(false);
+      return;
+    }
+    setToken(result.token);
+    setmfaEnabled(result.mfaEnabled);
+    settotpEnabled(result.totpEnabled);
+    setEmail(values.email.trim().toLowerCase());
+    setSuccess("Welcome back — opening your dashboard...");
+    setLoading(false);
+    router.replace("/dashboard");
+    router.refresh();
   }
 
   const inputClass = "h-11 rounded-lg text-base focus-visible:ring-[#EF4217]";
@@ -352,7 +415,40 @@ export default function LoginForm() {
 
           {/* Feedback */}
           {success && <p className="text-green-600 text-sm text-center font-medium">{success}</p>}
-          {error   && <p className="text-red-500  text-sm text-center font-medium">{error}</p>}
+          {error && (
+            <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              <p className="font-medium">{error}</p>
+              {invitationSignInProblem && effectiveInviteToken && (
+                <div data-testid="invitation-sign-in-recovery" className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  {invitationSignInProblem === "credentials" && (
+                    <Link
+                      href={invitationUrl("/forgot-password", effectiveInviteToken, invitationReturnTo)}
+                      className="inline-flex min-h-9 items-center justify-center rounded-md bg-[#EF4217] px-3 font-semibold text-white hover:bg-[#d63600]"
+                    >
+                      Reset password
+                    </Link>
+                  )}
+                  {invitationSignInProblem === "attachment" ? (
+                    <button
+                      type="button"
+                      onClick={openExistingAccountWithoutInvitation}
+                      className="inline-flex min-h-9 items-center justify-center rounded-md border border-red-300 bg-white px-3 font-semibold text-red-800 hover:bg-red-100"
+                    >
+                      Open my SlickHood account
+                    </button>
+                  ) : (
+                    <Link
+                      href="/login"
+                      onClick={() => setInviteToken(null)}
+                      className="inline-flex min-h-9 items-center justify-center rounded-md border border-red-300 bg-white px-3 font-semibold text-red-800 hover:bg-red-100"
+                    >
+                      Sign in without this invitation
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {invitationStatus === "unavailable" && (
             <button
               type="button"
