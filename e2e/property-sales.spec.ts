@@ -36,6 +36,27 @@ test("sales owner starts an email-bound sale from scoped property and unit selec
  expect(body.buyerUserId).toBeUndefined();
 });
 
+test("sales owner sees how to resolve an existing active sale before inviting again",async({context,page})=>{
+ await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline","view_property","view_unit","view_account"]});
+ await page.route("**/property/list**",route=>route.fulfill({json:pageEnvelope([{id:11,name:"Acacia Court",managementMode:"SALE"}])}));
+ await page.route("**/property/unit/list**",route=>route.fulfill({json:pageEnvelope([{unitId:77,propertyId:11,ref:"A-07",currency:"KES",price:15000000,leaseMode:"SALE"}])}));
+ await page.route("**/account/list**",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:81,name:"Sales collections",channel:"MPESA",category:"PROPERTY_SALES",active:true,verified:true}]}}));
+ await page.route("**/lease/documents/templates",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:9,documentType:"PROPERTY_SALE_LETTER_OF_OFFER",legalReviewRequired:false,legalReviewedAt:"2026-09-01T10:00:00"}]}}));
+ await page.route("**/sales**",async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path==="/dashboard/sales"){await route.continue();return}
+  await route.fulfill({json:pageEnvelope([{id:91,propertyId:11,propertyName:"Acacia Court",unitId:77,unitRef:"A-07",salesAgentUserId:100,buyerUserId:200,buyerEmail:"existing@example.com",status:"OFFERED",askingPrice:15000000,offerAmount:14500000,currency:"KES"}])});
+ });
+
+ await page.goto("/dashboard/sales");
+ await page.getByRole("combobox").nth(1).click();
+ await page.getByRole("option",{name:/A-07/}).click();
+ const conflict=page.getByRole("alert").filter({hasText:"This unit already has an active sale"});
+ await expect(conflict).toContainText("This unit already has an active sale");
+ await expect(conflict).toContainText("Continue sale #91 for existing@example.com, currently at Offered");
+ await expect(page.getByRole("button",{name:"Existing sale must be continued or cancelled"})).toBeDisabled();
+});
+
 test("buyer is routed to review and sign the sale letter of offer",async({context,page})=>{
  await authenticated(context,page,{title:"Buyer",permissions:["view_sale_pipeline","accept_sale_offer"]});
  await page.route("**/sales**",async route=>{
