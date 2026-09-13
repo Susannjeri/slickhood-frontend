@@ -82,6 +82,21 @@ jobs:
       - name: Create release checksum
         run: sha256sum deploy.tar.gz > release.sha256
 
+      - name: Prepare remote release staging directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -eu
+            staging=/tmp/slickhood-frontend-release
+            test "$staging" = /tmp/slickhood-frontend-release
+            available_kb="$(df -Pk /tmp | awk 'NR == 2 { print $4 }')"
+            test "${available_kb:-0}" -ge 524288
+            sudo rm -rf -- "$staging"
+            install -d -m 700 "$staging"
+
       - name: SCP archive to server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -90,9 +105,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "deploy.tar.gz,release.sha256"
           target: /tmp/slickhood-frontend-release
-          # This directory contains only disposable deployment transport files.
-          # Remove the previous run so stale archives cannot block or contaminate a release.
-          rm: true
 
       - name: Smoke candidate and perform rollback-safe cutover
         uses: appleboy/ssh-action@v1.0.3
