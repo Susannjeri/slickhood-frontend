@@ -73,7 +73,7 @@ export function MyNotifications() {
           <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex items-center gap-2"><span className="text-slate-500">{item.channel === "EMAIL" ? <Mail className="h-4 w-4"/> : item.channel === "IN_APP" ? <Bell className="h-4 w-4"/> : <MessageSquare className="h-4 w-4"/>}</span><strong>{item.notificationType.replaceAll("_", " ")}</strong>{!item.read && <Badge className="bg-[#EF4217]">New</Badge>}</div><Badge variant={item.delivered ? "default" : "outline"}>{item.delivered ? <CheckCircle2 className="mr-1 h-3 w-3"/> : <Clock3 className="mr-1 h-3 w-3"/>}{deliveryLabel(item)}</Badge></div>
           <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{notificationText(item.message)}</p><time className="mt-3 block text-xs text-muted-foreground" dateTime={item.createdOn}>{new Date(item.createdOn).toLocaleString()}</time>
           <div className="mt-2 flex flex-wrap gap-2">
-            {actionUrl && <Button asChild size="sm"><Link href={actionUrl} onClick={() => { if (!item.read) void markRead(item); }}>Review details</Link></Button>}
+            {actionUrl && <Button asChild size="sm"><Link href={actionUrl} onClick={() => { if (!item.read) void markRead(item); }}>{item.notificationType.includes("INVITE") ? "Review invitation" : "Review details"}</Link></Button>}
             {!item.read && <Button type="button" variant="ghost" size="sm" disabled={marking === item.id} onClick={() => void markRead(item)}><Check className="mr-1 h-4 w-4" />Mark as read</Button>}
           </div>
         </article>;
