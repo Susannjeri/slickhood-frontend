@@ -34,7 +34,6 @@ test("every Silverwood proposal supports repeatable risk items",async({context,p
   {code:"WIBA_EL",name:"WIBA",description:"WIBA",subjectTypes:["EMPLOYEES"],add:"Add job group",remove:"Delete job group"},
   {code:"CONTRACTORS_ALL_RISK",name:"Contractors' All Risk",description:"Construction",subjectTypes:["PROJECT"],add:"Add item",remove:"Delete item"},
   {code:"MEDICAL",name:"Medical",description:"Medical",subjectTypes:["FAMILY_INDIVIDUAL","CORPORATE"],add:"Add item",remove:"Delete item"},
-  {code:"MARINE_CARGO",name:"Marine Cargo",description:"Marine",subjectTypes:["GOODS"],add:"Add item",remove:"Delete item"},
   {code:"TRAVEL",name:"Travel",description:"Travel",subjectTypes:["PERSON"],add:"Add item",remove:"Delete item"},
   {code:"GOODS_IN_TRANSIT",name:"Goods in Transit",description:"Cargo",subjectTypes:["GOODS"],add:"Add item",remove:"Delete item"},
  ];
@@ -54,6 +53,31 @@ test("every Silverwood proposal supports repeatable risk items",async({context,p
   await expect(dialog.getByRole("button",{name:item.remove})).toHaveCount(before);
   await dialog.getByRole("button",{name:"Cancel"}).click();
  }
+});
+
+test("marine cargo IDF OCR populates immutable declarations and supports several consignments",async({context,page})=>{
+ let submitted:Record<string,unknown>|undefined,uploaded=0;
+ const marine={code:"MARINE_CARGO",name:"Marine Cargo",description:"Marine cargo cover",subjectTypes:["GOODS"]};
+ await authenticated(context,page,{title:"Homeowner",permissions:[]});
+ await page.route("**/insurance/agency",route=>route.fulfill({json:envelope({code:"SILVERWOOD",name:"Silverwood Insurance Agency"})}));
+ await page.route("**/insurance/products",route=>route.fulfill({json:envelope([marine])}));
+ await page.route("**/insurance/companies",route=>route.fulfill({json:envelope([])}));
+ await page.route("**/insurance/proposal-ocr/marine-idf",async route=>{const body=await route.request().postDataBuffer(),second=body?.includes(Buffer.from("SECOND"));return route.fulfill({json:envelope({idfNumber:second?"2026IM000124":"2026IM000123",importerName:"Example Importer Limited",importerPin:"P051234567A",origin:"China",portOfDischarge:"Mombasa",hsCode:"8703.23.90",descriptionAndApplication:second?"Industrial motors":"Industrial pumps",fobValue:second?"7500000":"5000000",transportMode:"SEA",netMass:second?"1800":"1250",quantity:second?"30":"20",unitOfMeasure:"PCS",confidence:96.2,reviewFields:[],extractionReference:second?"trusted-2":"trusted-1"})})});
+ await page.route("**/insurance/cases",async route=>{if(route.request().method()==="POST"){submitted=route.request().postDataJSON();return route.fulfill({json:envelope({id:91,reference:"INS-2026-MARINE",status:"SUBMITTED"})})}return route.fulfill({json:envelope([])})});
+ for(const endpoint of ["policies","renewals","claims"])await page.route(`**/insurance/${endpoint}`,route=>route.fulfill({json:envelope([])}));
+ await page.route("**/insurance/documents",route=>{if(route.request().method()==="POST")uploaded+=1;return route.fulfill({json:envelope(route.request().method()==="POST"?{id:uploaded}:[])});});
+ await page.goto("/dashboard/insurance");
+ await page.getByRole("button",{name:/Request a quote/}).first().click();
+ const dialog=page.getByRole("dialog");
+ await dialog.getByLabel("Full name").fill("Amina Kamau");await dialog.getByLabel("Phone").fill("0712345678");await dialog.getByLabel("Email").fill("amina@example.com");
+ await dialog.getByLabel("Preferred cover start").fill(new Date(Date.now()+86_400_000).toISOString().slice(0,10));
+ await dialog.getByLabel("Import Declaration Form (IDF / IM0)").setInputFiles({name:"first-idf.pdf",mimeType:"application/pdf",buffer:Buffer.from("%PDF-1.4 FIRST")});
+ await expect(dialog.getByLabel("IDF number")).toHaveValue("2026IM000123");await expect(dialog.getByLabel("Importer PIN")).toHaveAttribute("readonly","");await expect(dialog.getByLabel("FOB value")).toHaveAttribute("readonly","");
+ await dialog.getByLabel("Import Declaration Form (IDF / IM0)").setInputFiles({name:"second-idf.pdf",mimeType:"application/pdf",buffer:Buffer.from("%PDF-1.4 SECOND")});
+ await expect(dialog.getByLabel("IDF number")).toHaveCount(2);await expect(dialog.getByTestId("proposal-estimated-total")).toContainText("12,500,000");
+ await dialog.locator('input[type="checkbox"]').check();await dialog.getByRole("button",{name:"Submit request"}).click();
+ await expect.poll(()=>uploaded).toBe(2);
+ expect(submitted).toMatchObject({productCode:"MARINE_CARGO",sumInsured:12500000,proposalData:{consignments:[{idfNumber:"2026IM000123",importerName:"Example Importer Limited",fobValue:"5000000",quantity:"20"},{idfNumber:"2026IM000124",descriptionAndApplication:"Industrial motors",fobValue:"7500000",quantity:"30"}]}});
 });
 
 test("customer records payment and withdraws an eligible application with explicit dialogs",async({context,page})=>{

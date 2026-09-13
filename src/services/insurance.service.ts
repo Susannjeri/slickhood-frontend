@@ -9,6 +9,7 @@ export type InsuranceAccount={id:number;name:string;category:string;channel:stri
 export type PaymentDetail={key:string;label:string;description:string;value:string;displayField:boolean};
 export type InsurancePaymentOption={id:number;companyCode:string;companyName:string;accountName:string;channel:string;label:string;instructions:string;referenceTemplate?:string;paymentDetails:PaymentDetail[]};
 export type InsuranceProduct={code:string;name:string;description:string;subjectTypes:string[]};
+export type MarineIdfOcrResult={idfNumber:string;importerName:string;importerPin:string;origin:string;portOfDischarge:string;hsCode:string;descriptionAndApplication:string;fobValue:string;transportMode:string;netMass:string;quantity:string;unitOfMeasure:string;confidence:number;reviewFields:string[];extractionReference:string};
 export type InsuranceQuote={id:number;companyId:number;companyCode:string;companyName:string;quoteNumber?:string;status:string;currency:string;basePremium:number;taxesLevies:number;totalPremium:number;excessDetails?:string;coverageSummary:string;exclusions?:string;validUntil:string};
 export type InsurancePayment={id:number;quoteId:number;paymentConfigurationId?:number;amount:number;currency:string;paymentReference:string;paidAt:string;status:string;rejectionReason?:string;remittanceReference?:string;remittedAt?:string;proofAvailable:boolean;proofContentType?:string};
 export type InsuranceCase={id:number;reference:string;productCode:string;status:string;fullName:string;email:string;phone:string;subjectType:string;subjectDescription:string;sumInsured?:number;currency:string;coverStartDate?:string;riskDetails?:string;proposalData:Record<string,unknown>;assignedAdviserId?:number;submittedAt:string;selectedQuoteId?:number;quotes:InsuranceQuote[];payments:InsurancePayment[]};
@@ -36,6 +37,7 @@ export const insuranceService={
  deactivatePaymentConfiguration:(id:number)=>API.delete(`/insurance/admin/payment-configurations/${id}`),
  paymentOptions:async(companyCode:string)=>envelopeList<InsurancePaymentOption>(await API.get(`/insurance/companies/${encodeURIComponent(companyCode)}/payment-options`)),
  products:async()=>envelopeList<InsuranceProduct>(await API.get("/insurance/products")),
+ extractMarineIdf:async(file:File)=>{const f=new FormData();f.append("file",file);return envelopeItem<MarineIdfOcrResult>(await API.post("/insurance/proposal-ocr/marine-idf",f),{} as MarineIdfOcrResult)},
  cases:async()=>envelopeList<InsuranceCase>(await API.get("/insurance/cases")),
  createCase:async(payload:Record<string,unknown>)=>envelopeItem<InsuranceCase>(await API.post("/insurance/cases",payload),{} as InsuranceCase),
  withdrawCase:async(caseId:number)=>envelopeItem<InsuranceCase>(await API.post(`/insurance/cases/${caseId}/withdraw`),{} as InsuranceCase),
