@@ -92,6 +92,9 @@ jobs:
             set -eu
             staging=/tmp/slickhood-frontend-release
             test "$staging" = /tmp/slickhood-frontend-release
+            rollback_count="$(find /home/silverocean -maxdepth 1 -type d -name 'deploy.rollback-*' -printf '.' | wc -c)"
+            echo "Retained frontend rollback releases: $rollback_count"
+            test "$rollback_count" -le 5
             available_kb="$(df -Pk /tmp | awk 'NR == 2 { print $4 }')"
             test "${available_kb:-0}" -ge 524288
             sudo rm -rf -- "$staging"
@@ -178,6 +181,8 @@ jobs:
             sleep 8
             curl --fail --silent --show-error https://app.slickhood.com/login >/dev/null
             cutover_started=false
+            sudo rm -rf -- /tmp/slickhood-frontend-release
+            sudo rmdir "$candidate" 2>/dev/null || true
 
       - name: Verify production authentication contract
         run: bash ./scripts/verify-auth-production.sh

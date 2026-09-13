@@ -17,10 +17,11 @@ const tones=["bg-sky-50 text-sky-700","bg-emerald-50 text-emerald-700","bg-orang
 const money=(n:number|undefined,c="KES")=>n==null?"—":new Intl.NumberFormat("en-KE",{style:"currency",currency:c,maximumFractionDigits:2}).format(n);
 const title=(s:string)=>s.replaceAll("_"," ").toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
 const tone=(s:string)=>s.includes("REJECT")||s==="DECLINED"||s==="LAPSED"?"destructive":s.includes("ISSUED")||s==="ACTIVE"||s==="VERIFIED"||s==="RENEWED"?"default":"secondary";
+const hasAccountRole=(roles:{title:string}[],name:string)=>roles.some(role=>role.title.trim().toLowerCase()===name.toLowerCase());
 
 export default function InsuranceHubPage(){
  const permissions=useAuthStore(s=>s.permissions),roles=useAuthStore(s=>s.roles),canOperate=permissions.some(p=>["review_insurance_applications","manage_insurance_quotes","manage_insurance_claims","manage_insurance_renewals"].includes(p));
- const canInsureBuildings=roles.some(role=>role.title==="Landlord"),canInsureHouseholdItems=canInsureBuildings||roles.some(role=>role.title==="Tenant");
+ const canInsureBuildings=hasAccountRole(roles,"Landlord"),canInsureHouseholdItems=canInsureBuildings||hasAccountRole(roles,"Tenant");
  const [agency,setAgency]=useState<InsuranceAgency>({code:"SILVERWOOD",name:"Silverwood Insurance Agency",logoUrl:"/insurance/brands/silverwood.webp"}),[products,setProducts]=useState<InsuranceProduct[]>([]),[companies,setCompanies]=useState<InsuranceCompany[]>([]),[cases,setCases]=useState<InsuranceCase[]>([]),[policies,setPolicies]=useState<InsurancePolicy[]>([]),[renewals,setRenewals]=useState<InsuranceRenewalJourney[]>([]),[claims,setClaims]=useState<InsuranceClaim[]>([]),[documents,setDocuments]=useState<InsuranceDocument[]>([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
  const [quoteOpen,setQuoteOpen]=useState(false),[claimOpen,setClaimOpen]=useState(false),[documentOpen,setDocumentOpen]=useState(false),[paymentCase,setPaymentCase]=useState<InsuranceCase|null>(null),[withdrawCase,setWithdrawCase]=useState<InsuranceCase|null>(null),[selectedProduct,setSelectedProduct]=useState<InsuranceProduct|null>(null);
  const [paymentOptions,setPaymentOptions]=useState<InsurancePaymentOption[]>([]),[paymentOptionsLoading,setPaymentOptionsLoading]=useState(false);
