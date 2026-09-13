@@ -90,6 +90,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "deploy.tar.gz,release.sha256"
           target: /tmp/slickhood-frontend-release
+          # This directory contains only disposable deployment transport files.
+          # Remove the previous run so stale archives cannot block or contaminate a release.
+          rm: true
 
       - name: Smoke candidate and perform rollback-safe cutover
         uses: appleboy/ssh-action@v1.0.3
