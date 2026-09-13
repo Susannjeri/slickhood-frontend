@@ -1,0 +1,27 @@
+name: Production Host Diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Inspect deployment storage
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -eu
+            echo 'Filesystem capacity (KB)'
+            df -Pk / /tmp /home
+            echo 'SlickHood frontend release directories (KB)'
+            sudo du -sk /home/silverocean/deploy /home/silverocean/deploy.candidate-* /home/silverocean/deploy.rollback-* 2>/dev/null || true
+            echo 'Frontend transport directory (KB)'
+            sudo du -sk /tmp/slickhood-frontend-release 2>/dev/null || true
