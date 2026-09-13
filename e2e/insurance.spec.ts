@@ -94,7 +94,7 @@ test("customer records payment and withdraws an eligible application with explic
  await page.route("**/insurance/companies/APA/payment-options",route=>route.fulfill({json:envelope([{id:7,companyCode:"APA",companyName:"APA Insurance",accountName:"APA Premium Collection",channel:"MPESA",label:"Pay APA premium",instructions:"Use your application reference when paying.",referenceTemplate:"INS-YYYY-XXXX",paymentDetails:[{key:"paybill",label:"Paybill",description:"",value:"123456",displayField:true}]}])}));
  await page.route("**/insurance/cases/45/withdraw",async route=>{withdrawn=true;await route.fulfill({json:envelope({...draft,status:"WITHDRAWN"})})});
  await page.goto("/dashboard/insurance");
- await page.getByRole("button",{name:"Record payment"}).click();
+ await page.getByRole("button",{name:"Continue to payment"}).click();
  const paymentDialog=page.getByRole("dialog");
  await expect(paymentDialog.getByRole("heading",{name:"Pay the insurer and record payment"})).toBeVisible();
  await expect(paymentDialog.getByText("Paybill")).toBeVisible();await expect(paymentDialog.getByText("123456")).toBeVisible();
@@ -122,21 +122,23 @@ test("authorised Silverwood staff can open the operations queue",async({context,
  await expect(page.getByText("Payments to verify")).toBeVisible();await expect(page.getByText("2",{exact:true})).toBeVisible();
 });
 
-test("insurance adviser queue does not request manager reporting or show approval controls",async({context,page})=>{
- let summaryRequests=0,dispatched=false;
+test("insurance adviser requests at least three quotes and converts a verified reply",async({context,page})=>{
+ let summaryRequests=0,dispatched:string[]=[];
  await authenticated(context,page,{title:"InsuranceAdviser",permissions:["review_insurance_applications","manage_insurance_quotes","manage_insurance_claims","manage_insurance_renewals"]});
  await page.route("**/insurance/admin/operations/summary",r=>{summaryRequests+=1;return r.fulfill({status:403,json:envelope(null)})});
  await page.route("**/insurance/admin/cases**",r=>r.fulfill({json:envelope({content:[{id:1,reference:"INS-2026-TEST",productCode:"MOTOR",status:"QUOTED",fullName:"Amina Kamau",phone:"0712345678",email:"amina@example.com",subjectDescription:"Toyota Fielder",assignedAdviserId:7,riskDetails:null,quotes:[{id:9,status:"DRAFT",companyName:"APA Insurance"}],payments:[]}],totalElements:1,totalPages:1,number:0,size:100})}));
  await page.route("**/insurance/admin/staff",r=>r.fulfill({json:envelope([{id:7,fullName:"Amina Adviser",email:"amina@example.com",roleName:"INSURANCE_ADVISER"}])}));
  await page.route("**/insurance/admin/claims**",r=>r.fulfill({json:envelope({content:[],totalElements:0,totalPages:0,number:0,size:100})}));
  await page.route("**/insurance/admin/renewals**",r=>r.fulfill({json:envelope({content:[],totalElements:0,totalPages:0,number:0,size:100})}));
- await page.route("**/insurance/companies",r=>r.fulfill({json:envelope([{id:1,code:"APA",name:"APA Insurance",active:true}])}));
- await page.route("**/insurance/admin/cases/1/request-quote",async r=>{dispatched=true;expect(r.request().postDataJSON()).toEqual({companyCode:"APA"});return r.fulfill({json:envelope({status:"QUEUED"})})});
+ await page.route("**/insurance/companies",r=>r.fulfill({json:envelope([{id:1,code:"APA",name:"APA Insurance",active:true},{id:2,code:"BRITAM",name:"Britam",active:true},{id:3,code:"CIC",name:"CIC Insurance",active:true}])}));
+ await page.route("**/insurance/admin/quotation-companies",r=>r.fulfill({json:envelope([{id:1,code:"APA",name:"APA Insurance",quotationEmail:"quotes@apa.test",readyForQuotations:true},{id:2,code:"BRITAM",name:"Britam",quotationEmail:"quotes@britam.test",readyForQuotations:true},{id:3,code:"CIC",name:"CIC Insurance",quotationEmail:"quotes@cic.test",readyForQuotations:true}])}));
+ await page.route("**/insurance/admin/cases/1/request-quotes",async r=>{dispatched=r.request().postDataJSON().companyCodes;return r.fulfill({json:envelope([])})});
  await page.route("**/insurance/admin/cases/INS-2026-TEST/email-history",r=>r.fulfill({json:envelope([{id:3,companyCode:"APA",companyName:"APA Insurance",caseReference:"INS-2026-TEST",correlationId:"test",messageType:"QUOTATION_REQUEST",direction:"INBOUND",status:"RECEIVED_VERIFIED",senderAddress:"quotes@apa.test",recipientAddress:"info@silverwoodinsurance.com",subject:"Re: quotation",receivedAt:"2026-09-13T10:00:00"}])}));
  await page.goto("/dashboard/insurance/operations");
  await expect(page.getByRole("button",{name:"Add quote"})).toBeVisible();
- await page.getByRole("button",{name:"Send to insurer"}).click();await page.getByRole("button",{name:"Send secure request"}).click();await expect.poll(()=>dispatched).toBe(true);
+ await page.getByRole("button",{name:"Send to insurer"}).click();const dispatchDialog=page.getByRole("dialog");for(const insurer of ["APA Insurance","Britam","CIC Insurance"])await dispatchDialog.getByText(insurer,{exact:true}).locator("xpath=ancestor::label").getByRole("checkbox").check();await dispatchDialog.getByRole("button",{name:"Send to 3 insurers"}).click();await expect.poll(()=>dispatched).toEqual(["APA","BRITAM","CIC"]);
  await page.getByRole("button",{name:"Correspondence"}).click();const correspondenceDialog=page.getByRole("dialog");await expect(correspondenceDialog.getByText("Received Verified")).toBeVisible();
+ await expect(correspondenceDialog.getByRole("button",{name:"Create quote from verified response"})).toBeVisible();
  await expect(page.getByRole("button",{name:/Approve APA/})).toHaveCount(0);
  expect(summaryRequests).toBe(0);
 });
@@ -217,9 +219,7 @@ test("insurance journey runs from customer quote selection through policy issue 
 
  await page.goto("/dashboard/insurance");
  await page.getByRole("tab",{name:/Quotes/}).click();
- await page.getByRole("button",{name:"Choose this quote"}).click();
- await page.getByRole("tab",{name:/Applications/}).click();
- await page.getByRole("button",{name:"Record payment"}).click();
+ await page.getByRole("button",{name:"Choose & continue to payment"}).click();
  await page.getByLabel("Insurer or bank reference").fill("BANK-881");
  await page.getByRole("button",{name:"Save payment"}).click();
  await page.getByText("Upload payment proof").locator("..").locator('input[type="file"]').setInputFiles({name:"proof.png",mimeType:"image/png",buffer:Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])});

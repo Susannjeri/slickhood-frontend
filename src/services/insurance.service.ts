@@ -3,6 +3,7 @@ import {envelopeItem,envelopeList} from "@/lib/api-envelope";
 
 export type InsuranceCompany={id:number;code:string;name:string;logoUrl?:string;description?:string;active:boolean};
 export type InsuranceCompanyAdmin=InsuranceCompany&{quotationEmail?:string;claimsEmail?:string;renewalsEmail?:string};
+export type InsuranceQuotationCompany={id:number;code:string;name:string;quotationEmail?:string;readyForQuotations:boolean};
 export type InsuranceAgency={code:string;name:string;supportEmail?:string;supportPhone?:string;logoUrl?:string};
 export type InsurancePaymentConfiguration={id:number;companyCode:string;companyName:string;paymentAccountId:number;accountName:string;channel:string;label:string;instructions:string;referenceTemplate?:string;version:number;effectiveFrom:string;effectiveTo?:string;active:boolean;accountVerified:boolean;paymentDetails:PaymentDetail[]};
 export type InsuranceAccount={id:number;name:string;category:string;channel:string;active:boolean;verified:boolean};
@@ -10,7 +11,7 @@ export type PaymentDetail={key:string;label:string;description:string;value:stri
 export type InsurancePaymentOption={id:number;companyCode:string;companyName:string;accountName:string;channel:string;label:string;instructions:string;referenceTemplate?:string;paymentDetails:PaymentDetail[]};
 export type InsuranceProduct={code:string;name:string;description:string;subjectTypes:string[]};
 export type MarineIdfOcrResult={idfNumber:string;importerName:string;importerPin:string;origin:string;portOfDischarge:string;hsCode:string;descriptionAndApplication:string;fobValue:string;transportMode:string;netMass:string;quantity:string;unitOfMeasure:string;confidence:number;reviewFields:string[];extractionReference:string};
-export type InsuranceQuote={id:number;companyId:number;companyCode:string;companyName:string;quoteNumber?:string;status:string;currency:string;basePremium:number;taxesLevies:number;totalPremium:number;excessDetails?:string;coverageSummary:string;exclusions?:string;validUntil:string};
+export type InsuranceQuote={id:number;companyId:number;companyCode:string;companyName:string;companyLogoUrl?:string;quoteNumber?:string;status:string;currency:string;basePremium:number;taxesLevies:number;totalPremium:number;excessDetails?:string;coverageSummary:string;exclusions?:string;validUntil:string;sourceExchangeId?:number};
 export type InsurancePayment={id:number;quoteId:number;paymentConfigurationId?:number;amount:number;currency:string;paymentReference:string;paidAt:string;status:string;rejectionReason?:string;remittanceReference?:string;remittedAt?:string;proofAvailable:boolean;proofContentType?:string};
 export type InsuranceCase={id:number;reference:string;productCode:string;status:string;fullName:string;email:string;phone:string;subjectType:string;subjectDescription:string;sumInsured?:number;currency:string;coverStartDate?:string;riskDetails?:string;proposalData:Record<string,unknown>;assignedAdviserId?:number;submittedAt:string;selectedQuoteId?:number;quotes:InsuranceQuote[];payments:InsurancePayment[]};
 export type InsuranceEmailExchange={id:number;companyCode:string;companyName:string;caseReference:string;correlationId:string;messageType:string;direction:string;status:string;senderAddress:string;recipientAddress:string;subject:string;bodyHash:string;externalMessageId?:string;inReplyTo?:string;sentAt?:string;receivedAt?:string;lastError?:string;body?:string};
@@ -30,6 +31,7 @@ export const insuranceService={
  adminCompanies:async()=>envelopeList<InsuranceCompanyAdmin>(await API.get("/insurance/admin/companies")),
  createCompany:async(payload:Record<string,unknown>)=>envelopeItem<InsuranceCompanyAdmin>(await API.post("/insurance/admin/companies",payload),{} as InsuranceCompanyAdmin),
  updateCompany:async(code:string,payload:Record<string,unknown>)=>envelopeItem<InsuranceCompanyAdmin>(await API.put(`/insurance/admin/companies/${encodeURIComponent(code)}`,payload),{} as InsuranceCompanyAdmin),
+ uploadCompanyLogo:async(code:string,file:File)=>{const f=new FormData();f.append("file",file);return envelopeItem<InsuranceCompanyAdmin>(await API.post(`/insurance/admin/companies/${encodeURIComponent(code)}/logo`,f),{} as InsuranceCompanyAdmin)},
  deactivateCompany:async(code:string)=>envelopeItem<InsuranceCompanyAdmin>(await API.delete(`/insurance/admin/companies/${encodeURIComponent(code)}`),{} as InsuranceCompanyAdmin),
  insuranceAccounts:async()=>envelopeList<InsuranceAccount>(await API.get("/account/list",{params:{byLandlord:true,size:100}})),
  adminPaymentConfigurations:async(code:string)=>envelopeList<InsurancePaymentConfiguration>(await API.get(`/insurance/admin/companies/${encodeURIComponent(code)}/payment-configurations`)),
@@ -68,8 +70,9 @@ export const insuranceService={
  completeRenewal:(policyId:number,policyNumber:string)=>API.post(`/insurance/admin/policies/${policyId}/renewal-complete`,{policyNumber}),
  assignCase:(id:number,adviserUserId:number)=>API.post(`/insurance/admin/cases/${id}/assign`,{adviserUserId}),
  updateCaseStatus:(id:number,status:string,note?:string)=>API.post(`/insurance/admin/cases/${id}/status`,{status,note}),
- addQuote:(id:number,payload:Record<string,unknown>)=>API.post(`/insurance/admin/cases/${id}/quotes`,payload),
- requestInsurerQuote:(caseId:number,companyCode:string)=>API.post(`/insurance/admin/cases/${caseId}/request-quote`,{companyCode}),
+ quotationCompanies:async()=>envelopeList<InsuranceQuotationCompany>(await API.get("/insurance/admin/quotation-companies")),
+ addQuote:async(id:number,payload:Record<string,unknown>)=>envelopeItem<InsuranceQuote>(await API.post(`/insurance/admin/cases/${id}/quotes`,payload),{} as InsuranceQuote),
+ requestInsurerQuotes:(caseId:number,companyCodes:string[])=>API.post(`/insurance/admin/cases/${caseId}/request-quotes`,{companyCodes}),
  emailHistory:async(caseReference:string)=>envelopeList<InsuranceEmailExchange>(await API.get(`/insurance/admin/cases/${encodeURIComponent(caseReference)}/email-history`)),
  publishQuote:(caseId:number,quoteId:number)=>API.post(`/insurance/admin/cases/${caseId}/quotes/${quoteId}/publish`),
  decidePayment:(id:number,status:"VERIFIED"|"REJECTED",reason?:string)=>API.post(`/insurance/admin/payments/${id}/decision`,{status,reason}),
