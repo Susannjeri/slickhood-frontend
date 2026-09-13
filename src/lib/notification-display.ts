@@ -13,15 +13,16 @@ export function notificationText(message: string): string {
     }[entity] ?? entity)).trim();
 }
 
-// Invitation messages are stored as text, never executable markup. Only return an
-// HTTPS URL on the current SlickHood application origin, preventing a compromised
-// or malformed notification from becoming an open redirect/phishing link.
+// Notification messages are stored as text, never executable markup. Only return
+// an HTTPS URL on the current SlickHood application origin, or a known internal
+// application path. This keeps lifecycle calls-to-action useful without turning
+// stored messages into an open redirect/phishing link.
 export function notificationActionUrl(message: string, applicationOrigin: string): string | undefined {
   const text = notificationText(message);
-  const candidate = text.match(/https?:\/\/[^\s<>"']+/i)?.[0]?.replace(/[),.;]+$/, "");
+  const candidate = text.match(/https?:\/\/[^\s<>"']+|\/(?:dashboard|lease)\/[^\s<>"']*/i)?.[0]?.replace(/[),.;]+$/, "");
   if (!candidate) return undefined;
   try {
-    const url = new URL(candidate);
+    const url = new URL(candidate, applicationOrigin);
     const allowedOrigin = new URL(applicationOrigin).origin;
     const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost";
     if ((url.protocol !== "https:" && !(loopback && url.protocol === "http:"))

@@ -4,20 +4,53 @@ import {authenticated,envelope} from "./support";
 const product={code:"MOTOR",name:"Motor Insurance",description:"Private vehicle protection.",subjectTypes:["VEHICLE"]};
 
 test("customer can submit a minimal Silverwood quote request",async({context,page})=>{
+ let submitted:Record<string,unknown>|undefined;
  await authenticated(context,page,{title:"Homeowner",permissions:[]});
  await page.route("**/insurance/agency",r=>r.fulfill({json:envelope({code:"SILVERWOOD",name:"Silverwood Insurance Agency",logoUrl:"/insurance/brands/silverwood.webp"})}));
  await page.route("**/insurance/products",r=>r.fulfill({json:envelope([product])}));
  await page.route("**/insurance/companies",r=>r.fulfill({json:envelope([{id:1,code:"APA",name:"APA Insurance",active:true,logoUrl:"/insurance/brands/apa.webp"}])}));
- for(const endpoint of ["cases","policies","claims","documents"])await page.route(`**/insurance/${endpoint}`,async r=>r.request().method()==="POST"?r.fulfill({json:envelope({id:1,reference:"INS-2026-TEST",status:"SUBMITTED"})}):r.fulfill({json:envelope([])}));
+ await page.route("**/insurance/cases",async route=>{if(route.request().method()==="POST"){submitted=route.request().postDataJSON();return route.fulfill({json:envelope({id:1,reference:"INS-2026-TEST",status:"SUBMITTED"})})}return route.fulfill({json:envelope([])})});
+ for(const endpoint of ["policies","claims","documents"])await page.route(`**/insurance/${endpoint}`,r=>r.fulfill({json:envelope([])}));
  await page.goto("/dashboard/insurance");
  await expect(page.getByRole("heading",{name:"Insurance protection, made clear and connected."})).toBeVisible();
  await expect(page.getByRole("img",{name:"Silverwood Insurance Agency logo"})).toBeVisible();
  await expect(page.getByRole("img",{name:"APA Insurance logo"})).toBeVisible();
  await page.getByRole("button",{name:/Request a quote/}).first().click();
  const dialog=page.getByRole("dialog");await expect(dialog.getByRole("heading",{name:"Request Motor Insurance"})).toBeVisible();
- const inputs=dialog.locator("input");await inputs.nth(0).fill("Amina Kamau");await inputs.nth(1).fill("0712345678");await inputs.nth(2).fill("amina@example.com");await inputs.nth(3).fill("1500000");
- await dialog.locator("textarea").first().fill("2019 Toyota Fielder, private use");await dialog.locator('input[type="checkbox"]').check();await dialog.getByRole("button",{name:"Submit request"}).click();
+ await dialog.getByLabel("Full name").fill("Amina Kamau");await dialog.getByLabel("Phone").fill("0712345678");await dialog.getByLabel("Email").fill("amina@example.com");await dialog.getByLabel("Estimated value / sum insured").fill("1500000");
+ await dialog.getByLabel("Registration number").fill("KDA 123A");await dialog.getByLabel("Vehicle make and model").fill("2019 Toyota Fielder");await dialog.getByLabel("Age of driver").fill("36");await dialog.locator('input[type="checkbox"]').check();await dialog.getByRole("button",{name:"Submit request"}).click();
  await expect(page.getByText("Quote request submitted to Silverwood.")).toBeVisible();
+ expect(submitted).toMatchObject({productCode:"MOTOR",subjectType:"VEHICLE",proposalData:{vehicles:[{insuredType:"VEHICLE",registrationNumber:"KDA 123A",makeModel:"2019 Toyota Fielder",driverAge:"36",specialType:""}]}});
+});
+
+test("every Silverwood proposal supports repeatable risk items",async({context,page})=>{
+ const repeatableProducts=[
+  {code:"MOTOR",name:"Motor",description:"Motor",subjectTypes:["VEHICLE"],add:"Add another",remove:"Delete entry"},
+  {code:"DOMESTIC",name:"Domestic Package",description:"Domestic",subjectTypes:["PROPERTY","HOUSEHOLD_ITEMS"],add:"Add item",remove:"Delete item"},
+  {code:"FIRE_ALLIED",name:"Fire and Allied Perils",description:"Fire",subjectTypes:["PROPERTY"],add:"Add item",remove:"Delete item"},
+  {code:"WIBA_EL",name:"WIBA",description:"WIBA",subjectTypes:["EMPLOYEES"],add:"Add job group",remove:"Delete job group"},
+  {code:"CONTRACTORS_ALL_RISK",name:"Contractors' All Risk",description:"Construction",subjectTypes:["PROJECT"],add:"Add item",remove:"Delete item"},
+  {code:"MEDICAL",name:"Medical",description:"Medical",subjectTypes:["FAMILY_INDIVIDUAL","CORPORATE"],add:"Add item",remove:"Delete item"},
+  {code:"MARINE_CARGO",name:"Marine Cargo",description:"Marine",subjectTypes:["GOODS"],add:"Add item",remove:"Delete item"},
+  {code:"TRAVEL",name:"Travel",description:"Travel",subjectTypes:["PERSON"],add:"Add item",remove:"Delete item"},
+  {code:"GOODS_IN_TRANSIT",name:"Goods in Transit",description:"Cargo",subjectTypes:["GOODS"],add:"Add item",remove:"Delete item"},
+ ];
+ await authenticated(context,page,{title:"Landlord",permissions:[]});
+ await page.route("**/insurance/agency",r=>r.fulfill({json:envelope({code:"SILVERWOOD",name:"Silverwood Insurance Agency",logoUrl:"/insurance/brands/silverwood.webp"})}));
+ await page.route("**/insurance/products",r=>r.fulfill({json:envelope(repeatableProducts)}));
+ await page.route("**/insurance/companies",r=>r.fulfill({json:envelope([])}));
+ for(const endpoint of ["cases","policies","renewals","claims","documents"])await page.route(`**/insurance/${endpoint}`,r=>r.fulfill({json:envelope([])}));
+ await page.goto("/dashboard/insurance");
+ for(const item of repeatableProducts){
+  await page.getByRole("heading",{name:item.name,exact:true}).locator("..").getByRole("button",{name:"Request a quote"}).click();
+  const dialog=page.getByRole("dialog");
+  const before=await dialog.getByRole("button",{name:item.remove}).count();
+  await dialog.getByRole("button",{name:item.add}).first().click();
+  await expect(dialog.getByRole("button",{name:item.remove})).toHaveCount(before+1);
+  await dialog.getByRole("button",{name:item.remove}).last().click();
+  await expect(dialog.getByRole("button",{name:item.remove})).toHaveCount(before);
+  await dialog.getByRole("button",{name:"Cancel"}).click();
+ }
 });
 
 test("customer records payment and withdraws an eligible application with explicit dialogs",async({context,page})=>{
@@ -63,16 +96,20 @@ test("authorised Silverwood staff can open the operations queue",async({context,
 });
 
 test("insurance adviser queue does not request manager reporting or show approval controls",async({context,page})=>{
- let summaryRequests=0;
+ let summaryRequests=0,dispatched=false;
  await authenticated(context,page,{title:"InsuranceAdviser",permissions:["review_insurance_applications","manage_insurance_quotes","manage_insurance_claims","manage_insurance_renewals"]});
  await page.route("**/insurance/admin/operations/summary",r=>{summaryRequests+=1;return r.fulfill({status:403,json:envelope(null)})});
  await page.route("**/insurance/admin/cases**",r=>r.fulfill({json:envelope({content:[{id:1,reference:"INS-2026-TEST",productCode:"MOTOR",status:"QUOTED",fullName:"Amina Kamau",phone:"0712345678",email:"amina@example.com",subjectDescription:"Toyota Fielder",assignedAdviserId:7,riskDetails:null,quotes:[{id:9,status:"DRAFT",companyName:"APA Insurance"}],payments:[]}],totalElements:1,totalPages:1,number:0,size:100})}));
  await page.route("**/insurance/admin/staff",r=>r.fulfill({json:envelope([{id:7,fullName:"Amina Adviser",email:"amina@example.com",roleName:"INSURANCE_ADVISER"}])}));
  await page.route("**/insurance/admin/claims**",r=>r.fulfill({json:envelope({content:[],totalElements:0,totalPages:0,number:0,size:100})}));
  await page.route("**/insurance/admin/renewals**",r=>r.fulfill({json:envelope({content:[],totalElements:0,totalPages:0,number:0,size:100})}));
- await page.route("**/insurance/companies",r=>r.fulfill({json:envelope([])}));
+ await page.route("**/insurance/companies",r=>r.fulfill({json:envelope([{id:1,code:"APA",name:"APA Insurance",active:true}])}));
+ await page.route("**/insurance/admin/cases/1/request-quote",async r=>{dispatched=true;expect(r.request().postDataJSON()).toEqual({companyCode:"APA"});return r.fulfill({json:envelope({status:"QUEUED"})})});
+ await page.route("**/insurance/admin/cases/INS-2026-TEST/email-history",r=>r.fulfill({json:envelope([{id:3,companyCode:"APA",companyName:"APA Insurance",caseReference:"INS-2026-TEST",correlationId:"test",messageType:"QUOTATION_REQUEST",direction:"INBOUND",status:"RECEIVED_VERIFIED",senderAddress:"quotes@apa.test",recipientAddress:"info@silverwoodinsurance.com",subject:"Re: quotation",receivedAt:"2026-09-13T10:00:00"}])}));
  await page.goto("/dashboard/insurance/operations");
  await expect(page.getByRole("button",{name:"Add quote"})).toBeVisible();
+ await page.getByRole("button",{name:"Send to insurer"}).click();await page.getByRole("button",{name:"Send secure request"}).click();await expect.poll(()=>dispatched).toBe(true);
+ await page.getByRole("button",{name:"Correspondence"}).click();const correspondenceDialog=page.getByRole("dialog");await expect(correspondenceDialog.getByText("Received Verified")).toBeVisible();
  await expect(page.getByRole("button",{name:/Approve APA/})).toHaveCount(0);
  expect(summaryRequests).toBe(0);
 });

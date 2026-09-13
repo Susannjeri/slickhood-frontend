@@ -18,10 +18,12 @@ import { apiErrorMessage } from "@/lib/api-error";
 import { usePagedBusinessProperties, usePagedBusinessUnits } from "@/hooks/usePagedBusinessOptions";
 import { usePagedEstateRecords } from "@/hooks/usePagedEstateRecords";
 import { estateService } from "@/services/business-workflows.service";
+import { estateSetupService } from "@/services/estate-setup.service";
 import { useAuthStore } from "@/store/authStore";
 import { EstateServiceCharge, PropertyOwnership } from "@/types/business-workflows";
 import { createEmailOccupantInvite } from "@/lib/api";
 import PropertyAccountsSheet from "@/components/property/PropertyAccountsSheet";
+import { LateFeePolicySetup } from "@/components/billing/LateFeePolicySetup";
 
 const estateRoles = ["EstateManager", "EstateOperationsManager", "WorkspaceAdmin", "PropertyAccountant", "WorkspaceViewer", "SecuritySupervisor", "Homeowner"];
 function today() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Nairobi", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()); }
@@ -39,6 +41,7 @@ function EstateWorkspace() {
   const token = useAuthStore(state => state.token);
   const scopedPropertyIds = useAuthStore(state => state.propertyIds);
   const isHomeowner = useAuthStore(state => state.activeRole?.title === "Homeowner");
+  const isEstateBiller = useAuthStore(state => state.activeRole?.title === "EstateManager");
   const canViewCharges = permissions.includes("view_service_charge");
   const canViewInvoices = permissions.includes("view_invoice_list");
   const canManage = permissions.includes("manage_estate");
@@ -58,6 +61,8 @@ function EstateWorkspace() {
   const [agreementEffectiveDate, setAgreementEffectiveDate] = useState(today());
   const [busy, setBusy] = useState(false);
   const [receivingAccountOpen, setReceivingAccountOpen] = useState(false);
+  const [receivingAccountReady, setReceivingAccountReady] = useState<boolean | null>(null);
+  const [receivingAccountRevision, setReceivingAccountRevision] = useState(0);
   const [endingOwnership, setEndingOwnership] = useState<PropertyOwnership | null>(null);
   const [endDate, setEndDate] = useState(today());
   const [endReason, setEndReason] = useState("");
@@ -94,6 +99,18 @@ function EstateWorkspace() {
   }, [hasSelectedUnitLink, requestedUnitId, units]);
 
   const propertyId = effectivePropertyFilter === "all" ? undefined : Number(effectivePropertyFilter);
+  useEffect(() => {
+    let current = true;
+    if (!canManage || !propertyId) {
+      setReceivingAccountReady(null);
+      return () => { current = false; };
+    }
+    setReceivingAccountReady(null);
+    estateSetupService.status(propertyId)
+      .then(response => { if (current) setReceivingAccountReady(response.data.data.billingConfigured); })
+      .catch(() => { if (current) setReceivingAccountReady(null); });
+    return () => { current = false; };
+  }, [canManage, propertyId, receivingAccountRevision]);
   const registry = usePagedEstateRecords<PropertyOwnership>("/estate/ownership", Boolean(token), propertyId, undefined, ownershipSearch);
   const current = usePagedEstateRecords<PropertyOwnership>("/estate/ownership", Boolean(token), propertyId, true);
   const billing = usePagedEstateRecords<EstateServiceCharge>("/estate/service-charges", Boolean(token) && canViewCharges, propertyId);
@@ -112,6 +129,16 @@ function EstateWorkspace() {
     if (!token || !selectedUnit || !homeownerEmail.trim() || !agreementEffectiveDate) return;
     setBusy(true);
     try {
+      const setup = await estateSetupService.status(selectedUnit.propertyId);
+      if (!setup.data.data.billingConfigured) {
+        setReceivingAccountReady(false);
+        setReceivingAccountOpen(true);
+        toast.error("Connect a payment-ready account to this estate first.", {
+          description: "An account can be Active but still needs to be marked Ready for payments and connected to this estate.",
+        });
+        return;
+      }
+      setReceivingAccountReady(true);
       await createEmailOccupantInvite({
         inviteType: "HOMEOWNER",
         entityId: selectedUnit.unitId,
@@ -124,7 +151,16 @@ function EstateWorkspace() {
       setAgreementEffectiveDate(today());
       await load();
     } catch (error: unknown) {
-      toast.error(apiErrorMessage(error, "Could not send the homeowner invitation."));
+      const responseCode = (error as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      if (responseCode === "S00361") {
+        setReceivingAccountReady(false);
+        setReceivingAccountOpen(true);
+        toast.error("No payment-ready account is connected to this estate.", {
+          description: "Open the account shown here, complete setup if needed, then attach it to the selected estate.",
+        });
+      } else {
+        toast.error(apiErrorMessage(error, "Could not send the homeowner invitation."));
+      }
     } finally { setBusy(false); }
   }
 
@@ -182,7 +218,7 @@ function EstateWorkspace() {
 
     {isHomeowner && <div className="grid gap-4 sm:grid-cols-3"><Card><CardHeader className="pb-2"><CardDescription>Current ownerships</CardDescription><CardTitle>{current.loading ? "Loading…" : current.error ? "Unavailable" : current.total}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Outstanding balance (loaded charges)</CardDescription><CardTitle>{billing.loading ? "Loading…" : billing.error ? "Unavailable" : outstandingLabel}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Overdue charges (loaded)</CardDescription><CardTitle className={overdue.length ? "text-red-600" : "text-emerald-600"}>{billing.loading ? "Loading…" : billing.error ? "Unavailable" : overdue.length}</CardTitle></CardHeader></Card></div>}
 
-    {canManage && <Card className="border-orange-200"><CardHeader><CardTitle>First-time homeowner setup</CardTitle><CardDescription>Set the estate foundation once, then every homeowner invitation follows the same secure agreement journey.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><div className="rounded-lg border bg-white p-4"><p className="font-semibold">1. Estate agreement</p><p className="mt-1 text-sm text-muted-foreground">Review the approved agreement standard. SlickHood freezes it when the invitation is sent.</p><Button className="mt-3" size="sm" variant="outline" asChild><Link href="/dashboard/documents?type=ESTATE_RESIDENTIAL_AGREEMENT">Review agreement</Link></Button></div><div className="rounded-lg border bg-white p-4"><p className="font-semibold">2. Receiving account</p><p className="mt-1 text-sm text-muted-foreground">Create the account once, then attach the Ready for payments account to the selected estate.</p><div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" disabled={!selectedEstateProperty} onClick={()=>setReceivingAccountOpen(true)}>{selectedEstateProperty?`Connect to ${selectedEstateProperty.name}`:"Select an estate first"}</Button><Button size="sm" variant="ghost" asChild><Link href="/dashboard/estate/accounts">Manage accounts</Link></Button></div></div><div className="rounded-lg border bg-white p-4"><p className="font-semibold">3. Invite homeowner</p><p className="mt-1 text-sm text-muted-foreground">Choose a home below. New users register; existing users sign in with the invited email.</p></div></CardContent></Card>}
+    {canManage && <Card className="border-orange-200"><CardHeader><CardTitle>First-time homeowner setup</CardTitle><CardDescription>Set the estate foundation once, then every homeowner invitation follows the same secure agreement journey.</CardDescription></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><div className="rounded-lg border bg-white p-4"><p className="font-semibold">1. Estate agreement</p><p className="mt-1 text-sm text-muted-foreground">Review the approved agreement standard. SlickHood freezes it when the invitation is sent.</p><Button className="mt-3" size="sm" variant="outline" asChild><Link href="/dashboard/documents?type=ESTATE_RESIDENTIAL_AGREEMENT">Review agreement</Link></Button></div><div className="rounded-lg border bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold">2. Receiving account</p>{selectedEstateProperty&&<Badge variant={receivingAccountReady?"default":"outline"} className={receivingAccountReady?"bg-emerald-600":receivingAccountReady===false?"border-amber-300 bg-amber-50 text-amber-800":""}>{receivingAccountReady===true?"Connected & ready":receivingAccountReady===false?"Connection required":"Checking…"}</Badge>}</div><p className="mt-1 text-sm text-muted-foreground">Active and Ready for payments are separate states. The Ready account must also be connected to this estate.</p><div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" disabled={!selectedEstateProperty} onClick={()=>setReceivingAccountOpen(true)}>{selectedEstateProperty?receivingAccountReady?`Review account for ${selectedEstateProperty.name}`:`Connect account to ${selectedEstateProperty.name}`:"Select an estate first"}</Button><Button size="sm" variant="ghost" asChild><Link href="/dashboard/estate/accounts">Manage accounts</Link></Button></div></div><div className="rounded-lg border bg-white p-4"><p className="font-semibold">3. Invite homeowner</p><p className="mt-1 text-sm text-muted-foreground">Choose a home below. New users register; existing users sign in with the invited email.</p></div>{isEstateBiller&&<div className="md:col-span-3"><LateFeePolicySetup billingType="SERVICE_CHARGE" compact/></div>}</CardContent></Card>}
 
     {canManage && <Card id="onboard-homeowner"><CardHeader><CardTitle>Onboard a homeowner</CardTitle><CardDescription>{hasSelectedUnitLink?"The selected home is fixed. Enter the homeowner email and agreement effective date, then send.":"Choose the home, enter the homeowner's email and agreement date, then send. Existing users sign in; new users register and complete KYC from the same secure link."}</CardDescription></CardHeader><CardContent><form onSubmit={inviteHomeowner} className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">{!hasSelectedUnitLink&&<div className="space-y-2"><Label id="assignment-home-label" htmlFor="assignment-home">Homeowner unit</Label><Input value={unitOptions.search} onChange={event=>unitOptions.setSearch(event.target.value)} placeholder="Search home reference…"/><Select value={assignmentUnitId} onValueChange={setAssignmentUnitId} disabled={unitOptions.loading&&units.length===0}><SelectTrigger id="assignment-home" aria-labelledby="assignment-home-label"><SelectValue placeholder={unitOptions.loading?"Loading homeowner units…":"Select a homeowner unit"} /></SelectTrigger><SelectContent>{units.map(unit => <SelectItem key={unit.unitId} value={String(unit.unitId)} disabled={ownershipByUnit.has(unit.unitId)}>{properties.find(property=>property.id===unit.propertyId)?.name??`Estate #${unit.propertyId}`} / {unit.ref}{ownershipByUnit.has(unit.unitId)?" · Assigned":""}</SelectItem>)}</SelectContent></Select>{unitOptions.hasMore&&<Button type="button" size="sm" variant="outline" className="mt-2" onClick={unitOptions.loadMore} disabled={unitOptions.loading}>Load more homes</Button>}{!unitOptions.loading&&units.length===0&&<p className="text-sm text-amber-700">No homeowner units are configured. Create or change a unit to Homeowner / Service Charge first.</p>}</div>}<div className="space-y-2"><Label htmlFor="homeowner-email">Homeowner email</Label><Input id="homeowner-email" required type="email" autoComplete="email" maxLength={254} value={homeownerEmail} onChange={event=>setHomeownerEmail(event.target.value)} placeholder="homeowner@example.com"/></div><div className="space-y-2"><Label htmlFor="agreement-effective-date">Agreement effective date</Label><Input id="agreement-effective-date" required type="date" max={today()} value={agreementEffectiveDate} onChange={event=>setAgreementEffectiveDate(event.target.value)}/></div><div className="flex items-end"><Button type="submit" className="w-full bg-[#EF4217]" disabled={busy||!selectedAssignmentUnit||!homeownerEmail.trim()||!agreementEffectiveDate}>{busy?"Sending…":"Send invitation & agreement"}</Button></div>{selectedAssignmentUnit&&<div className="rounded-lg border border-blue-200 bg-blue-50 p-4 md:col-span-2 lg:col-span-4"><p className="font-semibold">Selected homeowner unit</p><div className="mt-2 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4"><p><span className="text-muted-foreground">Estate</span><br/><strong>{properties.find(property=>property.id===selectedAssignmentUnit.propertyId)?.name??`Estate #${selectedAssignmentUnit.propertyId}`}</strong></p><p><span className="text-muted-foreground">Home</span><br/><strong>{selectedAssignmentUnit.ref}</strong></p><p><span className="text-muted-foreground">Type and size</span><br/><strong>{selectedAssignmentUnit.unitType?.toLowerCase().replaceAll("_"," ")??"Not recorded"}{selectedAssignmentUnit.size?` · ${selectedAssignmentUnit.size.toLocaleString()} ${selectedAssignmentUnit.measurementUnits?.name??""}`:""}</strong></p><p><span className="text-muted-foreground">Service charge basis</span><br/><strong>{selectedAssignmentUnit.currency??"KES"} {selectedAssignmentUnit.price?.toLocaleString()??"Not set"}</strong></p></div></div>}{hasSelectedUnitLink&&!unitOptions.loading&&!selectedAssignmentUnit&&<div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 md:col-span-2 lg:col-span-4">This homeowner unit could not be loaded. Return to the unit and start homeowner onboarding again.</div>}</form></CardContent></Card>}
 
@@ -196,7 +232,7 @@ function EstateWorkspace() {
 
     {isHomeowner && <RecordControls feed={current} label="current homes" />}
     <EstateOperationsPanel key={effectivePropertyFilter} properties={estatePropertyIds.filter(id => propertyId === undefined || id === propertyId).map(id => ({ id, name: properties.find(property => property.id === id)?.name ?? currentOwnerships.find(item => item.propertyId === id)?.propertyName ?? `Property #${id}` }))} canManage={canManage} />
-    {selectedEstateProperty && <PropertyAccountsSheet propertyId={selectedEstateProperty.id} propertyName={selectedEstateProperty.name} open={receivingAccountOpen} onOpenChange={setReceivingAccountOpen} allowedCategories={["ESTATE_MANAGEMENT"]} createAccountHref="/dashboard/estate/accounts" />}
+    {selectedEstateProperty && <PropertyAccountsSheet propertyId={selectedEstateProperty.id} propertyName={selectedEstateProperty.name} open={receivingAccountOpen} onOpenChange={setReceivingAccountOpen} allowedCategories={["ESTATE_MANAGEMENT"]} createAccountHref="/dashboard/estate/accounts" onAccountsChanged={()=>setReceivingAccountRevision(value=>value+1)} />}
     <Dialog open={Boolean(endingOwnership)} onOpenChange={open => { if (!open && !busy) { setEndingOwnership(null); setEndReason(""); } }}><DialogContent><form onSubmit={endOwnership} className="space-y-4"><DialogHeader><DialogTitle>End ownership</DialogTitle><DialogDescription>This immediately removes homeowner access while preserving ownership and financial history. The homeowner will be notified.</DialogDescription></DialogHeader><div><Label htmlFor="ownership-end-date">End date</Label><Input id="ownership-end-date" required type="date" min={endingOwnership?.ownershipStart} max={today()} value={endDate} onChange={event => setEndDate(event.target.value)} /></div><div><Label htmlFor="ownership-end-reason">Reason</Label><Textarea id="ownership-end-reason" required maxLength={500} value={endReason} onChange={event => setEndReason(event.target.value)} placeholder="For example: property sale completed" /></div><DialogFooter><Button type="button" variant="outline" disabled={busy} onClick={() => setEndingOwnership(null)}>Cancel</Button><Button type="submit" variant="destructive" disabled={busy || !endReason.trim()}>End ownership</Button></DialogFooter></form></DialogContent></Dialog>
   </div>;
 }

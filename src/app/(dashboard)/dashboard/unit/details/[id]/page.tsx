@@ -78,6 +78,7 @@ import { usePropertyMetadata } from "@/app/(dashboard)/dashboard/property/proper
 import { parseUnitOrigin, unitListHref, unitOriginLabel } from "@/lib/unitNavigation";
 import { createMaintenance, downloadLeaseDocumentPdf, LeaseDocumentView, listLeaseDocuments, listUnitMaintenance, MaintenanceWorkOrder, updateMaintenance } from "@/lib/api";
 import { ProtectedPdfButton } from "@/components/documents/ProtectedPdfButton";
+import { LateFeePolicySetup } from "@/components/billing/LateFeePolicySetup";
 
 interface UnitDetail {
   propertyId: number;
@@ -808,7 +809,7 @@ export default function ViewUnitPage() {
 
         {/* Share Invite Dialog */}
         <Dialog open={shareInviteOpen} onOpenChange={setShareInviteOpen}>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[700px]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Send className="w-5 h-5" style={{ color: "#EF4217" }} />Share Invite
@@ -874,6 +875,7 @@ export default function ViewUnitPage() {
                   <Input id="lease-end-date" type="date" min={leaseStartDate || new Date().toISOString().slice(0, 10)} value={leaseEndDate} onChange={(event) => setLeaseEndDate(event.target.value)} required />
                 </div>
               </div>}
+              {occupantLabel === "Tenant" && activeRole?.title === "Landlord" && <LateFeePolicySetup billingType="RENTAL" compact/>}
               {occupantLabel === "Homeowner" && <div className="space-y-2">
                 <Label htmlFor="homeowner-agreement-date">Agreement effective date</Label>
                 <Input id="homeowner-agreement-date" type="date" max={nairobiToday()} value={leaseStartDate || nairobiToday()} onChange={(event) => setLeaseStartDate(event.target.value)} required />

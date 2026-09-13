@@ -46,6 +46,7 @@ interface PropertyAccountsSheetProps {
   onOpenChange: (open: boolean) => void;
   allowedCategories?: AccountCategory[];
   createAccountHref?: string;
+  onAccountsChanged?: () => void;
 }
 
 // Presigned channel icon URLs expire in ~1h (see account-module.md gotchas) —
@@ -118,6 +119,7 @@ export default function PropertyAccountsSheet({
   onOpenChange,
   allowedCategories = ["LANDLORD", "ESTATE_MANAGEMENT", "PROPERTY_SALES"],
   createAccountHref = "/dashboard/accounts",
+  onAccountsChanged,
 }: PropertyAccountsSheetProps) {
   const { handleListPropertyAccounts, handleListAccounts, handleAttachAccount, handleDetachAccount } =
     useApi();
@@ -199,6 +201,7 @@ export default function PropertyAccountsSheet({
         descriptionClassName: "!text-black",
       });
       await loadAttached();
+      onAccountsChanged?.();
     } catch (err: any) {
       console.error("Error attaching account:", err);
       toast.error("Failed to attach account", {
@@ -221,6 +224,7 @@ export default function PropertyAccountsSheet({
       toast.success(`${detachTarget.name} detached`);
       setDetachTarget(null);
       await loadAttached();
+      onAccountsChanged?.();
     } catch (err: any) {
       console.error("Error detaching account:", err);
       toast.error("Failed to detach account", {
@@ -310,14 +314,14 @@ export default function PropertyAccountsSheet({
                           {!account.verified && (
                             <p className="flex items-center gap-1 text-[11px] text-amber-700 mt-1">
                               <AlertTriangle className="w-3 h-3 shrink-0" />
-                              This account is not yet verified
+                              Complete its setup and mark it Ready for payments before attaching it.
                             </p>
                           )}
                         </div>
                         <Button
                           size="sm"
                           onClick={() => handleAttach(account)}
-                          disabled={attachingId === account.id}
+                          disabled={attachingId === account.id || !account.active || !account.verified}
                           className="shrink-0 text-white h-11 sm:h-9"
                           style={{ backgroundColor: "#EF4217" }}
                         >

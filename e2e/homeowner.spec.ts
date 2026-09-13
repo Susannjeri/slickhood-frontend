@@ -50,6 +50,13 @@ test("service-charge unit opens a prefilled two-field homeowner invitation", asy
   }]) }));
   await page.route("**/estate/ownership**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/estate/service-charges**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/estate/setup/properties/11", route => route.fulfill({ json: envelope({
+    propertyId: 11, propertyName: "Silverwood Estate", managementMode: "SERVICE_CHARGE",
+    activeUnits: 1, activeStaff: 0, operatingAccounts: 1, activeHomeowners: 0,
+    currentBudgets: 0, unitsConfigured: true, billingConfigured: true,
+    homeownerOperationsConfigured: false, readyForHomeownerOperations: false,
+    nextAction: "ASSIGN_HOMEOWNERS",
+  }) }));
   await page.route("**/estate/operations/properties/11/**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/invite/email", route => route.fulfill({
     status: 200,
