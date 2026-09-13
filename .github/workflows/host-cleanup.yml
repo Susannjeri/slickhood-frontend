@@ -1,0 +1,51 @@
+name: Production Frontend Storage Cleanup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Remove approved stale frontend releases
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 8m
+          script: |
+            set -eu
+            active=/home/silverocean/deploy
+            test -d "$active"
+            test "$(realpath "$active")" = /home/silverocean/deploy
+            remove_stale_release() {
+              stale="$1"
+              test -d "$stale"
+              test ! -L "$stale"
+              resolved="$(realpath "$stale")"
+              case "$resolved" in
+                /home/silverocean/deploy.rollback-*|/home/silverocean/deploy.candidate-*) ;;
+                *) echo "Refusing unexpected cleanup target: $resolved" >&2; exit 1 ;;
+              esac
+              test "$resolved" != "$active"
+              sudo rm -rf -- "$resolved"
+            }
+            for stale in /home/silverocean/deploy.rollback-* /home/silverocean/deploy.candidate-*; do
+              [ -d "$stale" ] || continue
+              remove_stale_release "$stale"
+            done
+            staging=/tmp/slickhood-frontend-release
+            test "$staging" = /tmp/slickhood-frontend-release
+            if [ -e "$staging" ]; then
+              test ! -L "$staging"
+              sudo rm -rf -- "$staging"
+            fi
+            test -f "$active/server.js"
+            echo 'Capacity after approved cleanup (KB)'
+            df -Pk /
