@@ -17,10 +17,12 @@ test("customer can submit a minimal Silverwood quote request",async({context,pag
  await expect(page.getByRole("img",{name:"APA Insurance logo"})).toBeVisible();
  await page.getByRole("button",{name:/Request a quote/}).first().click();
  const dialog=page.getByRole("dialog");await expect(dialog.getByRole("heading",{name:"Request Motor Insurance"})).toBeVisible();
- await dialog.getByLabel("Full name").fill("Amina Kamau");await dialog.getByLabel("Phone").fill("0712345678");await dialog.getByLabel("Email").fill("amina@example.com");await dialog.getByLabel("Estimated value / sum insured").fill("1500000");
- await dialog.getByLabel("Registration number").fill("KDA 123A");await dialog.getByLabel("Vehicle make and model").fill("2019 Toyota Fielder");await dialog.getByLabel("Age of driver").fill("36");await dialog.locator('input[type="checkbox"]').check();await dialog.getByRole("button",{name:"Submit request"}).click();
+ await dialog.getByLabel("Full name").fill("Amina Kamau");await dialog.getByLabel("Phone").fill("0712345678");await dialog.getByLabel("Email").fill("amina@example.com");
+ await dialog.getByLabel("Registration number").fill("KDA 123A");await dialog.getByLabel("Vehicle make and model").fill("2019 Toyota Fielder");await dialog.getByLabel("Age of driver").fill("36");await dialog.getByLabel("Estimated value").fill("1000000");
+ await dialog.getByRole("button",{name:"Add another"}).click();await dialog.getByLabel("Registration number").nth(1).fill("KDB 456B");await dialog.getByLabel("Vehicle make and model").nth(1).fill("Mercedes Actros");await dialog.getByLabel("Age of driver").nth(1).fill("42");await dialog.getByLabel("Estimated value").nth(1).fill("500000");
+ await expect(dialog.getByTestId("proposal-estimated-total")).toContainText("1,500,000");await dialog.locator('input[type="checkbox"]').check();await dialog.getByRole("button",{name:"Submit request"}).click();
  await expect(page.getByText("Quote request submitted to Silverwood.")).toBeVisible();
- expect(submitted).toMatchObject({productCode:"MOTOR",subjectType:"VEHICLE",proposalData:{vehicles:[{insuredType:"VEHICLE",registrationNumber:"KDA 123A",makeModel:"2019 Toyota Fielder",driverAge:"36",specialType:""}]}});
+ expect(submitted).toMatchObject({productCode:"MOTOR",subjectType:"VEHICLE",sumInsured:1500000,proposalData:{vehicles:[{insuredType:"VEHICLE",registrationNumber:"KDA 123A",makeModel:"2019 Toyota Fielder",driverAge:"36",estimatedValue:"1000000",specialType:""},{insuredType:"VEHICLE",registrationNumber:"KDB 456B",makeModel:"Mercedes Actros",driverAge:"42",estimatedValue:"500000",specialType:""}]}});
 });
 
 test("every Silverwood proposal supports repeatable risk items",async({context,page})=>{
