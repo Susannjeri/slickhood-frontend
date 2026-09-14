@@ -42,7 +42,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { useRouter, usePathname } from "next/navigation"
+import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth";
 import { useApi } from "@/hooks/useApi";
 import { AlertDialogDescription } from "@radix-ui/react-alert-dialog";
@@ -92,6 +92,7 @@ export default function AppSidebar() {
   const { logout } = useAuth();
   const { handleGetPendingUnits } = useApi();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const { hasPermission, hasRole, hasExcludedRole } = usePermissions();
   const canAccessJobs = hasPermission(["create_unit"]);
@@ -224,9 +225,17 @@ export default function AppSidebar() {
   const setSubMenuOpen = (label: string, nextOpen: boolean) =>
     setOpenSubMenus(prev => ({ ...prev, [label]: nextOpen }));
 
+  const isHrefActive = (href?: string) => {
+    if (!href) return false;
+    const [targetPath, targetQuery] = href.split("?", 2);
+    if (pathname !== targetPath) return false;
+    if (!targetQuery) return true;
+    const targetParams = new URLSearchParams(targetQuery);
+    return Array.from(targetParams.entries()).every(([key, value]) => searchParams.get(key) === value);
+  };
   const isLinkActive = (href?: string, subLinks?: typeof sidebarLinks[0]['subLinks']) => {
-    if (href && pathname === href) return true;
-    if (subLinks) return subLinks.some(s => pathname === s.href);
+    if (isHrefActive(href)) return true;
+    if (subLinks) return subLinks.some(s => isHrefActive(s.href));
     return false;
   };
 
@@ -363,7 +372,7 @@ export default function AppSidebar() {
                                     <SidebarMenuSubItem>
                                       <SidebarMenuSubButton
                                         asChild
-                                        isActive={pathname === subLink.href}
+                                        isActive={isHrefActive(subLink.href)}
                                         className={cn(
                                           "font-bold text-[#08184A]/70 dark:text-white transition-all duration-200",
                                           "hover:bg-[#08184A]/10 dark:hover:bg-white/10 hover:text-[#08184A] dark:hover:text-white hover:translate-x-1",

@@ -220,18 +220,47 @@ export const sidebarLinks: SidebarLink[] = [
   {
     icon: ShieldPlus,
     label: "Insurance Hub",
-    href: "/dashboard/insurance",
     protected: false,
     permissions: [],
-    description: "Quotes, policies, claims and renewals with Silverwood Insurance Agency.",
-  },
-  {
-    icon: ShieldCheck,
-    label: "Insurance Operations",
-    href: "/dashboard/insurance/operations",
-    protected: true,
-    permissions: ["review_insurance_applications", "manage_insurance_quotes", "approve_insurance_quotes", "verify_insurance_payments", "issue_insurance_policies", "manage_insurance_claims", "manage_insurance_renewals", "view_insurance_reports", "manage_insurance_catalog", "manage_insurance_payment_config"],
-    description: "Applications, quotes, payments, policies, claims and insurer catalogue.",
+    description: "Quotes, policies, claims, renewals and controlled Silverwood operations.",
+    subLinks: [
+      {
+        label: "My insurance",
+        href: "/dashboard/insurance",
+        protected: false,
+        permissions: [],
+      },
+      {
+        label: "Applications & quotes",
+        href: "/dashboard/insurance/operations?tab=applications",
+        protected: true,
+        permissions: ["review_insurance_applications", "manage_insurance_quotes", "approve_insurance_quotes", "verify_insurance_payments", "issue_insurance_policies"],
+      },
+      {
+        label: "Insurance companies",
+        href: "/dashboard/insurance/operations?tab=partners",
+        protected: true,
+        permissions: ["manage_insurance_catalog"],
+      },
+      {
+        label: "Insurer payment routes",
+        href: "/dashboard/insurance/operations?tab=payments",
+        protected: true,
+        permissions: ["manage_insurance_payment_config"],
+      },
+      {
+        label: "Claims",
+        href: "/dashboard/insurance/operations?tab=claims",
+        protected: true,
+        permissions: ["manage_insurance_claims"],
+      },
+      {
+        label: "Renewals",
+        href: "/dashboard/insurance/operations?tab=renewals",
+        protected: true,
+        permissions: ["manage_insurance_renewals"],
+      },
+    ],
   },
   {
     icon: PiggyBank,
@@ -606,7 +635,7 @@ const sectionDefinitions = [
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "My Services", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre"] },
-  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Recipient Payment Accounts", "SlickHood Accounts", "Tax Administration", "Audit Logs", "Insurance Operations", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
+  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Recipient Payment Accounts", "SlickHood Accounts", "Tax Administration", "Audit Logs", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
 ] as const
 
 const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))

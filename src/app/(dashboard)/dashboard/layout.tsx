@@ -5,12 +5,15 @@ import RoleSwitchOverlay from "@/components/layout/RoleSwitchOverlay"
 import { Navbar } from "@/components/layout/Navbar"
 import { BackgroundPattern } from "@/components/layout/BackgroundPattern"
 import OperationalAccessGuard from "@/components/auth/OperationalAccessGuard"
+import { Suspense } from "react"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="flex h-screen w-screen overflow-hidden">
-        <AppSidebar />
+        <Suspense fallback={null}>
+          <AppSidebar />
+        </Suspense>
 
         <main className="relative flex-1 overflow-y-auto bg-[#efefef] dark:bg-[#0D0B1F]">
          <Navbar  />
