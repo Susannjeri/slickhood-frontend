@@ -66,6 +66,15 @@ export default function RegisterForm() {
     });
     const profileType = form.watch("profileType");
 
+    const preserveInvitationOnSignIn = (event: React.MouseEvent<HTMLAnchorElement>) => {
+        const urlToken = new URLSearchParams(window.location.search).get("token")?.trim();
+        const pendingInvite = urlToken || useAuthStore.getState().inviteToken;
+        if (!pendingInvite) return;
+        event.preventDefault();
+        setInviteToken(pendingInvite);
+        router.push(invitationUrl("/login", pendingInvite, "/lease/initialize"));
+    };
+
     // Invitation context must survive email clients, cross-origin redirects and
     // browser-storage restrictions. The backend still validates that the token
     // is active and bound to the submitted email address.
@@ -385,6 +394,7 @@ export default function RegisterForm() {
                             {inviteToken && (
                                 <Link
                                     href={invitationUrl("/login", inviteToken, "/lease/initialize")}
+                                    onClick={preserveInvitationOnSignIn}
                                     className="inline-flex text-sm font-semibold text-[#EF4217] underline underline-offset-4"
                                 >
                                     Already registered? Sign in and continue this invitation
@@ -403,6 +413,7 @@ export default function RegisterForm() {
                         href={inviteToken
                             ? invitationUrl("/login", inviteToken, "/lease/initialize")
                             : "/login"}
+                        onClick={preserveInvitationOnSignIn}
                         className="font-semibold text-[#EF4217] hover:text-[#d63600] transition-colors"
                     >
                         Sign in
