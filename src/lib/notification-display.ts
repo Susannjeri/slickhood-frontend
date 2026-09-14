@@ -4,6 +4,51 @@ export function deliveryLabel(item: { delivered: boolean; channel: string }): st
   return item.channel === "EMAIL" ? "Accepted by mail server" : "Delivered";
 }
 
+const FRIENDLY_NOTIFICATION_TITLES: Record<string, string> = {
+  RENTAL_PAYMENT_OVERDUE: "Rent payment overdue",
+  RENT_PAYMENT_OVERDUE: "Rent payment overdue",
+  RENT_RECEIVABLE_OVERDUE: "Rent receivable overdue",
+  RENTAL_RECEIVABLE_OVERDUE: "Rent receivable overdue",
+  SALE_PAYMENT_OVERDUE: "Property payment overdue",
+  SALE_RECEIVABLE_OVERDUE: "Property-sale receivable overdue",
+  SERVICE_CHARGE_DUE_SOON: "Estate charge due soon",
+  SERVICE_CHARGE_OVERDUE: "Estate charge overdue",
+  SERVICE_CHARGE_RECEIVABLE_OVERDUE: "Estate charge receivable overdue",
+  LATE_FEE_ASSESSED: "Late-payment fee added",
+  LATE_FEE_ASSESSED_EMAIL: "Late-payment fee added",
+  LATE_FEE_BILLER: "Late-payment fee charged",
+  LEASE_TERMINATION_NOTICE: "Lease termination notice",
+  LEASE_TERMINATED: "Lease ended",
+  LEASE_RENEWED: "Lease renewed",
+  OWNERSHIP_RECORD_ENDED: "Homeownership record ended",
+  PAYMENT_RECEIVED: "Payment received",
+  PARTIAL_PAYMENT_RECEIVED: "Partial payment received",
+  INVITE_RECEIVED: "New invitation",
+};
+
+/** Converts internal event codes into short, customer-facing alert titles. */
+export function notificationTitle(type: string): string {
+  const normalized = type.trim().toUpperCase();
+  const mapped = FRIENDLY_NOTIFICATION_TITLES[normalized];
+  if (mapped) return mapped;
+  return normalized
+    .replace(/_EMAIL$/, "")
+    .split("_")
+    .filter(Boolean)
+    .map(word => word.charAt(0) + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+export function notificationActionLabel(type: string): string {
+  const normalized = type.toUpperCase();
+  if (normalized.includes("INVITE")) return "Review invitation";
+  if (normalized.includes("INVOICE") || normalized.includes("PAYMENT") || normalized.includes("FEE") || normalized.includes("CHARGE")) return "Review billing";
+  if (normalized.includes("LEASE") || normalized.includes("TERMINAT")) return "Review notice";
+  if (normalized.includes("SALE")) return "Review property sale";
+  if (normalized.includes("OWNERSHIP") || normalized.includes("ESTATE")) return "Review estate details";
+  return "Review details";
+}
+
 // Return text only, never executable HTML. Email markup should not clutter the in-app feed.
 export function notificationText(message: string): string {
   return message.replace(/<\s*br\s*\/?\s*>|<\/\s*(p|div|li)\s*>/gi, "\n")

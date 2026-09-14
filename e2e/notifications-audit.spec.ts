@@ -21,10 +21,25 @@ test("admin delivery records distinguish SMTP acceptance from unconfirmed delive
     { ...common, notificationId: 1, channel: "EMAIL", delivered: true },
     { ...common, notificationId: 2, channel: "SMS", delivered: false },
   ]), totalPages: 1, totalElements: 2 } }));
+  await page.route("**/notification/mine?**", route => route.fulfill({ json: { ...envelope([]), totalPages: 0, totalElements: 0 } }));
   await page.goto("/dashboard/notifications");
+  await page.getByRole("tab", { name: "Delivery monitor" }).click();
   await expect(page.getByText("Accepted by mail server", { exact: true })).toBeVisible();
   await expect(page.getByText("Delivery not confirmed", { exact: true })).toBeVisible();
   await expect(page.getByText("Failed", { exact: true })).toHaveCount(0);
+});
+
+test("operational users with delivery permission still open their own alerts first", async ({ context, page }) => {
+  await authenticated(context, page, { title: "EstateManager", permissions: ["view_notifications"] });
+  await page.route("**/notification/mine?**", route => route.fulfill({ json: { ...envelope([
+    { id: 12, channel: "IN_APP", notificationType: "SERVICE_CHARGE_OVERDUE", message: "Service charge invoice INV-12 is overdue. Open /dashboard/invoices to review or pay it.", delivered: true, read: false, createdOn: "2026-09-14T08:00:00+03:00" },
+  ]), totalElements: 1, totalPages: 1 } }));
+
+  await page.goto("/dashboard/notifications");
+
+  await expect(page.getByText("Estate charge overdue", { exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Delivery monitor" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Review billing" })).toBeVisible();
 });
 
 test("personal notifications distinguish email acceptance and render email markup as safe text", async ({ context, page }) => {

@@ -38,6 +38,7 @@ import {
   MessageSquare,
   RefreshCw,
   DollarSign,
+  ShieldCheck,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useAuthStore } from "@/store/authStore";
@@ -531,5 +532,18 @@ function DetailCard({
 
 export default function NotificationsPage() {
   const permissions = useAuthStore(state => state.permissions);
-  return permissions.includes("view_notifications") ? <AdminNotificationsPage /> : <MyNotifications />;
+  const canMonitorDelivery = permissions.includes("view_notifications");
+  const [view, setView] = useState<"mine" | "delivery">("mine");
+
+  return <div className="space-y-4">
+    {canMonitorDelivery && <div className="mx-auto flex w-full max-w-4xl gap-2 px-4 pt-4 sm:px-6" role="tablist" aria-label="Notification views">
+      <Button type="button" role="tab" aria-selected={view === "mine"} variant={view === "mine" ? "default" : "outline"} onClick={() => setView("mine")}>
+        <Bell className="mr-2 h-4 w-4" />My alerts
+      </Button>
+      <Button type="button" role="tab" aria-selected={view === "delivery"} variant={view === "delivery" ? "default" : "outline"} onClick={() => setView("delivery")}>
+        <ShieldCheck className="mr-2 h-4 w-4" />Delivery monitor
+      </Button>
+    </div>}
+    {view === "delivery" && canMonitorDelivery ? <AdminNotificationsPage /> : <MyNotifications />}
+  </div>;
 }
