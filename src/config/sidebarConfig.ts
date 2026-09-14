@@ -49,6 +49,15 @@ export const sidebarLinks: SidebarLink[] = [
     permissions: ["list_users"],
   },
   {
+    icon: Users,
+    label: "Subscribers",
+    href: "/dashboard/subscribers",
+    description: "View SlickHood subscribers, plans, terms, account status and renewal settings.",
+    protected: true,
+    permissions: ["view_subscription_plan"],
+    roles: ["Superadmin"],
+  },
+  {
     icon: DollarSign,
     label: "Payments",
     href: "/dashboard/payments",
@@ -394,6 +403,15 @@ export const sidebarLinks: SidebarLink[] = [
     ],
   },
   {
+    icon: Building,
+    label: "My rental units",
+    href: "/dashboard/my-units",
+    permissions: ["view_unit"],
+    roles: ["Tenant"],
+    protected: true,
+    description: "View every rental unit linked to your active tenancies.",
+  },
+  {
     icon: FileSignature,
     label: "Leases",
     permissions: ["view_active_lease", "view_lease_template", "create_lease_template", "edit_lease_template", "delete_lease_template"],
@@ -401,6 +419,7 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
     subLinks: [
       { label: "Lease operations", href: "/dashboard/lease/operations", permissions: ["view_active_lease"], protected: true },
+      { label: "Tenants", href: "/dashboard/rental/tenants", permissions: ["view_active_lease"], excludedRoles: ["Tenant"], protected: true },
       { label: "Lease templates", href: "/dashboard/lease/templates", permissions: ["view_lease_template"], excludedRoles: ["Tenant"], protected: true },
     ],
   },
@@ -436,6 +455,13 @@ export const sidebarLinks: SidebarLink[] = [
         protected: true,
       },
       {
+        label: "Homeowners",
+        href: "/dashboard/estate#homeowners",
+        permissions: ["view_estate"],
+        subscriptionFeatures: ["ESTATE_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT"],
+        protected: true,
+      },
+      {
         label: "Receiving Accounts",
         href: "/dashboard/estate/accounts",
         permissions: ["view_account"],
@@ -447,30 +473,39 @@ export const sidebarLinks: SidebarLink[] = [
   {
     icon: Building,
     label: "My Home",
-    href: "/dashboard/estate",
     permissions: ["view_estate"],
     roles: ["Homeowner"],
     protected: true,
     description: "View owned homes, service charges, balances and estate documents.",
+    subLinks: [
+      { label: "My homeowner units", href: "/dashboard/my-units", permissions: ["view_unit"], protected: true },
+      { label: "Ownership & charges", href: "/dashboard/estate", permissions: ["view_estate"], protected: true },
+    ],
   },
   {
     icon: Landmark,
     label: "Property Sale Management",
-    href: "/dashboard/sales",
     permissions: ["view_sale_pipeline"],
     roles: ["SalesAgent", "SalesCoordinator", "ListingAgent"],
     subscriptionFeatures: ["PROPERTY_SALES", "BUYER_PIPELINE"],
     protected: true,
     description: "Buyer journeys, viewings, offers, due diligence, completion and handover.",
+    subLinks: [
+      { label: "Overview & invitations", href: "/dashboard/sales", permissions: ["view_sale_pipeline"], protected: true },
+      { label: "Buyers", href: "/dashboard/sales#buyers", permissions: ["view_sale_pipeline"], protected: true },
+    ],
   },
   {
     icon: Landmark,
     label: "My Property Purchase",
-    href: "/dashboard/sales",
     permissions: ["view_sale_pipeline"],
     roles: ["Buyer"],
     protected: true,
     description: "Review offers, sale documents, milestones and property handover.",
+    subLinks: [
+      { label: "My sale units", href: "/dashboard/my-units", permissions: ["view_unit"], protected: true },
+      { label: "Purchase journey", href: "/dashboard/sales", permissions: ["view_sale_pipeline"], protected: true },
+    ],
   },
   {
     icon: ClipboardClock,

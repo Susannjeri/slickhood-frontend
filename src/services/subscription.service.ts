@@ -55,6 +55,23 @@ export interface SubscriptionBillingItem {
   status: "SUCCESSFUL" | "PROCESSING" | "PENDING";
 }
 
+export interface SubscriberRecord {
+  subscriptionId: number;
+  userId: number;
+  fullName?: string;
+  email: string;
+  phoneNumber?: string;
+  accountStatus: string;
+  role: string;
+  product?: string;
+  planCode: string;
+  status: "PENDING" | "ACTIVE" | "EXPIRED" | "SUSPENDED" | "CANCELLED";
+  startAt: string;
+  endAt?: string;
+  autoRenew: boolean;
+  createdOn: string;
+}
+
 export const subscriptionRoleForTitle = (title?: string | null) => {
   const normalized = title?.replaceAll(" ", "").toLowerCase();
   if (normalized === "landlord") return "LANDLORD";
@@ -186,6 +203,19 @@ export const getSubscriptionBillingHistory = (token: string, page = 0, size = 20
   API.get<{ data: SubscriptionBillingItem[] }>("/subscription/billing-history", {
     headers: { Authorization: `Bearer ${token}` },
     params: { page, size, sort: "createdOn,desc" },
+  });
+
+export const getSubscribers = (
+  token: string,
+  params: { page?: number; size?: number; search?: string; status?: string; product?: string } = {},
+) => API.get<{ data: SubscriberRecord[]; totalPages: number; totalElements: number }>(
+  "/subscription/admin/subscribers",
+  { headers: { Authorization: `Bearer ${token}` }, params: { page: 0, size: 25, ...params } },
+);
+
+export const updateSubscriberAutoRenew = (token: string, subscriptionId: number, autoRenew: boolean) =>
+  API.patch(`/subscription/admin/subscribers/${subscriptionId}`, { autoRenew }, {
+    headers: { Authorization: `Bearer ${token}` },
   });
 
 export const updateSubscriptionAutoRenew = (token: string, role: string, product: string | undefined, enabled: boolean) =>

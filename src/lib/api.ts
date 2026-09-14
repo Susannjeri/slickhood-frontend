@@ -1377,10 +1377,18 @@ export interface ActiveLease {
   agreementStatus?: "DRAFT" | "ISSUED" | "ACKNOWLEDGED" | "PARTIALLY_SIGNED" | "SIGNED";
   lifecycleStatus?: "DRAFT" | "ACTIVE" | "NOTICE_GIVEN" | "TERMINATED";
   terminationEffectiveDate?: string;
+  propertyId?: number;
+  propertyName?: string;
+  unitId?: number;
+  unitRef?: string;
+  tenantUserId?: number;
+  tenantEmail?: string;
+  tenantPhoneNumber?: string;
 }
 
-export const listActiveLeases = (page: number, size: number, token: string) =>
-  API.get(`/lease/list?page=${page}&size=${size}&sort=id,desc`, {
+export const listActiveLeases = (page: number, size: number, token: string, search?: string) =>
+  API.get(`/lease/list`, {
+    params: { page, size, sort: "id,desc", ...(search?.trim() ? { search: search.trim() } : {}) },
     headers: { Authorization: `Bearer ${token}` },
   });
 
