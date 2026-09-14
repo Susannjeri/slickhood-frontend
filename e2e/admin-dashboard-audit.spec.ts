@@ -29,7 +29,7 @@ test("admin dashboard keeps metrics and sidebar functions without a duplicate di
   if (await insurance.getAttribute("aria-expanded") !== "true") await insurance.click();
   await expect(insurance).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("link", { name: "Applications & quotes", exact: true }))
-    .toHaveAttribute("href", "/dashboard/insurance/operations?tab=applications");
+    .toHaveAttribute("href", "/dashboard/insurance/operations?tab=applications#applications-quotes");
   expect(existsSync(path.join(process.cwd(), "src/app/(dashboard)/dashboard/insurance/operations/page.tsx"))).toBe(true);
   await expect(page.getByText("Upcoming lease actions", { exact: true })).toHaveCount(0);
 });

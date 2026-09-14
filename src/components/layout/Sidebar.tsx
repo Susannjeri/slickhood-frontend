@@ -227,7 +227,8 @@ export default function AppSidebar() {
 
   const isHrefActive = (href?: string) => {
     if (!href) return false;
-    const [targetPath, targetQuery] = href.split("?", 2);
+    const [hrefWithoutHash] = href.split("#", 1);
+    const [targetPath, targetQuery] = hrefWithoutHash.split("?", 2);
     if (pathname !== targetPath) return false;
     if (!targetQuery) return true;
     const targetParams = new URLSearchParams(targetQuery);

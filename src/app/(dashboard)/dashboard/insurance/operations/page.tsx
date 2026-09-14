@@ -92,6 +92,13 @@ type Action =
 
 const title = (value: string) => value.replaceAll("_", " ").toLowerCase().replace(/(^|\s)\S/g, character => character.toUpperCase());
 const pageContent = <T,>(result: {content?: T[]}) => Array.isArray(result.content) ? result.content : [];
+const tabSectionIds: Record<string, string> = {
+  applications: "applications-quotes",
+  claims: "insurance-claims",
+  renewals: "insurance-renewals",
+  partners: "insurance-companies",
+  payments: "insurer-payment-routes",
+};
 
 export default function InsuranceOperationsPage() {
   const searchParams = useSearchParams();
@@ -149,6 +156,17 @@ export default function InsuranceOperationsPage() {
   const visibleTabs = [canUseApplicationQueue&&"applications", canManageClaims&&"claims", canManageRenewals&&"renewals", canCatalog&&"partners", canPaymentConfig&&"payments"].filter((value): value is string => Boolean(value));
   const requestedTab = searchParams.get("tab");
   const initialTab = requestedTab && visibleTabs.includes(requestedTab) ? requestedTab : defaultTab;
+  useEffect(() => {
+    if (!requestedTab || requestedTab !== initialTab) return;
+    const sectionId = tabSectionIds[initialTab];
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialTab, requestedTab]);
   const metrics = useMemo(() => [
     ["Open applications", summary.openCases, FileCheck2],
     ["Unassigned", summary.unassignedCases, Users],
@@ -309,11 +327,11 @@ export default function InsuranceOperationsPage() {
           {canCatalog && <TabsTrigger value="partners">Insurance companies</TabsTrigger>}
           {canPaymentConfig && <TabsTrigger value="payments">Payment routes</TabsTrigger>}
         </TabsList>
-        {canUseApplicationQueue && <TabsContent value="applications" className="space-y-4"><ApplicationQueue items={cases} permissions={{canReview, canQuote, canApprove, canVerify, canIssue}} onAction={setAction} onEvidence={payment=>void openEvidence(payment)} onDispatch={item=>void openDispatch(item)} onHistory={item=>void openCorrespondence(item)}/></TabsContent>}
-        {canManageClaims && <TabsContent value="claims" className="space-y-3"><ClaimQueue items={claims} onAction={item => {setClaimStatus(CLAIM_TRANSITIONS[item.status]?.[0] ?? "");setAction({kind: "claim-status", item});}}/></TabsContent>}
-        {canManageRenewals && <TabsContent value="renewals" className="space-y-3"><RenewalOperations items={renewals} journeys={renewalJourneys} canVerify={canVerify} canIssue={canIssue} busy={busy} setBusy={setBusy} reload={load}/></TabsContent>}
-        {canCatalog&&<TabsContent value="partners"><PartnerCatalog items={adminCompanies} onAdd={()=>openPartner()} onEdit={openPartner}/></TabsContent>}
-        {canPaymentConfig&&<TabsContent value="payments"><PaymentRoutes companies={companies.filter(company=>company.active)} accounts={accounts} configurations={paymentConfigurations} form={paymentConfiguration} setForm={setPaymentConfiguration} busy={busy} onSubmit={addPaymentConfiguration} onDeactivate={deactivatePaymentConfiguration}/></TabsContent>}
+        {canUseApplicationQueue && <TabsContent id="applications-quotes" value="applications" className="scroll-mt-24 space-y-4"><ApplicationQueue items={cases} permissions={{canReview, canQuote, canApprove, canVerify, canIssue}} onAction={setAction} onEvidence={payment=>void openEvidence(payment)} onDispatch={item=>void openDispatch(item)} onHistory={item=>void openCorrespondence(item)}/></TabsContent>}
+        {canManageClaims && <TabsContent id="insurance-claims" value="claims" className="scroll-mt-24 space-y-3"><ClaimQueue items={claims} onAction={item => {setClaimStatus(CLAIM_TRANSITIONS[item.status]?.[0] ?? "");setAction({kind: "claim-status", item});}}/></TabsContent>}
+        {canManageRenewals && <TabsContent id="insurance-renewals" value="renewals" className="scroll-mt-24 space-y-3"><RenewalOperations items={renewals} journeys={renewalJourneys} canVerify={canVerify} canIssue={canIssue} busy={busy} setBusy={setBusy} reload={load}/></TabsContent>}
+        {canCatalog&&<TabsContent id="insurance-companies" value="partners" className="scroll-mt-24"><PartnerCatalog items={adminCompanies} onAdd={()=>openPartner()} onEdit={openPartner}/></TabsContent>}
+        {canPaymentConfig&&<TabsContent id="insurer-payment-routes" value="payments" className="scroll-mt-24"><PaymentRoutes companies={companies.filter(company=>company.active)} accounts={accounts} configurations={paymentConfigurations} form={paymentConfiguration} setForm={setPaymentConfiguration} busy={busy} onSubmit={addPaymentConfiguration} onDeactivate={deactivatePaymentConfiguration}/></TabsContent>}
       </Tabs>
     </div>
     <ActionDialog action={action} busy={busy} staff={staff} companies={companies} adviserId={adviserId} setAdviserId={setAdviserId} caseStatus={caseStatus} setCaseStatus={setCaseStatus} note={note} setNote={setNote} reference={reference} setReference={setReference} quote={quote} setQuote={setQuote} quoteFile={quoteFile} setQuoteFile={setQuoteFile} policy={policy} setPolicy={setPolicy} claimStatus={claimStatus} setClaimStatus={setClaimStatus} insurerReference={insurerReference} setInsurerReference={setInsurerReference} renewalStatus={renewalStatus} setRenewalStatus={setRenewalStatus} onClose={closeAction} onSubmit={submitAction}/>

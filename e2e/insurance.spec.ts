@@ -167,9 +167,12 @@ test("insurance manager maintains partner branding and verified payment routes",
   return route.fulfill({json:envelope([{id:5,companyCode:"APA",companyName:"APA Insurance",paymentAccountId:17,accountName:"APA Premium Collection",channel:"MPESA",label:"Existing APA route",instructions:"Use the application reference.",version:1,effectiveFrom:"2026-09-01",active:true,accountVerified:true,paymentDetails:[]}])});
  });
  await page.route("**/insurance/admin/payment-configurations/5",route=>{deactivated=true;return route.fulfill({json:envelope(null)})});
- await page.goto("/dashboard/insurance/operations?tab=partners");
+ await page.goto("/dashboard/insurance/operations?tab=payments#insurer-payment-routes");
  await expect(page.getByRole("link",{name:"Insurance companies"})).toBeVisible();
+ await page.getByRole("link",{name:"Insurance companies"}).click();
+ await expect(page).toHaveURL(/\/dashboard\/insurance\/operations\?tab=partners#insurance-companies$/);
   await expect(page.getByRole("tab",{name:"Insurance companies"})).toHaveAttribute("data-state","active");
+ await expect(page.locator("#insurance-companies")).toBeVisible();
  await expect(page.getByText("Insurance company maintenance",{exact:true})).toBeVisible();
  await expect(page.getByRole("button",{name:"Add insurance company"})).toBeVisible();
  await expect(page.getByRole("img",{name:"APA Insurance logo"})).toBeVisible();
