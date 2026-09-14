@@ -62,7 +62,7 @@ test("manager termination requires a reason and sends the structured request", a
   expect(request.postDataJSON().endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 });
 
-test("manager onboards a homeowner directly from the homeowner-unit list", async ({ context, page }) => {
+test("manager onboards a homeowner without duplicating the homeowner-unit list", async ({ context, page }) => {
   await authenticated(context, page, {
     title: "EstateOperationsManager",
     permissions: ["view_estate", "manage_estate", "view_service_charge"],
@@ -71,7 +71,8 @@ test("manager onboards a homeowner directly from the homeowner-unit list", async
   });
   await page.route("**/estate/ownership**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/estate/service-charges**", route => route.fulfill({ json: envelope([]) }));
-  await page.route("**/estate/setup/properties/11", route => route.fulfill({ json: envelope(estateSetup(true)) }));
+  // A stale readiness response must never block the authoritative invitation endpoint.
+  await page.route("**/estate/setup/properties/11", route => route.fulfill({ json: envelope(estateSetup(false)) }));
   let homeownerEstateFilterRequested = false;
   await page.route("**/property/list**", route => {
     homeownerEstateFilterRequested = new URL(route.request().url()).searchParams.get("unitLeaseMode") === "SERVICE_CHARGE";
@@ -94,8 +95,7 @@ test("manager onboards a homeowner directly from the homeowner-unit list", async
   const sent = page.waitForRequest(request => request.url().endsWith("/invite/email") && request.method() === "POST");
   await page.getByRole("button", { name: "Send invitation & agreement", exact: true }).click();
   expect((await sent).postDataJSON()).toMatchObject({ inviteType: "HOMEOWNER", entityId: 77, email: "resident@example.test", leaseStartDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
-  await expect(page.getByText("Homeowner units", { exact: true })).toBeVisible();
-  await expect(page.getByText("Available", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Homeowner units", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Open home & invite" })).toHaveCount(0);
 });
 
@@ -141,7 +141,7 @@ test("estate setup connects a ready receiving account to the selected estate", a
   await expect(page.getByText("Connected & ready", { exact: true })).toBeVisible();
 });
 
-test("homeowner invitation opens account connection instead of repeating a server error", async ({ context, page }) => {
+test("authoritative homeowner invitation rejection opens account connection", async ({ context, page }) => {
   await authenticated(context, page, {
     title: "EstateManager",
     permissions: ["view_estate", "manage_estate", "view_service_charge", "view_account", "edit_property_param"],
@@ -157,8 +157,11 @@ test("homeowner invitation opens account connection instead of repeating a serve
   await page.route("**/estate/service-charges**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/estate/setup/properties/11", route => route.fulfill({ json: envelope(estateSetup(false)) }));
   await page.route("**/account/list**", route => route.fulfill({ json: envelope([]) }));
-  let invitationSent = false;
-  await page.route("**/invite/email", route => { invitationSent = true; return route.fulfill({ json: envelope([]) }); });
+  let invitationAttempted = false;
+  await page.route("**/invite/email", route => {
+    invitationAttempted = true;
+    return route.fulfill({ status: 400, json: { success: false, code: "S00361", description: "Receiving account required" } });
+  });
 
   await page.goto("/dashboard/estate?propertyId=11");
   await page.getByRole("combobox").nth(1).click();
@@ -168,5 +171,5 @@ test("homeowner invitation opens account connection instead of repeating a serve
 
   await expect(page.getByRole("heading", { name: "Payment Accounts" })).toBeVisible();
   await expect(page.getByText("No payment accounts attached to this property")).toBeVisible();
-  expect(invitationSent).toBe(false);
+  expect(invitationAttempted).toBe(true);
 });
