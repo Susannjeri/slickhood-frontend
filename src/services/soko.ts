@@ -1,44 +1,307 @@
-import {API} from "@/lib/api";
+import { API } from "@/lib/api";
 
-export type SokoStore={id:number;ownerUserId:number;name:string;description?:string;phoneNumber?:string;address?:string;latitude?:number;longitude?:number;serviceRadiusKm:number;status:string;pickupEnabled:boolean;deliveryEnabled:boolean;deliveryFee:number;currency:string;paymentAccountId?:number;submittedAt?:string;reviewedAt?:string;reviewReason?:string};
-export type SokoProduct={id:number;storeId:number;name:string;description?:string;category:string;unit:string;price:number;currency:string;stockQuantity:number;imageUrl?:string;status:string;moderationReason?:string};
-export type SokoRider={id:number;storeId:number;riderType:"INDIVIDUAL"|"DELIVERY_COMPANY";displayName:string;phoneNumber:string;email?:string;vehicleType?:string;vehiclePlate?:string;availability:"AVAILABLE"|"BUSY"|"OFFLINE";status:string;verified:boolean;completedDeliveries:number;notes?:string};
-export type CatalogProduct={product:SokoProduct;storeName:string;deliveryEnabled:boolean;pickupEnabled:boolean;distanceKm?:number;imageUrls?:string[];deliveryFee?:number};
-export type SokoOrderItem={id:number;productId:number;productName:string;unit:string;unitPrice:number;quantity:number;lineTotal:number};
-export type SokoOrder={id:number;orderNumber:string;storeId:number;status:string;paymentStatus:string;invoiceRef:string;deliveryMethod:string;deliveryAddress?:string;customerPhone:string;subtotal:number;deliveryFee:number;total:number;currency:string;destinationUnitId?:number;placedAt:string;riderId?:number;courierName?:string;courierPhone?:string;courierVehiclePlate?:string;deliveryCodeVerified:boolean;deliveryCodeAttempts:number;expectedArrivalAt?:string;deliveryProofReference?:string;deliveryProofAt?:string};
-export type SokoOrderDetail={order:SokoOrder & {refundStatus?:string};storeName:string;paymentAccountId:number;paymentChannel:string;items:SokoOrderItem[]};
-export type StorePayload={name:string;description?:string;phoneNumber?:string;address?:string;latitude?:number;longitude?:number;serviceRadiusKm:number;pickupEnabled:boolean;deliveryEnabled:boolean;deliveryFee:number;currency:string;paymentAccountId?:number};
-export type ProductPayload={storeId:number;name:string;description?:string;category:string;unit:string;price:number;stockQuantity:number;imageUrl?:string};
-export type RiderPayload={storeId:number;riderType:"INDIVIDUAL"|"DELIVERY_COMPANY";displayName:string;phoneNumber:string;email?:string;vehicleType?:string;vehiclePlate?:string;notes?:string};
+export type SokoStore = {
+  id: number;
+  ownerUserId: number;
+  name: string;
+  description?: string;
+  phoneNumber?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  serviceRadiusKm: number;
+  status: string;
+  pickupEnabled: boolean;
+  deliveryEnabled: boolean;
+  deliveryFee: number;
+  currency: string;
+  paymentAccountId?: number;
+  submittedAt?: string;
+  reviewedAt?: string;
+  reviewReason?: string;
+};
+export type SokoVariation = {
+  id?: number;
+  name: string;
+  value: string;
+  priceAdjustment?: number;
+  stockQuantity: number;
+};
+export type SokoProduct = {
+  id: number;
+  storeId: number;
+  name: string;
+  description?: string;
+  category: string;
+  unit: string;
+  price: number;
+  currency: string;
+  stockQuantity: number;
+  imageUrl?: string;
+  status: string;
+  moderationReason?: string;
+  variationsJson?: string;
+};
+export type SokoRider = {
+  id: number;
+  storeId: number;
+  riderType: "INDIVIDUAL" | "DELIVERY_COMPANY";
+  displayName: string;
+  phoneNumber: string;
+  email?: string;
+  vehicleType?: string;
+  vehiclePlate?: string;
+  availability: "AVAILABLE" | "BUSY" | "OFFLINE";
+  status: string;
+  verified: boolean;
+  verificationStatus?: string;
+  completedDeliveries: number;
+  notes?: string;
+};
+export type CatalogProduct = {
+  product: SokoProduct;
+  storeName: string;
+  deliveryEnabled: boolean;
+  pickupEnabled: boolean;
+  distanceKm?: number;
+  imageUrls?: string[];
+  deliveryFee?: number;
+};
+export type SokoOrderItem = {
+  id: number;
+  productId: number;
+  productName: string;
+  variationId?: number;
+  variationName?: string;
+  variationValue?: string;
+  unit: string;
+  unitPrice: number;
+  quantity: number;
+  lineTotal: number;
+};
+export type SokoOrder = {
+  id: number;
+  orderNumber: string;
+  storeId: number;
+  status: string;
+  paymentStatus: string;
+  invoiceRef: string;
+  deliveryMethod: string;
+  deliveryAddress?: string;
+  customerPhone: string;
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+  currency: string;
+  destinationUnitId?: number;
+  placedAt: string;
+  riderId?: number;
+  courierName?: string;
+  courierPhone?: string;
+  courierVehiclePlate?: string;
+  deliveryCodeVerified: boolean;
+  deliveryCodeAttempts: number;
+  deliveryCodeExpiresAt?: string;
+  deliveryCodeLockedAt?: string;
+  expectedArrivalAt?: string;
+  deliveryProofReference?: string;
+  deliveryProofAt?: string;
+  deliveryExceptionReason?: string;
+};
+export type SokoOrderDetail = {
+  order: SokoOrder & { refundStatus?: string };
+  storeName: string;
+  paymentAccountId: number;
+  paymentChannel: string;
+  items: SokoOrderItem[];
+};
+export type StorePayload = {
+  name: string;
+  description?: string;
+  phoneNumber?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  serviceRadiusKm: number;
+  pickupEnabled: boolean;
+  deliveryEnabled: boolean;
+  deliveryFee: number;
+  currency: string;
+  paymentAccountId?: number;
+};
+export type ProductPayload = {
+  storeId: number;
+  name: string;
+  description?: string;
+  category: string;
+  unit: string;
+  price: number;
+  stockQuantity: number;
+  imageUrl?: string;
+  variations?: SokoVariation[];
+};
+export type RiderPayload = {
+  storeId: number;
+  riderType: "INDIVIDUAL" | "DELIVERY_COMPANY";
+  displayName: string;
+  phoneNumber: string;
+  email?: string;
+  vehicleType?: string;
+  vehiclePlate?: string;
+  notes?: string;
+};
 
-export const searchSoko=(params:{query?:string;category?:string;latitude?:number;longitude?:number;radiusKm?:number})=>API.get("/soko/catalog",{params:{page:0,size:60,...params}});
-export const mySokoOrders=()=>API.get("/soko/order/my",{params:{page:0,size:100,sort:"createdOn,desc"}});
-export const merchantSokoOrders=()=>API.get("/soko/order/merchant",{params:{page:0,size:100,sort:"createdOn,desc"}});
-export const checkoutSoko=(payload:{storeId:number;items:{productId:number;quantity:number}[];deliveryMethod:string;deliveryAddress?:string;customerPhone:string;notes?:string;destinationUnitId?:number},idempotencyKey:string)=>API.post("/soko/order/checkout",payload,{headers:{"Idempotency-Key":idempotencyKey}});
-export const updateSokoOrder=(id:number,status:string,dispatch?:{riderId?:number;courierName?:string;courierPhone?:string;vehiclePlate?:string;expectedArrivalTime:string})=>API.put(`/soko/order/${id}/status`,dispatch??null,{params:{status}});
-export const getSokoDeliveryCode=(id:number)=>API.get(`/soko/order/${id}/delivery-code`);
-export const cancelSokoOrder=(id:number,reason:string)=>API.put(`/soko/order/${id}/cancel`,{reason});
-export const confirmSokoDelivery=(id:number,code:string)=>API.put(`/soko/order/${id}/delivery/confirm`,{code});
-export const uploadSokoDeliveryProof=(id:number,proof:File)=>{const data=new FormData();data.append("proof",proof);return API.put(`/soko/order/${id}/delivery/proof`,data);};
-export const getSokoDeliveryProof=(id:number)=>API.get(`/soko/order/${id}/delivery/proof`);
-export const mySokoStores=()=>API.get("/soko/store/my");
-export const createSokoStore=(payload:StorePayload)=>API.post("/soko/store",payload);
-export const updateSokoStore=(id:number,payload:StorePayload)=>API.put(`/soko/store/${id}`,payload);
-export const publishSokoStore=(id:number)=>API.put(`/soko/store/${id}/publish`);
-export const mySokoProducts=(storeId:number)=>API.get("/soko/product/my",{params:{storeId}});
-export const createSokoProduct=(payload:ProductPayload)=>API.post("/soko/product",payload);
-export const uploadSokoProductImages=(id:number,images:File[])=>{const data=new FormData();images.forEach(image=>data.append("images",image));return API.put(`/soko/product/${id}/images`,data);};
-export const updateSokoProduct=(id:number,payload:ProductPayload)=>API.put(`/soko/product/${id}`,payload);
-export const publishSokoProduct=(id:number)=>API.put(`/soko/product/${id}/publish`);
-export const mySokoRiders=(storeId:number)=>API.get("/soko/rider/my",{params:{storeId}});
-export const createSokoRider=(payload:RiderPayload)=>API.post("/soko/rider",payload);
-export const updateSokoRider=(id:number,payload:RiderPayload)=>API.put(`/soko/rider/${id}`,payload);
-export const setSokoRiderAvailability=(id:number,availability:"AVAILABLE"|"OFFLINE")=>API.put(`/soko/rider/${id}/availability`,null,{params:{availability}});
-export const removeSokoRider=(id:number)=>API.delete(`/soko/rider/${id}`);
-export const sokoAdminSummary=()=>API.get("/soko/admin/summary");
-export const sokoAdminStores=(status?:string)=>API.get("/soko/admin/stores",{params:{page:0,size:100,sort:"submittedAt,asc",status:status||undefined}});
-export const sokoAdminProducts=()=>API.get("/soko/admin/products",{params:{page:0,size:100,sort:"lastModifiedDate,desc"}});
-export const sokoAdminOrders=()=>API.get("/soko/admin/orders",{params:{page:0,size:100,sort:"createdOn,desc"}});
-export const moderateSokoStore=(id:number,decision:"APPROVE"|"REJECT"|"SUSPEND"|"REACTIVATE",reason?:string)=>API.put(`/soko/admin/stores/${id}/moderation`,{decision,reason});
-export const moderateSokoProduct=(id:number,decision:"SUSPEND"|"REACTIVATE",reason?:string)=>API.put(`/soko/admin/products/${id}/moderation`,{decision,reason});
-export const initiateSokoPayment=(invoiceRef:string,accountId:number,paymentChannel:string,phoneNumber?:string)=>API.post("/payment/init",{invoiceRef,accountId,paymentChannel,...(phoneNumber?{phoneNumber}:{})});
+export const searchSoko = (params: {
+  query?: string;
+  category?: string;
+  latitude?: number;
+  longitude?: number;
+  radiusKm?: number;
+}) => API.get("/soko/catalog", { params: { page: 0, size: 60, ...params } });
+export const mySokoOrders = () =>
+  API.get("/soko/order/my", {
+    params: { page: 0, size: 100, sort: "createdOn,desc" },
+  });
+export const merchantSokoOrders = () =>
+  API.get("/soko/order/merchant", {
+    params: { page: 0, size: 100, sort: "createdOn,desc" },
+  });
+export const checkoutSoko = (
+  payload: {
+    storeId: number;
+    items: { productId: number; quantity: number; variationId?: number }[];
+    deliveryMethod: string;
+    deliveryAddress?: string;
+    customerPhone: string;
+    notes?: string;
+    destinationUnitId?: number;
+  },
+  idempotencyKey: string,
+) =>
+  API.post("/soko/order/checkout", payload, {
+    headers: { "Idempotency-Key": idempotencyKey },
+  });
+export const updateSokoOrder = (
+  id: number,
+  status: string,
+  dispatch?: {
+    riderId?: number;
+    courierName?: string;
+    courierPhone?: string;
+    vehiclePlate?: string;
+    expectedArrivalTime: string;
+  },
+) =>
+  API.put(`/soko/order/${id}/status`, dispatch ?? null, { params: { status } });
+export const getSokoDeliveryCode = (id: number) =>
+  API.get(`/soko/order/${id}/delivery-code`);
+export const cancelSokoOrder = (id: number, reason: string) =>
+  API.put(`/soko/order/${id}/cancel`, { reason });
+export const confirmSokoDelivery = (id: number, code: string) =>
+  API.put(`/soko/order/${id}/delivery/confirm`, { code });
+export const uploadSokoDeliveryProof = (id: number, proof: File) => {
+  const data = new FormData();
+  data.append("proof", proof);
+  return API.put(`/soko/order/${id}/delivery/proof`, data);
+};
+export const getSokoDeliveryProof = (id: number) =>
+  API.get(`/soko/order/${id}/delivery/proof`);
+export const mySokoStores = () => API.get("/soko/store/my");
+export const createSokoStore = (payload: StorePayload) =>
+  API.post("/soko/store", payload);
+export const updateSokoStore = (id: number, payload: StorePayload) =>
+  API.put(`/soko/store/${id}`, payload);
+export const publishSokoStore = (id: number) =>
+  API.put(`/soko/store/${id}/publish`);
+export const mySokoProducts = (storeId: number) =>
+  API.get("/soko/product/my", { params: { storeId } });
+export const createSokoProduct = (payload: ProductPayload) =>
+  API.post("/soko/product", payload);
+export const uploadSokoProductImages = (id: number, images: File[]) => {
+  const data = new FormData();
+  images.forEach((image) => data.append("images", image));
+  return API.put(`/soko/product/${id}/images`, data);
+};
+export const updateSokoProduct = (id: number, payload: ProductPayload) =>
+  API.put(`/soko/product/${id}`, payload);
+export const publishSokoProduct = (id: number) =>
+  API.put(`/soko/product/${id}/publish`);
+export const pauseSokoProduct = (id: number) =>
+  API.put(`/soko/product/${id}/pause`);
+export const removeSokoProduct = (id: number) =>
+  API.delete(`/soko/product/${id}`);
+export const mySokoRiders = (storeId: number) =>
+  API.get("/soko/rider/my", { params: { storeId } });
+export const createSokoRider = (payload: RiderPayload) =>
+  API.post("/soko/rider", payload);
+export const updateSokoRider = (id: number, payload: RiderPayload) =>
+  API.put(`/soko/rider/${id}`, payload);
+export const setSokoRiderAvailability = (
+  id: number,
+  availability: "AVAILABLE" | "OFFLINE",
+) =>
+  API.put(`/soko/rider/${id}/availability`, null, { params: { availability } });
+export const removeSokoRider = (id: number) => API.delete(`/soko/rider/${id}`);
+export const myRiderAssignments = () =>
+  API.get("/soko/rider/assignments", {
+    params: { page: 0, size: 100, sort: "createdOn,desc" },
+  });
+export const acceptSokoAssignment = (id: number) =>
+  API.put(`/soko/order/${id}/rider/accept`);
+export const collectSokoDelivery = (id: number) =>
+  API.put(`/soko/order/${id}/rider/collect`);
+export const failSokoDelivery = (id: number, reason: string) =>
+  API.put(`/soko/order/${id}/rider/fail`, { reason });
+export const returnSokoDelivery = (id: number, reason: string) =>
+  API.put(`/soko/order/${id}/rider/return`, { reason });
+export const sokoAdminSummary = () => API.get("/soko/admin/summary");
+export const sokoAdminStores = (status?: string) =>
+  API.get("/soko/admin/stores", {
+    params: {
+      page: 0,
+      size: 100,
+      sort: "submittedAt,asc",
+      status: status || undefined,
+    },
+  });
+export const sokoAdminProducts = () =>
+  API.get("/soko/admin/products", {
+    params: { page: 0, size: 100, sort: "lastModifiedDate,desc" },
+  });
+export const sokoAdminOrders = () =>
+  API.get("/soko/admin/orders", {
+    params: { page: 0, size: 100, sort: "createdOn,desc" },
+  });
+export const sokoAdminRiders = () =>
+  API.get("/soko/admin/riders", {
+    params: { page: 0, size: 100, sort: "createdOn,desc" },
+  });
+export const decideSokoRider = (
+  id: number,
+  decision: "VERIFY" | "ACTIVATE" | "SUSPEND" | "REJECT",
+  reason?: string,
+) => API.put(`/soko/admin/riders/${id}/decision`, { decision, reason });
+export const reissueSokoDeliveryCode = (id: number, reason: string) =>
+  API.post(`/soko/admin/orders/${id}/delivery-code/reissue`, { reason });
+export const moderateSokoStore = (
+  id: number,
+  decision: "APPROVE" | "REJECT" | "SUSPEND" | "REACTIVATE",
+  reason?: string,
+) => API.put(`/soko/admin/stores/${id}/moderation`, { decision, reason });
+export const moderateSokoProduct = (
+  id: number,
+  decision: "SUSPEND" | "REACTIVATE",
+  reason?: string,
+) => API.put(`/soko/admin/products/${id}/moderation`, { decision, reason });
+export const initiateSokoPayment = (
+  invoiceRef: string,
+  accountId: number,
+  paymentChannel: string,
+  phoneNumber?: string,
+) =>
+  API.post("/payment/init", {
+    invoiceRef,
+    accountId,
+    paymentChannel,
+    ...(phoneNumber ? { phoneNumber } : {}),
+  });

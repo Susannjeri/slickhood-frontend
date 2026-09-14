@@ -1,5 +1,5 @@
 // src/config/sidebarConfig.ts
-import { HomeIcon, User, Settings, Rocket, DollarSign, Crown, Building, FileSignature, ClipboardClock, Bell, ReceiptText, Users, Wallet, Landmark, Wrench, LayoutGrid, ChartNoAxesCombined, ShieldCheck, ShieldPlus, ShoppingBasket, BadgeDollarSign, CircleHelp, FileKey2, PiggyBank, Calculator } from "lucide-react"
+import { HomeIcon, User, Settings, Rocket, DollarSign, Crown, Building, FileSignature, ClipboardClock, Bell, ReceiptText, Users, Wallet, Landmark, Wrench, LayoutGrid, ChartNoAxesCombined, ShieldCheck, ShieldPlus, ShoppingBasket, BadgeDollarSign, CircleHelp, FileKey2, PiggyBank, Calculator, Truck } from "lucide-react"
 import { LucideIcon } from "lucide-react"
 // import { fa } from "zod/v4/locales"
 
@@ -49,12 +49,30 @@ export const sidebarLinks: SidebarLink[] = [
     permissions: ["list_users"],
   },
   {
+    icon: ShieldPlus,
+    label: "KYC Requirements",
+    href: "/dashboard/kyc-requirements",
+    description: "Configure, preview and publish reusable KYC requirements for Marketplace services and Soko categories.",
+    protected: true,
+    permissions: ["list_users"],
+    roles: ["Superadmin"],
+  },
+  {
     icon: Users,
     label: "Subscribers",
     href: "/dashboard/subscribers",
     description: "View SlickHood subscribers, plans, terms, account status and renewal settings.",
     protected: true,
     permissions: ["view_subscription_plan"],
+    roles: ["Superadmin"],
+  },
+  {
+    icon: Truck,
+    label: "Rider Verification",
+    href: "/dashboard/rider-verification",
+    description: "Verify, activate or suspend delivery riders before Marketplace assignment.",
+    protected: true,
+    permissions: ["list_users"],
     roles: ["Superadmin"],
   },
   {
@@ -627,6 +645,8 @@ export const sidebarLinks: SidebarLink[] = [
     subLinks: [
       { label: "Services", href: "/dashboard/marketplace", permissions: ["view_sp_service"], protected: true },
       { label: "Soko", href: "/dashboard/soko", permissions: [], protected: true },
+      { label: "Soko inventory", href: "/dashboard/soko-inventory", permissions: [], protected: true },
+      { label: "My deliveries", href: "/dashboard/soko-deliveries", permissions: [], protected: true },
     ],
   },
   {
@@ -695,7 +715,7 @@ const sectionDefinitions = [
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "My Services", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre"] },
-  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Subscribers", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Recipient Payment Accounts", "SlickHood Accounts", "Tax Administration", "Audit Logs", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
+  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "KYC Requirements", "Rider Verification", "Subscribers", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Recipient Payment Accounts", "SlickHood Accounts", "Tax Administration", "Audit Logs", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
 ] as const
 
 const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))
