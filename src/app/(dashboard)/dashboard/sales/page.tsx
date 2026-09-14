@@ -47,7 +47,7 @@ function SalesWorkspace(){
  const searchParams=useSearchParams();
  const permissions=useAuthStore(s=>s.permissions),token=useAuthStore(s=>s.token),activeRole=useAuthStore(s=>s.activeRole?.title),canManage=permissions.includes("manage_sale_pipeline"),canAccept=permissions.includes("accept_sale_offer"),isBuyer=activeRole==="Buyer";
  const isSalesBiller=activeRole==="SalesAgent";
- const requestedPropertyId=Number(searchParams.get("propertyId")),requestedUnitId=Number(searchParams.get("unitId"));
+ const requestedPropertyId=Number(searchParams.get("propertyId")),requestedUnitId=Number(searchParams.get("unitId")),requestedSaleId=Number(searchParams.get("saleId"));
  const hasSelectedUnitLink=Number.isSafeInteger(requestedPropertyId)&&requestedPropertyId>0&&Number.isSafeInteger(requestedUnitId)&&requestedUnitId>0;
  const [items,setItems]=useState<SaleTransaction[]>([]);
  const [loadError,setLoadError]=useState(""); const loadSequence=useRef(0);
@@ -75,6 +75,7 @@ function SalesWorkspace(){
   finally{if(sequence===loadSequence.current)setLoading(false)}
  },[page,search]);
  useEffect(()=>{void load();return()=>{loadSequence.current++}},[load]);
+ useEffect(()=>{if(loading||!Number.isSafeInteger(requestedSaleId)||requestedSaleId<=0)return;requestAnimationFrame(()=>document.getElementById(`sale-${requestedSaleId}`)?.scrollIntoView({behavior:"smooth",block:"center"}))},[items,loading,requestedSaleId]);
  useEffect(()=>{if(!canManage||!token){setSetupLoading(false);return}let cancelled=false;void (async()=>{setSetupLoading(true);setSetupError("");try{const [accountResponse,templateResponse]=await Promise.all([listAccounts(token,{byLandlord:true,size:100}),leaseDocumentService.templates()]);if(cancelled)return;const accounts=(accountResponse.data?.data??[]).filter((account:Account)=>account.category==="PROPERTY_SALES"&&account.active&&account.verified);setPaymentAccounts(accounts);setOfferTemplateReady((templateResponse.data?.data??[]).some((template:{documentType:string;legalReviewRequired:boolean;legalReviewedAt?:string})=>template.documentType==="PROPERTY_SALE_LETTER_OF_OFFER"&&!template.legalReviewRequired&&Boolean(template.legalReviewedAt)))}catch(error:unknown){if(!cancelled)setSetupError(apiErrorMessage(error,"Property Sales setup could not be checked."))}finally{if(!cancelled)setSetupLoading(false)}})();return()=>{cancelled=true}},[canManage,token]);
  useEffect(()=>{if(propertyOptions.error)toast.error(apiErrorMessage(propertyOptions.error,"Could not load sale properties."))},[propertyOptions.error]);
  useEffect(()=>{if(unitOptions.error)toast.error(apiErrorMessage(unitOptions.error,"Could not load sale units."))},[unitOptions.error]);

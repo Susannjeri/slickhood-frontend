@@ -496,7 +496,7 @@ export const sidebarLinks: SidebarLink[] = [
   {
     icon: Users,
     label: "Buyers",
-    href: "/dashboard/sales#buyers",
+    href: "/dashboard/sales/buyers",
     permissions: ["view_sale_pipeline"],
     roles: ["SalesAgent", "SalesCoordinator", "ListingAgent"],
     subscriptionFeatures: ["PROPERTY_SALES", "BUYER_PIPELINE"],

@@ -26,10 +26,10 @@ test("property sales staff sees a direct Buyers navigation item", async ({ conte
 
   await page.goto("/dashboard");
 
-  await expect(page.getByRole("link", { name: "Buyers", exact: true })).toHaveAttribute("href", "/dashboard/sales#buyers");
+  await expect(page.getByRole("link", { name: "Buyers", exact: true })).toHaveAttribute("href", "/dashboard/sales/buyers");
 });
 
-test("Buyers section link activates itself and deactivates the sales overview", async ({ context, page }) => {
+test("Buyers opens a dedicated directory and deactivates the sales overview", async ({ context, page }) => {
   await authenticated(context, page, {
     title: "SalesAgent",
     permissions: ["view_sale_pipeline"],
@@ -39,7 +39,26 @@ test("Buyers section link activates itself and deactivates the sales overview", 
   await page.route("**/sales**", route => {
     const url = new URL(route.request().url());
     if (route.request().resourceType() !== "document" && (url.pathname === "/sales" || url.pathname === "/api/sales")) {
-      return route.fulfill({ json: envelope([]) });
+      return route.fulfill({ json: {
+        ...envelope([{
+          id: 13,
+          propertyId: 41,
+          propertyName: "Tatu 2",
+          unitId: 417,
+          unitRef: "T101-COPY-41-7",
+          salesAgentUserId: 100,
+          buyerUserId: 205,
+          buyerName: "Collectable Class",
+          buyerEmail: "buyer@example.com",
+          status: "OFFERED",
+          askingPrice: 2000000,
+          offerAmount: 2000000,
+          currency: "KES",
+        }]),
+        totalPages: 1,
+        totalElements: 1,
+        size: 25,
+      } });
     }
     return route.continue();
   });
@@ -48,8 +67,12 @@ test("Buyers section link activates itself and deactivates the sales overview", 
   const buyers = page.getByRole("link", { name: "Buyers", exact: true });
   await buyers.click();
 
-  await expect(page).toHaveURL(/\/dashboard\/sales#buyers$/);
-  await expect(page.getByText("Buyers & sale transactions", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard\/sales\/buyers$/);
+  await expect(page.getByText("Buyer directory", { exact: true })).toBeVisible();
+  await expect(page.getByText("Collectable Class", { exact: true })).toBeVisible();
+  await expect(page.getByText("buyer@example.com", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Tatu 2 \/ T101-COPY-41-7/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Manage sale" })).toHaveAttribute("href", "/dashboard/sales?saleId=13#sale-13");
   await expect(buyers).toHaveAttribute("data-active", "true");
   await expect(page.getByRole("button", { name: "Property Sale Management", exact: true })).toHaveAttribute("data-active", "false");
 });
