@@ -119,7 +119,25 @@ interface Unit {
     advertise: boolean;
     thumbnail: string;
     unitId: number;
+    lifecycle?: {
+        code: string;
+        label: string;
+        description: string;
+        invitationBlocked: boolean;
+        activeInviteId?: number | null;
+        journeyId?: number | null;
+    };
 }
+
+const lifecycleTone = (code?: string) => {
+    if (["AVAILABLE_RENTAL", "AVAILABLE_HOMEOWNER", "AVAILABLE_SALE", "OCCUPIED", "HOMEOWNER_ONBOARDED", "SOLD"].includes(code ?? "")) {
+        return "bg-green-100 text-green-800";
+    }
+    if (["BUYER_PAYMENT_DUE", "RENT_PAYMENT_DUE", "ESTATE_PAYMENT_DUE", "TENANT_INVITED", "HOMEOWNER_INVITED", "BUYER_INVITED"].includes(code ?? "")) {
+        return "bg-amber-100 text-amber-800";
+    }
+    return "bg-blue-100 text-blue-800";
+};
 
 interface Staff {
     name: string | null;
@@ -1162,12 +1180,12 @@ export default function PropertyDetailsPage() {
                                                     <TableCell className="py-3">
                                                         <span
                                                             className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${
-                                                                unit.occupied
-                                                                    ? "bg-red-100 text-red-800"
-                                                                    : "bg-green-100 text-green-800"
+                                                                unit.lifecycle ? lifecycleTone(unit.lifecycle.code)
+                                                                    : unit.occupied ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"
                                                             }`}
+                                                            title={unit.lifecycle?.description}
                                                         >
-                                                            {unit.occupied ? "Occupied" : "Available"}
+                                                            {unit.lifecycle?.label ?? (unit.occupied ? "Occupied" : "Available")}
                                                         </span>
                                                     </TableCell>
 

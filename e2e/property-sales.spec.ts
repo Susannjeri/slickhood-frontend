@@ -3,6 +3,38 @@ import { authenticated } from "./support";
 
 const pageEnvelope=(data:unknown[])=>({success:true,code:"s00000",description:"Success",data,size:25,totalPages:data.length?1:0,totalElements:data.length});
 
+test("sale unit exposes its live status and opens the prefilled buyer invitation from the top action",async({context,page})=>{
+ await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline","view_property","view_unit","view_account"],propertyIds:[11],propertyNames:["Acacia Court"]});
+ await page.route("**/property/type**",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:"APARTMENT",name:"Apartment"}]}}));
+ await page.route("**/property/unit/type**",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:"TWO_BEDROOM",name:"Two bedroom"}]}}));
+ await page.route("**/property/measurement/units**",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:1,name:"sqm"}]}}));
+ await page.route("**/property/unit/charges?unitId=77",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[]}}));
+ await page.route("**/maintenance/unit/77",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[]}}));
+ await page.route("**/lease/documents**",route=>route.fulfill({json:pageEnvelope([])}));
+ await page.route("**/property/list**",route=>route.fulfill({json:pageEnvelope([{id:11,name:"Acacia Court",managementMode:"SALE"}])}));
+ await page.route("**/property/unit/list**",route=>{
+  const unit={unitId:77,propertyId:11,ref:"A-07",unitType:"TWO_BEDROOM",propertyType:"APARTMENT",size:88,measurementUnits:{id:1,name:"sqm"},utilities:[],currency:"KES",price:15000000,leaseMode:"SALE",occupied:false,advertise:false,thumbnail:"",images:[],templateId:null,lifecycle:{code:"AVAILABLE_SALE",label:"Available for sale",description:"No buyer journey is active.",invitationBlocked:false,activeInviteId:null,journeyId:null}};
+  return route.fulfill({json:page.url().includes("/unit/details/")?{success:true,code:"s00000",description:"Success",data:unit}:pageEnvelope([unit])});
+ });
+ await page.route("**/account/list**",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:81,name:"Sales collections",channel:"MPESA",category:"PROPERTY_SALES",active:true,verified:true}]}}));
+ await page.route("**/lease/documents/templates",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:9,documentType:"PROPERTY_SALE_LETTER_OF_OFFER",legalReviewRequired:false,legalReviewedAt:"2026-09-01T10:00:00"}]}}));
+ await page.route("**/sales**",route=>new URL(route.request().url()).pathname==="/dashboard/sales"
+  ? route.continue()
+  : route.fulfill({json:pageEnvelope([])}));
+
+ await page.goto("/dashboard/unit/details/77?p=11&from=sale");
+ await expect(page.getByText("Available for sale",{exact:true}).first()).toBeVisible();
+ await expect(page.getByText("No buyer journey is active.",{exact:true}).first()).toBeVisible();
+ await page.getByRole("button",{name:"Invite buyer"}).first().click();
+
+ await expect(page).toHaveURL(/\/dashboard\/sales\?propertyId=11&unitId=77#invite-buyer$/);
+ await expect(page.getByText("Selected sale unit")).toBeVisible();
+ await expect(page.getByText("A-07",{exact:true})).toBeVisible();
+ await expect(page.getByLabel("Buyer email")).toBeVisible();
+ await expect(page.getByLabel("Buyer response due")).toBeVisible();
+ await expect(page.getByLabel("Sale unit")).toHaveCount(0);
+});
+
 test("sales owner starts an email-bound sale from scoped property and unit selectors",async({context,page})=>{
  await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline","view_property","view_unit","view_account"]});
  await page.route("**/property/list**",route=>route.fulfill({json:pageEnvelope([{id:11,name:"Acacia Court",managementMode:"SALE"}])}));

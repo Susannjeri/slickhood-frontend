@@ -100,6 +100,14 @@ interface UnitDetail {
   leaseId?: number;
   tenantSigned?: boolean;
   ownerSigned?: boolean;
+  lifecycle?: {
+    code: string;
+    label: string;
+    description: string;
+    invitationBlocked: boolean;
+    activeInviteId?: number | null;
+    journeyId?: number | null;
+  };
 }
 
 interface UnitCharge {
@@ -168,6 +176,17 @@ function formatDate(dateString: string) {
 
 function formatUnitPrice(price: number | null | undefined) {
   return Number.isFinite(Number(price)) ? Number(price).toLocaleString() : "Not set";
+}
+
+function lifecycleTone(code?: string) {
+  if (!code) return "bg-slate-100 text-slate-700";
+  if (["AVAILABLE_RENTAL", "AVAILABLE_HOMEOWNER", "AVAILABLE_SALE", "OCCUPIED", "HOMEOWNER_ONBOARDED", "SOLD"].includes(code)) {
+    return "bg-green-100 text-green-800";
+  }
+  if (["BUYER_PAYMENT_DUE", "RENT_PAYMENT_DUE", "ESTATE_PAYMENT_DUE", "TENANT_INVITED", "HOMEOWNER_INVITED", "BUYER_INVITED"].includes(code)) {
+    return "bg-amber-100 text-amber-800";
+  }
+  return "bg-blue-100 text-blue-800";
 }
 
 function nairobiToday() {
@@ -568,7 +587,7 @@ export default function ViewUnitPage() {
         setLeaseStartDate("");
         setLeaseEndDate("");
         setCreateInviteOpen(false);
-        loadUnitInvites();
+        await Promise.all([loadUnitInvites(), loadUnitDetails()]);
       }
     } catch (err: unknown) {
       const apiError = err as { response?: { data?: { description?: string } } };
@@ -620,8 +639,8 @@ export default function ViewUnitPage() {
       setActionLoading(true);
       const response = await handleUpdateInvite({ id: inviteId, active: false });
       if (response.success) {
-        toast.success("Invite terminated successfully");
-        loadUnitInvites();
+        toast.success("Invitation cancelled. This unit can now be invited again.");
+        await Promise.all([loadUnitInvites(), loadUnitDetails()]);
       }
     } catch (err) {
       toast.error("Failed to terminate invite");
@@ -798,6 +817,9 @@ export default function ViewUnitPage() {
   const isRentalUnit = !isHomeownerUnit && !isSaleUnit;
   const priceLabel = isHomeownerUnit ? "Service charge" : isSaleUnit ? "Asking price" : "Rent";
   const occupantLabel = isHomeownerUnit ? "Homeowner" : "Tenant";
+  const lifecycleLabel = unit.lifecycle?.label ?? (unit.occupied ? "Occupied" : isHomeownerUnit ? "Ready for homeowner" : isSaleUnit ? "Available for sale" : "Available for rent");
+  const lifecycleDescription = unit.lifecycle?.description ?? "No active onboarding journey.";
+  const invitationBlocked = unit.lifecycle?.invitationBlocked ?? unit.occupied;
 
   // ─── Main Render ──────────────────────────────────────────────────────────
 
@@ -979,6 +1001,13 @@ export default function ViewUnitPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
+              {isSaleUnit && (
+                <CanProperty propertyId={Number(propertyId)} permissions={["view_sale_pipeline"]}>
+                  <Button onClick={() => router.push(`/dashboard/sales?propertyId=${propertyId}&unitId=${unitId}#invite-buyer`)} className="text-white" style={{ backgroundColor: "#EF4217" }}>
+                    <UserPlus className="w-4 h-4 mr-2" />{invitationBlocked ? "Open buyer journey" : "Invite buyer"}
+                  </Button>
+                </CanProperty>
+              )}
               <CanProperty propertyId={Number(propertyId)} permissions={["edit_unit"]}>
                 <Button onClick={handleEdit} className="text-white hover:opacity-90 transition" style={{ backgroundColor: "#EF4217" }}>
                   <Edit className="w-4 h-4 mr-2" />Edit Unit
@@ -992,13 +1021,24 @@ export default function ViewUnitPage() {
                   </Button>
                 </CanProperty>
               )}
-              <Can permissions={isHomeownerUnit ? ["manage_estate"] : ["create_invite"]}>
-                {!unit.occupied && tenants.length === 0 && (
+              {!isSaleUnit && unit.lifecycle?.activeInviteId && (
+                <Can permissions={isHomeownerUnit ? ["manage_estate"] : ["update_invite"]}>
+                  <Button variant="outline" disabled={actionLoading} onClick={() => {
+                    if (window.confirm(`Cancel the active ${occupantLabel.toLowerCase()} invitation for Unit ${unit.ref}?`)) {
+                      void onTerminateInvite(unit.lifecycle!.activeInviteId!);
+                    }
+                  }} className="border-red-200 text-red-700 hover:bg-red-50">
+                    <Trash2 className="w-4 h-4 mr-2" />Cancel invitation
+                  </Button>
+                </Can>
+              )}
+              {!isSaleUnit && <Can permissions={isHomeownerUnit ? ["manage_estate"] : ["create_invite"]}>
+                {!invitationBlocked && (
                   <Button onClick={() => isHomeownerUnit ? router.push(`/dashboard/estate?propertyId=${propertyId}&unitId=${unitId}#onboard-homeowner`) : setCreateInviteOpen(true)} variant="outline">
                     <UserPlus className="w-4 h-4 mr-2" />Assign {occupantLabel}
                   </Button>
                 )}
-              </Can>
+              </Can>}
             </div>
           </div>
         </div>
@@ -1010,9 +1050,10 @@ export default function ViewUnitPage() {
             <CardContent className="p-4 space-y-2">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Unit</p>
               <p className="text-xl font-bold" style={{ color: "#141130" }}>{unit.ref}</p>
-              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${unit.occupied ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-700"}`}>
-                {isHomeownerUnit ? "Estate home" : isSaleUnit ? "Sale unit" : unit.occupied ? "Occupied" : "Vacant"}
+              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${lifecycleTone(unit.lifecycle?.code)}`} title={lifecycleDescription}>
+                {lifecycleLabel}
               </span>
+              <p className="text-xs text-gray-500">{lifecycleDescription}</p>
             </CardContent>
           </Card>
           {/* Type */}
@@ -1063,8 +1104,8 @@ export default function ViewUnitPage() {
                     </div>
                   </>
                 )}
-                <div className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: unit.occupied ? "#6B7280" : "#10B981" }}>
-                  {isHomeownerUnit ? "Estate home" : isSaleUnit ? "Sale unit" : unit.occupied ? "Occupied" : "Available"}
+                <div className={`absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-semibold ${lifecycleTone(unit.lifecycle?.code)}`}>
+                  {lifecycleLabel}
                 </div>
               </>
             ) : (
@@ -1196,7 +1237,7 @@ export default function ViewUnitPage() {
                 <CanProperty propertyId={Number(propertyId)} permissions={["view_homeowners"]}><Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/estate?propertyId=${propertyId}&unitId=${unitId}`)}>Ownership & agreements</Button></CanProperty>
                 <CanProperty propertyId={Number(propertyId)} permissions={["view_lease_document"]}><Button size="sm" variant="outline" onClick={() => router.push(`/dashboard/documents?propertyId=${propertyId}&type=ESTATE_RESIDENTIAL_AGREEMENT`)}>View agreements</Button></CanProperty>
               </CardContent></Card>}
-              {isSaleUnit && <Card><CardHeader className="pb-3"><CardTitle className="text-base">Offer & sale agreement</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-gray-500">Use the sales pipeline for the buyer invitation, letter of offer, signatures and completion evidence.</p><CanProperty propertyId={Number(propertyId)} permissions={["view_sale_pipeline"]}><Button size="sm" onClick={() => router.push(`/dashboard/sales?propertyId=${propertyId}&unitId=${unitId}`)}>Open property sale</Button></CanProperty></CardContent></Card>}
+              {isSaleUnit && <Card><CardHeader className="pb-3"><CardTitle className="text-base">Offer & sale agreement</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-gray-500">{lifecycleDescription}</p><CanProperty propertyId={Number(propertyId)} permissions={["view_sale_pipeline"]}><Button size="sm" onClick={() => router.push(`/dashboard/sales?propertyId=${propertyId}&unitId=${unitId}#invite-buyer`)}>{invitationBlocked ? "Open buyer journey" : "Invite buyer"}</Button></CanProperty></CardContent></Card>}
               {/* Tenant card */}
               {isRentalUnit && <CanProperty propertyId={Number(propertyId)} permissions={["view_tenants"]}>
                 <Card>
