@@ -72,7 +72,7 @@ export default function RegisterForm() {
         if (!pendingInvite) return;
         event.preventDefault();
         setInviteToken(pendingInvite);
-        router.push(invitationUrl("/login", pendingInvite, "/lease/initialize"));
+        router.push(invitationUrl("/login", pendingInvite, safeInvitationReturnTo(window.location.search)));
     };
 
     // Invitation context must survive email clients, cross-origin redirects and
@@ -393,7 +393,7 @@ export default function RegisterForm() {
                             <p className="text-red-500 text-sm font-medium">{error}</p>
                             {inviteToken && (
                                 <Link
-                                    href={invitationUrl("/login", inviteToken, "/lease/initialize")}
+                                    href={invitationUrl("/login", inviteToken)}
                                     onClick={preserveInvitationOnSignIn}
                                     className="inline-flex text-sm font-semibold text-[#EF4217] underline underline-offset-4"
                                 >
@@ -411,7 +411,7 @@ export default function RegisterForm() {
                     Already have an account?{" "}
                     <Link
                         href={inviteToken
-                            ? invitationUrl("/login", inviteToken, "/lease/initialize")
+                            ? invitationUrl("/login", inviteToken)
                             : "/login"}
                         onClick={preserveInvitationOnSignIn}
                         className="font-semibold text-[#EF4217] hover:text-[#d63600] transition-colors"

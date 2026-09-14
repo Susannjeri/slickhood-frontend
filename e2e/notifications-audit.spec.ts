@@ -3,7 +3,7 @@ import { authenticated, envelope } from "./support";
 
 test("shared profile header alerts the signed-in user to unread notifications", async ({ context, page }) => {
   await authenticated(context, page, { title: "Tenant", permissions: [] });
-  await page.route("**/notification/mine/unread-count", route => route.fulfill({ json: envelope({ count: 3 }) }));
+  await page.route("**/notification/mine/unread-count", route => route.fulfill({ json: envelope([{ count: 3 }]) }));
 
   await page.goto("/dashboard");
 

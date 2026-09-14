@@ -166,6 +166,67 @@ test("a bound staff invitation survives validation and offers sign-in before reg
   expect(storedInvite).toBe("insurance-invite-token");
 });
 
+test("a logged-out homeowner invitation preserves the return to its agreement journey", async ({ page }) => {
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/inspect**", route => route.fulfill({ json: {
+    success: true, code: "S00127", description: "Link is valid.",
+    data: [{ type: "HOMEOWNER", expiresAt: "2026-10-01T00:00:00", validForSeconds: 86400 }],
+  } }));
+  await page.route("**/invite/validate**", route => route.fulfill({ json: {
+    success: true, code: "S00141", description: "Sign in to accept this homeowner invitation.",
+    data: [
+      "https://app.slickhood.test/register?token=homeowner-invite-token",
+      "/dashboard/documents?type=ESTATE_RESIDENTIAL_AGREEMENT",
+    ],
+  } }));
+
+  await page.goto("/lease/onboard?token=homeowner-invite-token");
+
+  await expect(page).toHaveURL(/\/login\?invitation=ready&token=homeowner-invite-token&returnTo=%2Flease%2Fonboard$/);
+  await expect(page.getByTestId("invitation-ready")).toContainText("Sign in with the invited email");
+});
+
+test("a consumed homeowner invitation opens the agreement once for its signed-in recipient", async ({ context, page }) => {
+  const homeownerRole = {
+    title: "Homeowner",
+    permissions: ["view_lease_document"],
+    properties: [{ id: 83, name: "Jabali Towers" }],
+  };
+  const refreshedToken = testToken([
+    { title: "Tenant", permissions: [] },
+    homeownerRole,
+  ]);
+  await authenticated(context, page, { title: "Tenant", permissions: [] });
+  let validationCalls = 0;
+  await page.route("**/invite/validate**", route => {
+    validationCalls += 1;
+    return route.fulfill({ json: {
+      ...envelope(["/dashboard/documents?type=ESTATE_RESIDENTIAL_AGREEMENT"]),
+      code: "S0025",
+    } });
+  });
+  await page.route("**/browser-session/refresh", route => route.fulfill({
+    headers: { "set-cookie": `token=${refreshedToken}; Path=/; HttpOnly; SameSite=Lax` },
+    json: { success: true },
+  }));
+  await page.route("**/browser-session/get-token", route => route.fulfill({ json: {
+    success: true,
+    data: { jwt: refreshedToken },
+  } }));
+  await page.route("**/lease/documents**", route => route.fulfill({ json: {
+    ...envelope([]), totalPages: 0, totalElements: 0,
+  } }));
+
+  await page.goto("/lease/onboard?token=consumed-homeowner-token");
+
+  await expect(page).toHaveURL(/\/dashboard\/documents\?type=ESTATE_RESIDENTIAL_AGREEMENT$/);
+  await expect.poll(() => validationCalls).toBe(1);
+  const activeRole = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("auth-storage") || "{}").state?.activeRole?.title
+  );
+  expect(activeRole).toBe("Homeowner");
+});
+
 test("a tenant invitation survives sign-in and returns to lease initialization", async ({ page }) => {
   const jwt = testToken([{ title: "Tenant", permissions: ["create_new_lease"] }]);
   await page.route("https://accounts.google.com/**", route => route.abort());

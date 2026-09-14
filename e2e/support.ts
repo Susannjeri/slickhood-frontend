@@ -73,7 +73,7 @@ export async function authenticated(
     }],
   } }));
   await page.route("**/invite/pending/tenant", route => route.fulfill({ json: envelope([]) }));
-  await page.route("**/notification/mine/unread-count", route => route.fulfill({ json: envelope({ count: 0 }) }));
+  await page.route("**/notification/mine/unread-count", route => route.fulfill({ json: envelope([{ count: 0 }]) }));
   return token;
 }
 

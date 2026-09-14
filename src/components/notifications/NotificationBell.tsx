@@ -23,7 +23,11 @@ export function NotificationBell() {
     try {
       const response = await notificationService.unreadCount();
       if (currentRequest !== requestId.current) return;
-      const count = Number(response.data?.data?.count);
+      // ResponseDTO serializes every payload as a list, including a single
+      // { count } object. Retain object support for older environments.
+      const payload = response.data?.data as { count?: unknown } | { count?: unknown }[] | undefined;
+      const value = Array.isArray(payload) ? payload[0]?.count : payload?.count;
+      const count = Number(value);
       setUnreadCount(Number.isFinite(count) && count > 0 ? Math.floor(count) : 0);
     } catch {
       // The notification centre remains accessible if the lightweight badge refresh fails.

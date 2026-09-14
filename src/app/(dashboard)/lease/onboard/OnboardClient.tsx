@@ -1,10 +1,12 @@
 // app/lease/onboard/OnboardClient.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useApi } from '@/hooks/useApi';
+import { useAuth } from '@/hooks/useAuth';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,27 +15,16 @@ export default function OnboardClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setInviteToken, setStep, resetRegistrationData } = useAuthStore();
-  const { token: jwtToken } = useAuthStore.getState();
+  const jwtToken = useAuthStore(state => state.token);
+  const sessionReady = useAuthStore(state => state.sessionReady);
   const { handleValidateInviteToken } = useApi();
+  const { handleTokenRefresh } = useAuth();
+  const processedTokenRef = useRef<string | null | undefined>(undefined);
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    validateInvite();
-  }, [searchParams]);
-
-  const validateInvite = async () => {
-    if (!searchParams) {
-      setError('Invalid invite link. No parameters provided.');
-      setLoading(false);
-      return;
-    }
-
-    // Extract token from URL
-    const tokens = searchParams.getAll('token');
-    const token = tokens.filter(t => t && t.trim() !== '').pop() || null;
-    
+  const validateInvite = useCallback(async (token: string | null) => {
     if (!token) {
       setError('Invalid invite link. No token provided.');
       setLoading(false);
@@ -64,9 +55,33 @@ export default function OnboardClient() {
           resetRegistrationData();
           setInviteToken(token);
           setStep('account');
-          router.replace(`/login?invitation=ready&token=${encodeURIComponent(token)}`);
-        } else if (code === 'S00143') { 
-          // Authenticated validation has already applied the invited role.
+          const homeownerInvite = Array.isArray(response.data) && response.data.includes(
+            '/dashboard/documents?type=ESTATE_RESIDENTIAL_AGREEMENT'
+          );
+          const returnTo = homeownerInvite ? `&returnTo=${encodeURIComponent('/lease/onboard')}` : '';
+          router.replace(`/login?invitation=ready&token=${encodeURIComponent(token)}${returnTo}`);
+        } else if (code === 'S00143' || code === 'S0025') {
+          // Authenticated validation has already applied the invited role. A
+          // homeowner invitation leads directly to the generated agreement.
+          const destination = Array.isArray(response.data)
+            ? response.data.find((value: unknown) =>
+                typeof value === 'string'
+                && value === '/dashboard/documents?type=ESTATE_RESIDENTIAL_AGREEMENT')
+            : undefined;
+          if (jwtToken && destination) {
+            await handleTokenRefresh();
+            const homeownerRole = useAuthStore.getState().roles.find(
+              role => role.title.toLowerCase() === 'homeowner'
+            );
+            if (!homeownerRole) {
+              throw new Error('Your homeowner access could not be refreshed. Please sign in again from the invitation.');
+            }
+            useAuthStore.getState().setActiveRole(homeownerRole);
+            setInviteToken(null);
+            setStep('complete');
+            router.replace(destination);
+            return;
+          }
           setInviteToken(null);
           setStep('complete');
           router.replace(jwtToken ? '/continue-setup' : '/login');
@@ -83,17 +98,30 @@ export default function OnboardClient() {
         }
       }
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error validating invite token:', err);
       setInviteToken(null);
       setError(
-        err.response?.data?.description || 
-        err.message || 
+        (axios.isAxiosError<{ description?: string }>(err) && err.response?.data?.description) ||
+        (err instanceof Error && err.message) ||
         'Failed to validate invite token. Please contact support.'
       );
       setLoading(false);
     }
-  };
+  }, [handleTokenRefresh, handleValidateInviteToken, jwtToken, resetRegistrationData,
+    router, setInviteToken, setStep]);
+
+  useEffect(() => {
+    // A link opened in a new tab must wait for the secure HttpOnly-cookie
+    // session to hydrate. Otherwise an existing user is misclassified as a
+    // guest and is sent back through registration.
+    if (!sessionReady) return;
+    const tokens = searchParams?.getAll('token') ?? [];
+    const token = tokens.filter(value => value.trim() !== '').pop() ?? null;
+    if (processedTokenRef.current === token) return;
+    processedTokenRef.current = token;
+    void validateInvite(token);
+  }, [searchParams, sessionReady, validateInvite]);
 
   // Loading state
   if (loading) {
