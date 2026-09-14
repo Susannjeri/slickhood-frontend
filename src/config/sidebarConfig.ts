@@ -404,12 +404,12 @@ export const sidebarLinks: SidebarLink[] = [
   },
   {
     icon: Building,
-    label: "My rental units",
+    label: "My units",
     href: "/dashboard/my-units",
     permissions: ["view_unit"],
-    roles: ["Tenant"],
+    roles: ["Tenant", "Homeowner", "Buyer"],
     protected: true,
-    description: "View every rental unit linked to your active tenancies.",
+    description: "View every unit linked to your active tenancy, ownership or purchase.",
   },
   {
     icon: FileSignature,
@@ -478,7 +478,6 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
     description: "View owned homes, service charges, balances and estate documents.",
     subLinks: [
-      { label: "My homeowner units", href: "/dashboard/my-units", permissions: ["view_unit"], protected: true },
       { label: "Ownership & charges", href: "/dashboard/estate", permissions: ["view_estate"], protected: true },
     ],
   },
@@ -492,8 +491,17 @@ export const sidebarLinks: SidebarLink[] = [
     description: "Buyer journeys, viewings, offers, due diligence, completion and handover.",
     subLinks: [
       { label: "Overview & invitations", href: "/dashboard/sales", permissions: ["view_sale_pipeline"], protected: true },
-      { label: "Buyers", href: "/dashboard/sales#buyers", permissions: ["view_sale_pipeline"], protected: true },
     ],
+  },
+  {
+    icon: Users,
+    label: "Buyers",
+    href: "/dashboard/sales#buyers",
+    permissions: ["view_sale_pipeline"],
+    roles: ["SalesAgent", "SalesCoordinator", "ListingAgent"],
+    subscriptionFeatures: ["PROPERTY_SALES", "BUYER_PIPELINE"],
+    protected: true,
+    description: "View buyers, assigned sale units, offer status, documents and transaction actions.",
   },
   {
     icon: Landmark,
@@ -503,7 +511,6 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
     description: "Review offers, sale documents, milestones and property handover.",
     subLinks: [
-      { label: "My sale units", href: "/dashboard/my-units", permissions: ["view_unit"], protected: true },
       { label: "Purchase journey", href: "/dashboard/sales", permissions: ["view_sale_pipeline"], protected: true },
     ],
   },
@@ -683,12 +690,12 @@ export const sidebarLinks: SidebarLink[] = [
 // the single source of truth; these sections only control presentation.
 const sectionDefinitions = [
   { label: "Overview", links: ["Home", "Business Areas", "My Wealth"] },
-  { label: "Property & Leasing", links: ["Properties", "Leases", "Documents & Notices", "Estate Management", "My Home", "Property Sale Management", "My Property Purchase", "Community Funds"] },
+  { label: "Property & Leasing", links: ["Properties", "My units", "Leases", "Documents & Notices", "Estate Management", "My Home", "Property Sale Management", "Buyers", "My Property Purchase", "Community Funds"] },
   { label: "Money", links: ["Billing", "Tax Assist", "Reports", "Insurance Hub"] },
   { label: "People & Access", links: ["Team & Access", "Visitors", "Visitor Management", "Smart Gates"] },
   { label: "Services & Shopping", links: ["Marketplace", "My Services", "Affiliate"] },
   { label: "Support", links: ["Notifications", "Help Desk", "Privacy Centre"] },
-  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Recipient Payment Accounts", "SlickHood Accounts", "Tax Administration", "Audit Logs", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
+  { label: "Administration", links: ["Users & Staff", "KYC Reviews", "Subscribers", "Team User Types", "Property Type Catalogue", "Property Listing Moderation", "Recipient Payment Accounts", "SlickHood Accounts", "Tax Administration", "Audit Logs", "Service Management", "Soko Management", "Wealth Management", "Affiliate Management"] },
 ] as const
 
 const sidebarLinkByLabel = new Map(sidebarLinks.map((link) => [link.label, link]))
