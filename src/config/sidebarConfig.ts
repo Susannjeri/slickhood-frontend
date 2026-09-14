@@ -262,6 +262,17 @@ export const sidebarLinks: SidebarLink[] = [
       },
     ],
   },
+  // Route-guard metadata retained outside the rendered section definitions.
+  // The visible Insurance Hub sublinks improve navigation without broadening
+  // the existing operations permission boundary.
+  {
+    icon: ShieldCheck,
+    label: "Insurance Operations Access",
+    href: "/dashboard/insurance/operations",
+    protected: true,
+    permissions: ["review_insurance_applications", "manage_insurance_quotes", "approve_insurance_quotes", "verify_insurance_payments", "issue_insurance_policies", "manage_insurance_claims", "manage_insurance_renewals", "view_insurance_reports", "manage_insurance_catalog", "manage_insurance_payment_config"],
+    description: "Permission boundary for controlled insurance operations.",
+  },
   {
     icon: PiggyBank,
     label: "Community Funds",

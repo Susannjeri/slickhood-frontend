@@ -21,11 +21,16 @@ test("admin dashboard keeps metrics and sidebar functions without a duplicate di
   for (const [name, href] of [
     ["Users & Staff", "/dashboard/users"],
     ["Subscription & billing", "/dashboard/subscriptions"],
-    ["Insurance Operations", "/dashboard/insurance/operations"],
   ]) {
     await expect(page.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
     expect(existsSync(path.join(process.cwd(), "src/app/(dashboard)", href, "page.tsx")), href).toBe(true);
   }
+  const insurance = page.getByRole("button", { name: "Insurance Hub", exact: true });
+  if (await insurance.getAttribute("aria-expanded") !== "true") await insurance.click();
+  await expect(insurance).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByRole("link", { name: "Applications & quotes", exact: true }))
+    .toHaveAttribute("href", "/dashboard/insurance/operations?tab=applications");
+  expect(existsSync(path.join(process.cwd(), "src/app/(dashboard)/dashboard/insurance/operations/page.tsx"))).toBe(true);
   await expect(page.getByText("Upcoming lease actions", { exact: true })).toHaveCount(0);
 });
 
