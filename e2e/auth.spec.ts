@@ -155,7 +155,8 @@ test("a bound staff invitation survives validation and offers sign-in before reg
   // Simulate browser/email privacy controls discarding persisted state. The
   // email-bound token in the URL must still survive the registration handoff.
   await page.evaluate(() => window.localStorage.removeItem("auth-storage"));
-  await page.reload();
+  await page.reload({ waitUntil: "commit" });
+  await expect(page.getByTestId("invitation-ready")).toContainText("Sign in with the invited email");
   await page.getByRole("link", { name: "Sign up" }).click();
   await expect(page).toHaveURL(/\/register\?token=insurance-invite-token$/);
   const storedInvite = await page.evaluate(() => {
