@@ -11,6 +11,8 @@ export type KycMatrixRequirement = {
   profileScope: "INDIVIDUAL" | "COMPANY" | "BOTH";
   acceptedDocumentTypes: string;
   conditionDescription?: string;
+  conditionRule?: "NON_PASSPORT_IDENTITY" | "PROFILE_IS" | "VERIFIED_DOCUMENT_PRESENT" | "VERIFIED_DOCUMENT_MISSING";
+  conditionValue?: string;
   validityDays?: number;
   renewalLeadDays?: number;
   active: boolean;

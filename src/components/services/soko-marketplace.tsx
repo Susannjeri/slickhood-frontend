@@ -21,6 +21,7 @@ import {
   cancelSokoOrder,
   checkoutSoko,
   confirmSokoDelivery,
+  confirmSokoDeliveryCodeRecovery,
   createSokoProduct,
   createSokoRider,
   createSokoStore,
@@ -34,6 +35,7 @@ import {
   pauseSokoProduct,
   publishSokoProduct,
   publishSokoStore,
+  requestSokoDeliveryCodeRecovery,
   removeSokoProduct,
   removeSokoRider,
   searchSoko,
@@ -61,6 +63,14 @@ const productVariations = (value?: string): SokoVariation[] => {
     return [];
   }
 };
+const GROCERY_CATEGORIES = [
+  ["FRESH_PRODUCE", "Fresh produce"], ["MEAT_POULTRY_SEAFOOD", "Meat, poultry & seafood"],
+  ["DAIRY_EGGS", "Dairy & eggs"], ["BAKERY", "Bakery"], ["PANTRY_STAPLES", "Pantry staples"],
+  ["NON_ALCOHOLIC_BEVERAGES", "Non-alcoholic beverages"], ["SNACKS_CONFECTIONERY", "Snacks & confectionery"],
+  ["FROZEN_FOODS", "Frozen foods"], ["BREAKFAST_CEREALS", "Breakfast & cereals"],
+  ["COOKING_OILS_SPICES", "Cooking oils & spices"],
+] as const;
+const groceryCategoryLabel=(value:string)=>GROCERY_CATEGORIES.find(([code])=>code===value)?.[1]??value;
 
 export default function SokoMarketplace() {
   const checkoutKeyRef = useRef<string | null>(null);
@@ -112,7 +122,7 @@ export default function SokoMarketplace() {
   const blankProduct = {
     name: "",
     description: "",
-    category: "Groceries",
+    category: "PANTRY_STAPLES",
     unit: "item",
     price: 0,
     stockQuantity: 0,
@@ -642,7 +652,7 @@ export default function SokoMarketplace() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-xs font-semibold uppercase text-[#FF4B1F]">
-                            {p.category}
+                            {groceryCategoryLabel(p.category)}
                           </p>
                           <h3 className="mt-1 font-bold text-[#020B2D]">
                             {p.name}
@@ -895,7 +905,7 @@ export default function SokoMarketplace() {
                     setProductForm({
                       name: "",
                       description: "",
-                      category: "Groceries",
+                      category: "PANTRY_STAPLES",
                       unit: "item",
                       price: 0,
                       stockQuantity: 0,
@@ -952,41 +962,11 @@ export default function SokoMarketplace() {
               </div>
               {selectedStore > 0 && (
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {(["name", "category", "unit"] as const).map((k) => (
-                    <input
-                      key={k}
-                      list={
-                        k === "category"
-                          ? "soko-categories"
-                          : k === "unit"
-                            ? "soko-units"
-                            : undefined
-                      }
-                      value={String(productForm[k])}
-                      onChange={(e) =>
-                        setProductForm({ ...productForm, [k]: e.target.value })
-                      }
-                      placeholder={
-                        k === "name"
-                          ? "Product name"
-                          : k === "category"
-                            ? "Choose or type a category"
-                            : "Choose or type a selling unit"
-                      }
-                      className="rounded-xl border p-3 text-sm"
-                    />
-                  ))}
-                  <datalist id="soko-categories">
-                    <option value="Groceries" />
-                    <option value="Fresh produce" />
-                    <option value="Food & drinks" />
-                    <option value="Household" />
-                    <option value="Health & personal care" />
-                    <option value="Fashion" />
-                    <option value="Electronics" />
-                    <option value="Home & garden" />
-                    <option value="Other" />
-                  </datalist>
+                  <input value={productForm.name} onChange={(e)=>setProductForm({...productForm,name:e.target.value})} placeholder="Product name" className="rounded-xl border p-3 text-sm"/>
+                  <select aria-label="Grocery category" value={productForm.category} onChange={(e)=>setProductForm({...productForm,category:e.target.value})} className="rounded-xl border p-3 text-sm">
+                    {GROCERY_CATEGORIES.map(([code,label])=><option key={code} value={code}>{label}</option>)}
+                  </select>
+                  <input list="soko-units" value={productForm.unit} onChange={(e)=>setProductForm({...productForm,unit:e.target.value})} placeholder="Choose or type a selling unit" className="rounded-xl border p-3 text-sm"/>
                   <datalist id="soko-units">
                     <option value="item" />
                     <option value="kg" />
@@ -1463,7 +1443,9 @@ function OrderList({
     [proof, setProof] = useState<File | null>(null),
     [deliveryCode, setDeliveryCode] = useState(""),
     [busy, setBusy] = useState(false),
-    [codes, setCodes] = useState<Record<number, string>>({});
+    [codes, setCodes] = useState<Record<number, string>>({}),
+    [recoveryOrderId, setRecoveryOrderId] = useState<number | null>(null),
+    [recoveryOtp, setRecoveryOtp] = useState("");
   const openDispatch = (order: SokoOrderDetail) => {
     const available = riders.filter(
       (r) =>
@@ -1509,6 +1491,27 @@ function OrderList({
     } catch (e) {
       onError(errorText(e, "Delivery code is not available yet."));
     }
+  };
+  const requestRecovery = async (id: number) => {
+    setBusy(true);
+    try {
+      await requestSokoDeliveryCodeRecovery(id);
+      setRecoveryOrderId(id);setRecoveryOtp("");
+      setPaymentMessage("A 6-digit identity check was sent to your verified email. Enter it below within 10 minutes.");
+      await onChanged();
+    } catch (e) { onError(errorText(e,"Delivery-code recovery could not be started.")); }
+    finally { setBusy(false); }
+  };
+  const confirmRecovery = async () => {
+    if(recoveryOrderId==null||!/^[0-9]{6}$/.test(recoveryOtp))return onError("Enter the 6-digit verification code sent to your email.");
+    setBusy(true);
+    try {
+      await confirmSokoDeliveryCodeRecovery(recoveryOrderId,recoveryOtp);
+      const id=recoveryOrderId;setRecoveryOrderId(null);setRecoveryOtp("");
+      await showCode(id);await onChanged();
+      setPaymentMessage("Identity confirmed. Your previous delivery code is invalid and the replacement is ready.");
+    } catch(e){onError(errorText(e,"The verification code is invalid or expired."));}
+    finally{setBusy(false);}
   };
   const [savedProofs, setSavedProofs] = useState<Record<number, boolean>>({});
   const hasProof =
@@ -1699,6 +1702,10 @@ function OrderList({
                           View delivery code
                         </button>
                       )}
+                      <button disabled={busy} onClick={()=>requestRecovery(x.order.id)} className="ml-2 rounded-lg border px-3 py-2 text-xs font-semibold">
+                        Can&apos;t access the code?
+                      </button>
+                      {recoveryOrderId===x.order.id&&<div className="mt-3 flex max-w-md flex-wrap gap-2 rounded-xl border bg-slate-50 p-3"><label className="w-full text-xs font-semibold">Email verification code</label><input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={recoveryOtp} onChange={e=>setRecoveryOtp(e.target.value.replace(/\D/g,"").slice(0,6))} className="min-w-0 flex-1 rounded-lg border px-3 py-2"/><button disabled={busy||recoveryOtp.length!==6} onClick={confirmRecovery} className="rounded-lg bg-[#020B2D] px-4 py-2 text-xs font-semibold text-white">Verify & replace code</button></div>}
                     </div>
                   )}
                 </div>

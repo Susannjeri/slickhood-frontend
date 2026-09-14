@@ -698,7 +698,7 @@ export const sidebarLinks: SidebarLink[] = [
     icon: Wallet,
     label: "Merchant Accounts",
     href: "/dashboard/merchant-accounts",
-    description: "Configure payment accounts for Services and Soko settlements.",
+    description: "Configure provider payment accounts. Customer funds go directly to the provider; SlickHood does not hold them.",
     permissions: ["view_account"],
     roles: ["ServiceProvider"],
     protected: true,

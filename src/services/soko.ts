@@ -103,6 +103,8 @@ export type SokoOrder = {
   deliveryCodeAttempts: number;
   deliveryCodeExpiresAt?: string;
   deliveryCodeLockedAt?: string;
+  deliveryRecoveryOtpExpiresAt?: string;
+  deliveryRecoveryRequestedAt?: string;
   expectedArrivalAt?: string;
   deliveryProofReference?: string;
   deliveryProofAt?: string;
@@ -195,6 +197,10 @@ export const updateSokoOrder = (
   API.put(`/soko/order/${id}/status`, dispatch ?? null, { params: { status } });
 export const getSokoDeliveryCode = (id: number) =>
   API.get(`/soko/order/${id}/delivery-code`);
+export const requestSokoDeliveryCodeRecovery = (id: number) =>
+  API.post(`/soko/order/${id}/delivery-code/recovery/request`);
+export const confirmSokoDeliveryCodeRecovery = (id: number, otp: string) =>
+  API.post(`/soko/order/${id}/delivery-code/recovery/confirm`, { otp });
 export const cancelSokoOrder = (id: number, reason: string) =>
   API.put(`/soko/order/${id}/cancel`, { reason });
 export const confirmSokoDelivery = (id: number, code: string) =>
