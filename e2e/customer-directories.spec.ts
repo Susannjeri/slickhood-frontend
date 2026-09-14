@@ -29,6 +29,31 @@ test("property sales staff sees a direct Buyers navigation item", async ({ conte
   await expect(page.getByRole("link", { name: "Buyers", exact: true })).toHaveAttribute("href", "/dashboard/sales#buyers");
 });
 
+test("Buyers section link activates itself and deactivates the sales overview", async ({ context, page }) => {
+  await authenticated(context, page, {
+    title: "SalesAgent",
+    permissions: ["view_sale_pipeline"],
+  });
+  await page.route("**/dash/totals**", route => route.fulfill({ json: envelope([{}]) }));
+  await page.route("**/reports/catalog", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/sales**", route => {
+    const url = new URL(route.request().url());
+    if (route.request().resourceType() !== "document" && (url.pathname === "/sales" || url.pathname === "/api/sales")) {
+      return route.fulfill({ json: envelope([]) });
+    }
+    return route.continue();
+  });
+
+  await page.goto("/dashboard");
+  const buyers = page.getByRole("link", { name: "Buyers", exact: true });
+  await buyers.click();
+
+  await expect(page).toHaveURL(/\/dashboard\/sales#buyers$/);
+  await expect(page.getByText("Buyers & sale transactions", { exact: true })).toBeVisible();
+  await expect(buyers).toHaveAttribute("data-active", "true");
+  await expect(page.getByRole("button", { name: "Property Sale Management", exact: true })).toHaveAttribute("data-active", "false");
+});
+
 test("landlord tenant directory shows scoped contact, unit, documents and billing actions", async ({ context, page }) => {
   await authenticated(context, page, {
     title: "Landlord",

@@ -111,6 +111,7 @@ export default function AppSidebar() {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
   const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
+  const [currentHash, setCurrentHash] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
@@ -119,6 +120,13 @@ export default function AppSidebar() {
   const workspaceRequestId = useRef(0);
   const activeBusinessArea = businessAreaForRoleTitle(activeRole?.title);
   const entitlementScope = activeBusinessArea ? `${activeRole?.title}:${activeBusinessArea.subscriptionProduct}` : null;
+
+  useEffect(() => {
+    const syncHash = () => setCurrentHash(window.location.hash);
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     const area = activeBusinessArea;
@@ -227,12 +235,28 @@ export default function AppSidebar() {
 
   const isHrefActive = (href?: string) => {
     if (!href) return false;
-    const [hrefWithoutHash] = href.split("#", 1);
+    const [hrefWithoutHash, targetHash] = href.split("#", 2);
     const [targetPath, targetQuery] = hrefWithoutHash.split("?", 2);
     if (pathname !== targetPath) return false;
-    if (!targetQuery) return true;
-    const targetParams = new URLSearchParams(targetQuery);
-    return Array.from(targetParams.entries()).every(([key, value]) => searchParams.get(key) === value);
+    if (targetQuery) {
+      const targetParams = new URLSearchParams(targetQuery);
+      if (!Array.from(targetParams.entries()).every(([key, value]) => searchParams.get(key) === value)) return false;
+    }
+    if (targetHash) return currentHash === `#${targetHash}`;
+
+    const currentSectionHasItsOwnLink = sidebarLinks
+      .flatMap(link => [link, ...(link.subLinks ?? [])])
+      .some(candidate => {
+        if (!candidate.href) return false;
+        const [candidateWithoutHash, candidateHash] = candidate.href.split("#", 2);
+        if (!candidateHash || currentHash !== `#${candidateHash}`) return false;
+        const [candidatePath, candidateQuery] = candidateWithoutHash.split("?", 2);
+        if (pathname !== candidatePath) return false;
+        if (!candidateQuery) return true;
+        const candidateParams = new URLSearchParams(candidateQuery);
+        return Array.from(candidateParams.entries()).every(([key, value]) => searchParams.get(key) === value);
+      });
+    return !currentSectionHasItsOwnLink;
   };
   const isLinkActive = (href?: string, subLinks?: typeof sidebarLinks[0]['subLinks']) => {
     if (isHrefActive(href)) return true;
@@ -392,7 +416,7 @@ export default function AppSidebar() {
                           <SidebarMenuButton
                             asChild
                             tooltip={link.label}
-                            isActive={pathname === link.href}
+                            isActive={isHrefActive(link.href)}
                             className={cn(
                               "font-bold text-[#08184A]/70 dark:text-white transition-all duration-200",
                               "hover:bg-[#08184A]/10 dark:hover:bg-white/10 hover:text-[#08184A] dark:hover:text-white hover:translate-x-1",
