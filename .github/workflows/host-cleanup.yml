@@ -36,9 +36,23 @@ jobs:
               test "$resolved" != "$active"
               sudo rm -rf -- "$resolved"
             }
-            for stale in /home/silverocean/deploy.rollback-* /home/silverocean/deploy.candidate-*; do
+            for stale in /home/silverocean/deploy.rollback-*; do
               [ -d "$stale" ] || continue
               remove_stale_release "$stale"
+            done
+            for candidate in /home/silverocean/deploy.candidate-*; do
+              [ -d "$candidate" ] || continue
+              test ! -L "$candidate"
+              resolved="$(realpath "$candidate")"
+              case "$resolved" in
+                /home/silverocean/deploy.candidate-*) ;;
+                *) echo "Refusing unexpected candidate target: $resolved" >&2; exit 1 ;;
+              esac
+              if [ -n "$(find "$resolved" -mindepth 1 -print -quit)" ]; then
+                echo "Retaining non-empty candidate release: $resolved"
+                continue
+              fi
+              remove_stale_release "$resolved"
             done
             staging=/tmp/slickhood-frontend-release
             test "$staging" = /tmp/slickhood-frontend-release
