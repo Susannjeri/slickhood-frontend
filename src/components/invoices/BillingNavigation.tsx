@@ -18,6 +18,8 @@ const subscriptionRoles = new Set([
   "Affiliate", "AssetPortfolioManager", "Superadmin",
 ]);
 
+const latePaymentRoles = new Set(["Landlord", "EstateManager", "SalesAgent"]);
+
 /** Navigation only: destination pages and APIs retain their own authorization. */
 export function BillingNavigation() {
   const path = usePathname();
@@ -28,6 +30,7 @@ export function BillingNavigation() {
     { href: "/dashboard/invoices", label: "Bills & invoices", allowed: permissions.includes("view_invoice_list") },
     { href: "/dashboard/payments", label: "Payment history", allowed: permissions.includes("view_payment_list") },
     { href: settings ?? "", label: "Receiving accounts", allowed: Boolean(settings) && permissions.includes("view_account") },
+    { href: "/dashboard/billing/late-payment", label: "Late-payment settings", allowed: Boolean(role && latePaymentRoles.has(role)) },
     { href: "/dashboard/subscriptions", label: "Subscription & billing", allowed: Boolean(role && subscriptionRoles.has(role)) },
     { href: "/dashboard/upgrade-plan", label: "Change plan", allowed: Boolean(role && role !== "Superadmin" && subscriptionRoles.has(role)) },
   ].filter(link => link.allowed);

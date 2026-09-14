@@ -76,6 +76,13 @@ export const sidebarLinks: SidebarLink[] = [
         permissions: ["view_payment_list"],
       },
       {
+        label: "Late-payment settings",
+        href: "/dashboard/billing/late-payment",
+        protected: false,
+        permissions: [],
+        roles: ["Landlord", "EstateManager", "SalesAgent"],
+      },
+      {
         label: "Receiving accounts",
         href: "/dashboard/accounts",
         protected: true,
