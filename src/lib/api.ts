@@ -139,11 +139,11 @@ export const claimGuestHelpConversation = (accessToken: string) => API.post("/he
 
 export type TeamMembershipStatus = "PENDING" | "ACCEPTED" | "KYC_PENDING" | "ACTIVE" | "EXPIRED" | "REVOKED" | "SUSPENDED";
 export type TeamScopeType = "ENTIRE_WORKSPACE" | "SELECTED_RESOURCES";
-export interface TeamRoleOption { id: number; code: string; name: string; permissionTemplate: string }
+export interface TeamRoleOption { id: number; code: string; name: string; description?: string; permissionTemplate: string }
 export interface TeamResource { id: number; name: string; description?: string }
 export interface TeamInvitation { id: number; email: string; role: string; roleName: string; scopeType: TeamScopeType; resourceIds: number[]; status: TeamMembershipStatus; expiresAt: string; resendCount: number }
 export interface TeamMember { id: number; userId: number; email: string; name: string; role: string; roleName: string; scopeType: TeamScopeType; resourceIds: number[]; status: TeamMembershipStatus; acceptedAt?: string; activatedAt?: string }
-export interface TeamWorkspace { id: number; name: string; businessArea: string; owner: boolean; seatLimit: number; seatsUsed: number; roles: TeamRoleOption[]; resources: TeamResource[]; invitations: TeamInvitation[]; members: TeamMember[] }
+export interface TeamWorkspace { id: number; name: string; businessArea: string; owner: boolean; canGrantEntireWorkspace: boolean; seatLimit: number; seatsUsed: number; roles: TeamRoleOption[]; resources: TeamResource[]; invitations: TeamInvitation[]; members: TeamMember[] }
 export interface TeamWorkspaceOption { id: number; name: string; businessArea: string; owner: boolean }
 export type TeamBusinessArea = "LANDLORD" | "ESTATE_MANAGEMENT" | "PROPERTY_SALE_MANAGEMENT";
 export type TeamPermissionTemplate = "WORKSPACE_ADMIN" | "PROPERTY_MANAGER" | "PROPERTY_ACCOUNTANT" | "LEASING_OFFICER" | "ESTATE_OPERATIONS_MANAGER" | "SECURITY_SUPERVISOR" | "GUARD" | "SALES_COORDINATOR" | "LISTING_AGENT" | "VIEWER";

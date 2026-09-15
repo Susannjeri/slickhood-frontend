@@ -11,14 +11,15 @@ test("property handoff keeps least-privilege scope and confirms revocation", asy
 
   let revokeCalls = 0;
   let revoked = false;
-  await page.route("**/team-access", route => route.fulfill({ json: envelope({
+  await page.route("**/team-access", route => route.request().resourceType() === "document" ? route.continue() : route.fulfill({ json: envelope({
     id: 7,
     name: "Green Court Estate Management",
     businessArea: "ESTATE_MANAGEMENT",
     owner: true,
+    canGrantEntireWorkspace: true,
     seatLimit: 5,
     seatsUsed: revoked ? 0 : 1,
-    roles: [{ id: 12, code: "ESTATE_OPERATIONS_MANAGER", name: "Estate operations manager", permissionTemplate: "ESTATE_OPERATIONS_MANAGER" }],
+    roles: [{ id: 12, code: "ESTATE_OPERATIONS_MANAGER", name: "Estate operations manager", description: "Estate operations and community administration", permissionTemplate: "ESTATE_OPERATIONS_MANAGER" }],
     resources: [
       { id: 41, name: "Green Court", description: "Nairobi" },
       { id: 42, name: "Blue Court", description: "Mombasa" },
@@ -50,7 +51,7 @@ test("property handoff keeps least-privilege scope and confirms revocation", asy
 
   await page.goto("/dashboard/team-access?propertyId=41");
 
-  await expect(page.getByText("Selected properties, estates or listings")).toBeVisible();
+  await expect(page.getByText("Selected estates and properties")).toBeVisible();
   await expect(page.getByText("Green Court", { exact: true })).toBeVisible();
   await expect(page.getByRole("checkbox").first()).toBeChecked();
 
@@ -60,5 +61,36 @@ test("property handoff keeps least-privilege scope and confirms revocation", asy
 
   await page.getByRole("button", { name: "Confirm" }).click();
   await expect.poll(() => revokeCalls).toBe(1);
-  await expect(page.getByText("No team members yet.")).toBeVisible();
+  await expect(page.getByText("No internal users yet.")).toBeVisible();
+});
+
+test("scoped workspace administrator cannot grant all responsibility areas", async ({ context, page }) => {
+  await authenticated(context, page, {
+    title: "Workspace Admin",
+    permissions: [],
+    propertyIds: [41],
+    propertyNames: ["Green Court"],
+  });
+
+  await page.route("**/team-access", route => route.request().resourceType() === "document" ? route.continue() : route.fulfill({ json: envelope({
+    id: 7,
+    name: "Green Court Estate Management",
+    businessArea: "ESTATE_MANAGEMENT",
+    owner: false,
+    canGrantEntireWorkspace: false,
+    seatLimit: 5,
+    seatsUsed: 1,
+    roles: [{ id: 13, code: "ESTATE_VIEWER", name: "Viewer", description: "Read-only workspace access", permissionTemplate: "VIEWER" }],
+    resources: [{ id: 41, name: "Green Court", description: "Nairobi" }],
+    invitations: [],
+    members: [],
+  }) }));
+
+  await page.goto("/dashboard/team-access");
+
+  await expect(page.getByRole("heading", { name: "Internal Team" })).toBeVisible();
+  await expect(page.getByText("Selected estates and properties")).toBeVisible();
+  await page.getByText("Selected estates and properties").click();
+  await expect(page.getByRole("option", { name: "All estates and properties" })).toHaveCount(0);
+  await expect(page.getByText("Read-only workspace access")).toBeVisible();
 });
