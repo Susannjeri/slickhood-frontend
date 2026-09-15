@@ -26,7 +26,7 @@ export default function DashboardError({
         </div>
         <h1 className="text-xl font-semibold text-[#141130]">We couldn’t load this workspace</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Your last change was saved. Refresh the workspace or return to the dashboard to continue.
+          This page could not be displayed. Try again or return to the dashboard to continue.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Button type="button" onClick={() => reset()}>

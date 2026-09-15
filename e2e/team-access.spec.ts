@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { authenticated, envelope } from "./support";
 
+const workspaceFixture = (businessArea = "ESTATE_MANAGEMENT") => ({
+  id: 7, name: "Green Court workspace", businessArea, owner: true,
+  canGrantEntireWorkspace: true, seatLimit: 5, seatsUsed: 0,
+  roles: [{ id: 12, code: "VIEWER", name: "Viewer", permissionTemplate: "VIEWER" }],
+  resources: [{ id: 41, name: "Green Court", description: "Nairobi" }],
+  invitations: [], members: [],
+});
+
 test("property handoff keeps least-privilege scope and confirms revocation", async ({ context, page }) => {
   await authenticated(context, page, {
     title: "Estate Manager",
@@ -11,7 +19,7 @@ test("property handoff keeps least-privilege scope and confirms revocation", asy
 
   let revokeCalls = 0;
   let revoked = false;
-  await page.route("**/team-access", route => route.request().resourceType() === "document" ? route.continue() : route.fulfill({ json: envelope({
+  await page.route("**/team-access", route => route.request().resourceType() === "document" ? route.continue() : route.fulfill({ json: envelope([{
     id: 7,
     name: "Green Court Estate Management",
     businessArea: "ESTATE_MANAGEMENT",
@@ -38,7 +46,7 @@ test("property handoff keeps least-privilege scope and confirms revocation", asy
       acceptedAt: "2026-08-30T10:00:00",
       activatedAt: "2026-08-30T11:00:00",
     }],
-  }) }));
+  }]) }));
   await page.route("**/team-access/members/91", async route => {
     if (route.request().method() === "DELETE") {
       revokeCalls += 1;
@@ -54,6 +62,16 @@ test("property handoff keeps least-privilege scope and confirms revocation", asy
   await expect(page.getByText("Selected estates and properties")).toBeVisible();
   await expect(page.getByText("Green Court", { exact: true })).toBeVisible();
   await expect(page.getByRole("checkbox").first()).toBeChecked();
+
+  let editedScope: unknown;
+  await page.route("**/team-access/members/91/scope", async route => {
+    editedScope = route.request().postDataJSON();
+    await route.fulfill({ json: envelope([{ status: "ACTIVE" }]) });
+  });
+  await page.getByRole("button", { name: "Edit responsibilities" }).click();
+  await page.getByRole("button", { name: "Save responsibilities" }).click();
+  await expect.poll(() => editedScope).toEqual({ scopeType: "SELECTED_RESOURCES", resourceIds: [41] });
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Revoke", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Revoke membership?" })).toBeVisible();
@@ -72,7 +90,7 @@ test("scoped workspace administrator cannot grant all responsibility areas", asy
     propertyNames: ["Green Court"],
   });
 
-  await page.route("**/team-access", route => route.request().resourceType() === "document" ? route.continue() : route.fulfill({ json: envelope({
+  await page.route("**/team-access", route => route.request().resourceType() === "document" ? route.continue() : route.fulfill({ json: envelope([{
     id: 7,
     name: "Green Court Estate Management",
     businessArea: "ESTATE_MANAGEMENT",
@@ -84,13 +102,75 @@ test("scoped workspace administrator cannot grant all responsibility areas", asy
     resources: [{ id: 41, name: "Green Court", description: "Nairobi" }],
     invitations: [],
     members: [],
-  }) }));
+  }]) }));
 
   await page.goto("/dashboard/team-access");
 
-  await expect(page.getByRole("heading", { name: "Internal Team" })).toBeVisible();
+  await expect(page.locator("section").getByRole("heading", { name: "Internal Team", exact: true })).toBeVisible();
   await expect(page.getByText("Selected estates and properties")).toBeVisible();
   await page.getByText("Selected estates and properties").click();
   await expect(page.getByRole("option", { name: "All estates and properties" })).toHaveCount(0);
   await expect(page.getByText("Read-only workspace access")).toBeVisible();
 });
+
+for (const profile of [
+  { title: "Landlord", businessArea: "LANDLORD", permissions: ["view_property", "manage_property"] },
+  { title: "Estate Manager", businessArea: "ESTATE_MANAGEMENT", permissions: ["view_estate", "manage_estate"] },
+  { title: "Sales Agent", businessArea: "PROPERTY_SALE_MANAGEMENT", permissions: ["view_property", "manage_property"] },
+]) {
+  test(`${profile.title} sends an invitation with selected responsibility areas`, async ({ context, page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", error => pageErrors.push(error.message));
+    await authenticated(context, page, { ...profile, propertyIds: [41], propertyNames: ["Green Court"] });
+    let payload: unknown;
+    let invited = false;
+    await page.route("**/team-access", route => route.request().resourceType() === "document" ? route.continue() : route.fulfill({
+      json: envelope([{ ...workspaceFixture(profile.businessArea), invitations: invited ? [{
+        id: 82, email: "staff@example.com", role: "VIEWER", roleName: "Viewer",
+        scopeType: "SELECTED_RESOURCES", resourceIds: [41], status: "PENDING",
+        expiresAt: "2026-12-01T12:00:00", resendCount: 0,
+      }] : [] }]),
+    }));
+    await page.route("**/team-access/invitations", async route => {
+      payload = route.request().postDataJSON();
+      invited = true;
+      await route.fulfill({ json: envelope([{ id: 82 }]) });
+    });
+    if (profile.businessArea === "PROPERTY_SALE_MANAGEMENT") await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/dashboard/team-access?propertyId=41");
+    await expect(page.locator("section").getByRole("heading", { name: "Internal Team", exact: true })).toBeVisible();
+    await page.getByLabel("Work email").fill("staff@example.com");
+    await page.getByRole("button", { name: "Send secure invitation" }).click();
+    await expect.poll(() => payload).toEqual({ email: "staff@example.com", roleDefinitionId: 12, scopeType: "SELECTED_RESOURCES", resourceIds: [41] });
+    await expect(page.getByText("staff@example.com", { exact: true })).toBeVisible();
+    expect(pageErrors).toEqual([]);
+  });
+}
+
+for (const failure of [
+  { name: "empty workspace list", status: 200, body: envelope([]) },
+  { name: "malformed workspace", status: 200, body: envelope([{ ...workspaceFixture(), roles: null }]) },
+  { name: "forbidden workspace", status: 403, body: { success: false, description: "You do not have permission to manage this team.", data: [] } },
+  { name: "server error", status: 500, body: { success: false, data: [] } },
+]) {
+  test(`${failure.name} remains recoverable without a render crash`, async ({ context, page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", error => pageErrors.push(error.message));
+    await authenticated(context, page, { title: "Estate Manager", permissions: ["view_estate", "manage_estate"] });
+    let recovered = false;
+    await page.route("**/team-access", route => route.request().resourceType() === "document" ? route.continue() : route.fulfill({
+      status: recovered ? 200 : failure.status,
+      json: recovered ? envelope([workspaceFixture()]) : failure.body,
+    }));
+    await page.goto("/dashboard/team-access");
+    await expect(page.getByRole("heading", { name: "Internal Team could not be loaded" })).toBeVisible();
+    await expect(page.locator('p[role="alert"]')).toHaveText(failure.status === 403
+      ? "You do not have permission to manage this team."
+      : "We could not load your internal team. Please try again. If this continues, contact support.");
+    recovered = true;
+    await page.getByRole("button", { name: "Retry loading team" }).click();
+    await expect(page.locator("section").getByRole("heading", { name: "Internal Team", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Retry loading team" })).toHaveCount(0);
+    expect(pageErrors).toEqual([]);
+  });
+}

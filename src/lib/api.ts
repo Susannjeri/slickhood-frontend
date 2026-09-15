@@ -149,7 +149,7 @@ export type TeamBusinessArea = "LANDLORD" | "ESTATE_MANAGEMENT" | "PROPERTY_SALE
 export type TeamPermissionTemplate = "WORKSPACE_ADMIN" | "PROPERTY_MANAGER" | "PROPERTY_ACCOUNTANT" | "LEASING_OFFICER" | "ESTATE_OPERATIONS_MANAGER" | "SECURITY_SUPERVISOR" | "GUARD" | "SALES_COORDINATOR" | "LISTING_AGENT" | "VIEWER";
 export interface TeamRoleDefinition { id: number; code: string; displayName: string; description?: string; businessArea: TeamBusinessArea; permissionTemplate: TeamPermissionTemplate; active: boolean }
 export interface TeamRoleDefinitionPayload { code: string; displayName: string; description?: string; businessArea: TeamBusinessArea; permissionTemplate: TeamPermissionTemplate }
-export const getTeamWorkspace = () => API.get("/team-access");
+export const getTeamWorkspace = () => API.get<{ success: boolean; data: TeamWorkspace[] }>("/team-access");
 export const getTeamWorkspaces = () => API.get<{ data: TeamWorkspaceOption[] }>("/team-access/workspaces");
 export const inviteTeamMember = (payload: { email: string; roleDefinitionId: number; scopeType: TeamScopeType; resourceIds: number[] }) => API.post("/team-access/invitations", payload);
 export const resendTeamInvitation = (id: number) => API.post(`/team-access/invitations/${id}/resend`);

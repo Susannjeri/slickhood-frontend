@@ -53,13 +53,47 @@ function ScopePicker({ workspace, scopeType, resourceIds, onScope, onResources }
 
 export default function TeamAccessPage() {
   const [workspace, setWorkspace] = useState<TeamWorkspace | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true); const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState(""); const [roleDefinitionId, setRoleDefinitionId] = useState("");
   const [scopeType, setScopeType] = useState<TeamScopeType>("ENTIRE_WORKSPACE"); const [resourceIds, setResourceIds] = useState<number[]>([]);
   const [editing, setEditing] = useState<TeamMember | null>(null); const [editScope, setEditScope] = useState<TeamScopeType>("ENTIRE_WORKSPACE"); const [editResources, setEditResources] = useState<number[]>([]);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
 
-  const load = useCallback(async () => { try { setLoading(true); const response = await getTeamWorkspace(); const value = response.data.data as TeamWorkspace; setWorkspace(value); setRoleDefinitionId(current => current || String(value.roles[0]?.id ?? "")); if (!value.canGrantEntireWorkspace) setScopeType("SELECTED_RESOURCES"); const propertyId = Number(new URLSearchParams(window.location.search).get("propertyId")); if (propertyId && value.resources.some(r => r.id === propertyId)) { setScopeType("SELECTED_RESOURCES"); setResourceIds([propertyId]); } } catch (error) { toast.error(errorMessage(error,"Could not load Internal Team.")); } finally { setLoading(false); } }, []);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const response = await getTeamWorkspace();
+      // ResponseDTO always wraps a single workspace in its data list.
+      const data = response.data.data;
+      const value = Array.isArray(data) && data.length === 1 ? data[0] : null;
+      if (!response.data.success || !value || typeof value.id !== "number"
+        || typeof value.canGrantEntireWorkspace !== "boolean"
+        || !Array.isArray(value.roles) || !Array.isArray(value.resources)
+        || !Array.isArray(value.members) || !Array.isArray(value.invitations)
+        || value.roles.some(role => !role || typeof role.id !== "number")
+        || value.resources.some(resource => !resource || typeof resource.id !== "number")
+        || value.members.some(member => !member || !Array.isArray(member.resourceIds) || !(member.status in statusStyle))
+        || value.invitations.some(invitation => !invitation || !Array.isArray(invitation.resourceIds) || !(invitation.status in statusStyle))) {
+        throw new Error("Invalid team workspace response");
+      }
+      setRoleDefinitionId(current => value.roles.some(role => String(role.id) === current) ? current : String(value.roles[0]?.id ?? ""));
+      if (!value.canGrantEntireWorkspace) setScopeType("SELECTED_RESOURCES");
+      const propertyId = Number(new URLSearchParams(window.location.search).get("propertyId"));
+      if (propertyId && value.resources.some(resource => resource.id === propertyId)) {
+        setScopeType("SELECTED_RESOURCES");
+        setResourceIds([propertyId]);
+      }
+      // Never commit an invalid response to render state.
+      setWorkspace(value);
+    } catch (error) {
+      setWorkspace(null);
+      setLoadError(errorMessage(error, "We could not load your internal team. Please try again. If this continues, contact support."));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
   useEffect(() => { void load(); }, [load]);
   const seats = useMemo(() => workspace ? `${workspace.seatsUsed} / ${workspace.seatLimit < 0 ? "Unlimited" : workspace.seatLimit}` : "—", [workspace]);
   const selectedRole = workspace?.roles.find(role=>String(role.id)===roleDefinitionId);
@@ -77,7 +111,7 @@ export default function TeamAccessPage() {
   const saveScope = async () => { if (!editing) return; if (editScope === "SELECTED_RESOURCES" && editResources.length === 0) return toast.error("Select at least one resource."); await action(() => updateTeamMemberScope(editing.id,{scopeType:editScope,resourceIds:editResources}),"Access scope updated."); setEditing(null); };
 
   if (loading) return <div className="flex min-h-[50vh] items-center justify-center"><RefreshCw className="h-7 w-7 animate-spin text-orange-600" /></div>;
-  if (!workspace) return <div className="p-6 text-sm text-muted-foreground">Internal Team is available to landlords, estate managers, property sales managers and authorised workspace administrators.</div>;
+  if (!workspace) return <main className="mx-auto max-w-2xl p-6"><Card><CardHeader><CardTitle><h2>Internal Team could not be loaded</h2></CardTitle></CardHeader><CardContent className="space-y-4"><p role="alert" className="text-sm text-muted-foreground">{loadError}</p><Button onClick={() => void load()}><RefreshCw className="mr-2 h-4 w-4" /> Retry loading team</Button></CardContent></Card></main>;
 
   return <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
     <section className="overflow-hidden rounded-2xl bg-[#071a4f] text-white shadow-sm"><div className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between lg:p-8"><div><div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-orange-300"><ShieldCheck className="h-4 w-4" /> Secure delegated access</div><h1 className="text-3xl font-bold">Internal Team</h1><p className="mt-2 max-w-2xl text-sm text-blue-100">Invite your staff into {workspace.name}, choose an approved Customer Team User Type and assign only the properties or estates they are responsible for.</p></div><div className="rounded-xl border border-white/20 bg-white/10 px-5 py-4"><p className="text-xs uppercase tracking-wide text-blue-100">Team seats used</p><p className="mt-1 text-2xl font-bold">{seats}</p></div></div></section>
