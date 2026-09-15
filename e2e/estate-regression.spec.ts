@@ -78,6 +78,24 @@ test("estate pagination preserves records and paid amounts are not shown as zero
   await expect(page.getByText("Cedar Estate / HOME-9", { exact: true }).first()).toBeVisible();
 });
 
+test("current-homeowner selector waits for its verified feed before opening", async ({ context, page }) => {
+  await authenticated(context, page, { title: "EstateManager", permissions, propertyIds: [11], propertyNames: ["Cedar Estate"] });
+  await emptyOperations(page);
+  let release!: () => void;
+  const delayed = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/estate/ownership**", async route => {
+    if (new URL(route.request().url()).searchParams.get("active") === "true") await delayed;
+    await route.fulfill({ json: envelope([owner()]) });
+  });
+  await page.goto("/dashboard/estate?propertyId=11");
+  const selector = page.getByRole("combobox", { name: "Homeowner / home" });
+  await expect(selector).toBeDisabled();
+  release();
+  await expect(selector).toBeEnabled();
+  await selector.click();
+  await expect(page.getByRole("option", { name: /Homeowner 9.*Cedar/ })).toBeVisible();
+});
+
 test("changing estate clears invoice recipient and resets operations context", async ({ context, page }) => {
   await authenticated(context, page, { title: "EstateManager", permissions, propertyIds: [11, 12], propertyNames: ["Cedar Estate", "Palm Estate"] });
   await emptyOperations(page);
