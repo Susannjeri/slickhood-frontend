@@ -149,6 +149,7 @@ export type TeamBusinessArea = "LANDLORD" | "ESTATE_MANAGEMENT" | "PROPERTY_SALE
 export type TeamPermissionTemplate = "WORKSPACE_ADMIN" | "PROPERTY_MANAGER" | "PROPERTY_ACCOUNTANT" | "LEASING_OFFICER" | "ESTATE_OPERATIONS_MANAGER" | "SECURITY_SUPERVISOR" | "GUARD" | "SALES_COORDINATOR" | "LISTING_AGENT" | "VIEWER";
 export interface TeamRoleDefinition { id: number; code: string; displayName: string; description?: string; businessArea: TeamBusinessArea; permissionTemplate: TeamPermissionTemplate; active: boolean }
 export interface TeamRoleDefinitionPayload { code: string; displayName: string; description?: string; businessArea: TeamBusinessArea; permissionTemplate: TeamPermissionTemplate }
+export interface TeamRoleTemplate { permissionTemplate: TeamPermissionTemplate; displayName: string; businessAreas: TeamBusinessArea[] }
 export const getTeamWorkspace = () => API.get<{ success: boolean; data: TeamWorkspace[] }>("/team-access");
 export const getTeamWorkspaces = () => API.get<{ data: TeamWorkspaceOption[] }>("/team-access/workspaces");
 export const inviteTeamMember = (payload: { email: string; roleDefinitionId: number; scopeType: TeamScopeType; resourceIds: number[] }) => API.post("/team-access/invitations", payload);
@@ -158,7 +159,8 @@ export const updateTeamMemberScope = (id: number, payload: { scopeType: TeamScop
 export const suspendTeamMember = (id: number) => API.post(`/team-access/members/${id}/suspend`);
 export const resumeTeamMember = (id: number) => API.post(`/team-access/members/${id}/resume`);
 export const revokeTeamMember = (id: number) => API.delete(`/team-access/members/${id}`);
-export const listTeamRoleDefinitions = () => API.get("/team-access/role-definitions");
+export const listTeamRoleDefinitions = () => API.get<{ data: TeamRoleDefinition[] }>("/team-access/role-definitions");
+export const listTeamRoleTemplates = () => API.get<{ data: TeamRoleTemplate[] }>("/team-access/role-templates");
 export const createTeamRoleDefinition = (payload: TeamRoleDefinitionPayload) => API.post("/team-access/role-definitions", payload);
 export const updateTeamRoleDefinition = (id: number, payload: TeamRoleDefinitionPayload) => API.put(`/team-access/role-definitions/${id}`, payload);
 export const setTeamRoleDefinitionStatus = (id: number, active: boolean) => API.patch(`/team-access/role-definitions/${id}/status`, null, { params: { active } });

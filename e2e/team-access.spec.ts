@@ -118,15 +118,20 @@ for (const profile of [
   { title: "Estate Manager", businessArea: "ESTATE_MANAGEMENT", permissions: ["view_estate", "manage_estate"] },
   { title: "Sales Agent", businessArea: "PROPERTY_SALE_MANAGEMENT", permissions: ["view_property", "manage_property"] },
 ]) {
-  test(`${profile.title} sends an invitation with selected responsibility areas`, async ({ context, page }) => {
+  for (const role of [
+    { id: 12, code: "VIEWER", name: "Viewer", permissionTemplate: "VIEWER" },
+    { id: 13, code: "GUARD", name: "Guard", permissionTemplate: "GUARD" },
+    { id: 14, code: "SECURITY_SUPERVISOR", name: "Security supervisor", permissionTemplate: "SECURITY_SUPERVISOR" },
+  ]) {
+  test(`${profile.title} sends a ${role.name} invitation with selected responsibility areas`, async ({ context, page }) => {
     const pageErrors: string[] = [];
     page.on("pageerror", error => pageErrors.push(error.message));
     await authenticated(context, page, { ...profile, propertyIds: [41], propertyNames: ["Green Court"] });
     let payload: unknown;
     let invited = false;
     await page.route("**/team-access", route => route.request().resourceType() === "document" ? route.continue() : route.fulfill({
-      json: envelope([{ ...workspaceFixture(profile.businessArea), invitations: invited ? [{
-        id: 82, email: "staff@example.com", role: "VIEWER", roleName: "Viewer",
+      json: envelope([{ ...workspaceFixture(profile.businessArea), roles: [role], invitations: invited ? [{
+        id: 82, email: "staff@example.com", role: role.permissionTemplate, roleName: role.name,
         scopeType: "SELECTED_RESOURCES", resourceIds: [41], status: "PENDING",
         expiresAt: "2026-12-01T12:00:00", resendCount: 0,
       }] : [] }]),
@@ -141,10 +146,11 @@ for (const profile of [
     await expect(page.locator("section").getByRole("heading", { name: "Internal Team", exact: true })).toBeVisible();
     await page.getByLabel("Work email").fill("staff@example.com");
     await page.getByRole("button", { name: "Send secure invitation" }).click();
-    await expect.poll(() => payload).toEqual({ email: "staff@example.com", roleDefinitionId: 12, scopeType: "SELECTED_RESOURCES", resourceIds: [41] });
+    await expect.poll(() => payload).toEqual({ email: "staff@example.com", roleDefinitionId: role.id, scopeType: "SELECTED_RESOURCES", resourceIds: [41] });
     await expect(page.getByText("staff@example.com", { exact: true })).toBeVisible();
     expect(pageErrors).toEqual([]);
   });
+  }
 }
 
 for (const failure of [
