@@ -4,8 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import {
     getServiceCategories,
+    pauseProviderService,
     getServiceProviderServices,
 } from "@/services/serviceProvider";
+import { toast } from "sonner";
+import { apiErrorMessage } from "@/lib/api-error";
 import AddServiceModal from "./add-service-modal";
 import ConfirmDeleteServiceModal from "./confirmdeleteservicemodal";
 
@@ -31,6 +34,7 @@ interface ProviderService {
     | "SUBMITTED"
     | "UNDER_REVIEW"
     | "LISTED"
+    | "HIDDEN"
     | "SUSPENDED"
     | "REMOVED";
     riskLabel: "UNDER_REVIEW" | "VERIFIED" | "TRUSTED";
@@ -63,6 +67,7 @@ const STATUS_META: Record<
         dot: "bg-green-500",
         badge: "bg-green-50 text-green-700",
     },
+    HIDDEN: {label:"Paused",dot:"bg-slate-400",badge:"bg-slate-100 text-slate-600"},
     SUSPENDED: {
         label: "Suspended",
         dot: "bg-red-500",
@@ -104,6 +109,9 @@ export default function ServiceProvider() {
         category: ServiceCategory;
     } | null>(null);
 
+    const [editingPricing,setEditingPricing]=useState(false);
+    const [actionBusy,setActionBusy]=useState<number>();
+    const toggleListing=async(service:ProviderService)=>{if(!token||actionBusy!==undefined)return;setActionBusy(service.id);try{await pauseProviderService(token,service.id,service.status==="LISTED");await fetchServices();}catch(e){toast.error(apiErrorMessage(e,"The listing could not be updated."));}finally{setActionBusy(undefined);}};
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
     const [page, setPage] = useState(0);
@@ -357,7 +365,7 @@ export default function ServiceProvider() {
                             </thead>
                             <tbody className="divide-y divide-gray-100 bg-white">
                                 {pagedServices.map((service) => {
-                                    const meta = STATUS_META[service.status];
+                                    const meta = STATUS_META[service.status]??STATUS_META.DRAFT;
 
                                     return (
                                         <tr
@@ -414,11 +422,13 @@ export default function ServiceProvider() {
                                                 )}
                                             </td>
                                             <td className="px-5 py-4 text-right">
+                                                {["LISTED","HIDDEN"].includes(service.status)&&<button disabled={actionBusy!==undefined} onClick={()=>void toggleListing(service)} className="mr-2 rounded-md border px-2.5 py-1 font-semibold">{service.status==="LISTED"?"Pause listing":"Resume listing"}</button>}
+                                                {["DRAFT","HIDDEN"].includes(service.status)&&<button onClick={()=>{setEditingPricing(true);handleResumeDraft(service);}} className="mr-2 rounded-md border px-2.5 py-1 font-semibold">Edit pricing</button>}
                                                 {service.status === "DRAFT" && (
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleResumeDraft(service)}
+                                                            onClick={() => {setEditingPricing(false);handleResumeDraft(service);}}
                                                             className="rounded-md border border-[#FF4B1F]/30 px-2.5 py-1 text-[11px] font-semibold text-[#FF4B1F] transition hover:bg-[#FF4B1F]/5"
                                                         >
                                                             Resume →
@@ -493,9 +503,10 @@ export default function ServiceProvider() {
                     existingServices={services}
                     takenCategoryIds={takenCategoryIds}
                     initialDraft={resumeDraft ?? undefined}
+                    editPricing={Boolean(resumeDraft)&&editingPricing}
                     onClose={() => {
                         setShowAddService(false);
-                        setResumeDraft(null);
+                        setResumeDraft(null);setEditingPricing(false);
                         fetchServices(); // refresh list after adding or resuming a service
                     }}
                 />

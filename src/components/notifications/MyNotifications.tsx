@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useAuthStore } from "@/store/authStore";
 import { Bell, Check, CheckCircle2, Clock3, Loader2, Mail, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,12 @@ import { deliveryLabel, notificationActionLabel, notificationActionUrl, notifica
 const PAGE_SIZE = 10;
 
 export function MyNotifications() {
+  const email = useAuthStore(state => state.email);
+  const sessionReady = useAuthStore(state => state.sessionReady);
+  return <AccountNotifications key={JSON.stringify([email, sessionReady])} enabled={sessionReady && !!email} />;
+}
+
+function AccountNotifications({ enabled }: { enabled: boolean }) {
   const [items, setItems] = useState<MyNotification[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -21,15 +28,19 @@ export function MyNotifications() {
   const [marking, setMarking] = useState<number>();
   const [error, setError] = useState<string>();
   const requestId = useRef(0);
+  const mounted = useRef(false);
+  const readIds = useRef(new Set<number>());
 
   const load = useCallback(async () => {
+    if (!enabled) { setLoading(false); return; }
     const currentRequest = ++requestId.current;
     setLoading(true);
     setError(undefined);
     try {
       const response = await notificationService.mine(page, PAGE_SIZE);
       if (currentRequest !== requestId.current) return;
-      setItems(response.data?.data ?? []);
+      if (response.data?.success === false || !Array.isArray(response.data?.data)) throw new Error("The notification response could not be read. Please try again.");
+      setItems(response.data.data.map((item: MyNotification) => ({ ...item, read: item.read || readIds.current.has(item.id) })));
       setTotalPages(response.data?.totalPages ?? 0);
       setTotalElements(response.data?.totalElements ?? 0);
     } catch (error: unknown) {
@@ -38,21 +49,39 @@ export function MyNotifications() {
     } finally {
       if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [page]);
+  }, [page, enabled]);
 
-  useEffect(() => { void load(); return () => { requestId.current++; }; }, [load]);
+  useEffect(() => {
+    mounted.current = true;
+    void load();
+    const refresh = () => { if (document.visibilityState === "visible") void load(); };
+    const timer = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      mounted.current = false;
+      requestId.current++;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [load]);
 
   const markRead = async (item: MyNotification) => {
-    if (item.read || marking) return;
+    if (!enabled || item.read || marking) return;
     setMarking(item.id);
     try {
       await notificationService.markRead(item.id);
+      if (!mounted.current) return;
+      readIds.current.add(item.id);
       setItems(current => current.map(value => value.id === item.id ? { ...value, read: true } : value));
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     } catch (error: unknown) {
-      toast.error(apiErrorMessage(error, "Could not mark this notification as read."));
+      if (mounted.current) toast.error(apiErrorMessage(error, "Could not mark this notification as read."));
     } finally {
-      setMarking(undefined);
+      if (mounted.current) setMarking(undefined);
     }
   };
 
@@ -63,20 +92,21 @@ export function MyNotifications() {
       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-50 text-[#EF4217]"><Bell /></div>
       <div><h1 className="text-3xl font-bold text-[#141130]">Your notifications</h1><p className="text-sm text-muted-foreground">Payment reminders, estate updates and delivery confirmations · {totalElements} total{unread ? ` · ${unread} new on this page` : ""}</p></div>
     </div>
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Notification coverage">
-      {["Payments due, overdue and late fees", "Lease notices and termination", "Property-sale status and payments", "Estate charges and ownership changes"].map(label =>
-        <div key={label} className="rounded-xl border bg-white p-4 text-sm font-medium text-slate-700"><CheckCircle2 className="mb-2 h-4 w-4 text-emerald-600" />{label}</div>)}
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Notification topics">
+      {["Payments and agreement notices", "Marketplace orders and delivery", "Invitations and account updates", "Estate charges and ownership changes"].map(label =>
+        <div key={label} className="rounded-xl border bg-white p-4 text-sm font-medium text-slate-700"><Bell className="mb-2 h-4 w-4 text-slate-400" />{label}</div>)}
     </div>
     {error ? <div role="alert" className="rounded-xl border bg-white p-6"><p>{error}</p><Button className="mt-3" onClick={() => void load()}>Try again</Button></div> : loading && items.length === 0 ? <div className="flex justify-center rounded-xl border bg-white py-20"><Loader2 className="h-8 w-8 animate-spin text-[#EF4217]" /></div> :
       items.length === 0 ? <div className="rounded-xl border bg-white py-16 text-center"><Bell className="mx-auto mb-3 h-10 w-10 text-slate-300"/><h2 className="font-semibold">You are all caught up</h2><p className="mt-1 text-sm text-muted-foreground">New estate and payment updates will appear here.</p></div> :
       <div className="space-y-3">{items.map(item => {
         const actionUrl = item.channel === "IN_APP" && typeof window !== "undefined"
-          ? notificationActionUrl(item.message, window.location.origin)
+          ? notificationActionUrl(item.actionStatus && item.actionStatus !== "AVAILABLE" && item.actionStatus !== "LEGACY" ? "" : item.actionPath || item.message, window.location.origin)
           : undefined;
         return <article key={item.id} className={`rounded-xl border p-5 shadow-sm ${item.read ? "bg-white" : "border-orange-200 bg-orange-50/40"}`}>
           <div className="flex flex-wrap items-start justify-between gap-3"><div className="flex items-center gap-2"><span className="text-slate-500">{item.channel === "EMAIL" ? <Mail className="h-4 w-4"/> : item.channel === "IN_APP" ? <Bell className="h-4 w-4"/> : <MessageSquare className="h-4 w-4"/>}</span><strong>{notificationTitle(item.notificationType)}</strong>{!item.read && <Badge className="bg-[#EF4217]">New</Badge>}</div><Badge variant={item.delivered ? "default" : "outline"}>{item.delivered ? <CheckCircle2 className="mr-1 h-3 w-3"/> : <Clock3 className="mr-1 h-3 w-3"/>}{deliveryLabel(item)}</Badge></div>
           <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">{notificationText(item.message)}</p><time className="mt-3 block text-xs text-muted-foreground" dateTime={item.createdOn}>{new Date(item.createdOn).toLocaleString()}</time>
           <div className="mt-2 flex flex-wrap gap-2">
+            {item.actionStatus && !["AVAILABLE", "LEGACY", "NOT_ACTIONABLE"].includes(item.actionStatus) && <span className="self-center text-xs text-muted-foreground">{item.actionStatus === "EXPIRED" ? "This invitation has expired. Ask the sender for a new invitation." : item.actionStatus === "CANCELLED" || item.actionStatus === "REVOKED" ? "This invitation was cancelled." : item.actionStatus === "ACCEPTED" ? "Invitation already accepted. Continue from your dashboard." : "This invitation is no longer available."}</span>}
             {actionUrl && <Button asChild size="sm"><Link href={actionUrl} onClick={() => { if (!item.read) void markRead(item); }}>{notificationActionLabel(item.notificationType)}</Link></Button>}
             {!item.read && <Button type="button" variant="ghost" size="sm" disabled={marking === item.id} onClick={() => void markRead(item)}><Check className="mr-1 h-4 w-4" />Mark as read</Button>}
           </div>

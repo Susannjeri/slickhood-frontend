@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthStore } from "@/store/authStore";
+import HelpArticleReferences from "@/components/helpdesk/HelpArticleReferences";
 import {
   addHelpInternalNote, createHelpConversation, escalateHelpConversation, getHelpConversation, getHelpDeskSupportSummary,
   HelpDeskArticle, HelpDeskConversation, HelpDeskMessage, HelpDeskSupportSummary,
@@ -240,7 +241,13 @@ function HelpDeskWorkspace() {
 function MessageBubble({ message }: { message: HelpDeskMessage }) {
   const mine = message.senderType === "USER";
   const icon = message.senderType === "AI" ? <Bot className="h-4 w-4" /> : message.senderType === "AGENT" ? <Headphones className="h-4 w-4" /> : <UserRound className="h-4 w-4" />;
-  return <div className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-2xl px-4 py-3 ${message.internalNote ? "border border-amber-300 bg-amber-50 text-amber-950" : mine ? "bg-[#141130] text-white" : "border bg-white text-slate-800"}`}><div className="mb-1 flex items-center gap-2 text-xs font-semibold opacity-70">{icon}{message.internalNote ? "Internal note" : message.senderType === "AI" ? "Slickhood Help" : message.senderType === "AGENT" ? "Support agent" : message.senderType === "SYSTEM" ? "System" : "You"}</div><p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p></div></div>;
+  return <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+    <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${message.internalNote ? "border border-amber-300 bg-amber-50 text-amber-950" : mine ? "bg-[#141130] text-white" : "border bg-white text-slate-800"}`}>
+      <div className="mb-1 flex items-center gap-2 text-xs font-semibold opacity-70">{icon}{message.internalNote ? "Internal note" : message.senderType === "AI" ? "Slickhood Help" : message.senderType === "AGENT" ? "Support agent" : message.senderType === "SYSTEM" ? "System" : "You"}</div>
+      <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p>
+      {message.senderType === "AI" && !message.internalNote && <HelpArticleReferences sourceIds={message.sourceArticleIds} />}
+    </div>
+  </div>;
 }
 function Status({ status }: { status: string }) { const styles: Record<string,string>={OPEN:"bg-blue-100 text-blue-800",ESCALATED:"bg-amber-100 text-amber-800",WAITING_FOR_SUPPORT:"bg-amber-100 text-amber-800",WAITING_FOR_CUSTOMER:"bg-cyan-100 text-cyan-800",ASSIGNED:"bg-purple-100 text-purple-800",RESOLVED:"bg-green-100 text-green-800"}; return <Badge className={styles[status] ?? ""}>{status.toLowerCase().replaceAll("_", " ")}</Badge>; }
 function Loader(){return <div className="flex h-40 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[#EF4217]" /></div>}

@@ -7,6 +7,7 @@ import { Bot, ChevronDown, Headphones, Loader2, MessageCircle, Send, ShieldAlert
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuthStore } from "@/store/authStore";
+import HelpArticleReferences from "./HelpArticleReferences";
 import {
   claimGuestHelpConversation, createGuestHelpConversation, createHelpConversation, escalateGuestHelpConversation, escalateHelpConversation,
   getGuestHelpConversation, getHelpConversation, HelpDeskConversation, HelpDeskGuestSession, HelpDeskMessage,
@@ -27,7 +28,8 @@ type StoredGuest = { ticketNumber: string; accessToken: string; expiresAt: strin
 export default function HelpChatBox() {
   const token = useAuthStore((state) => state.token);
   const role = useAuthStore((state) => state.activeRole?.title);
-  return <HelpChatSession key={`${token ?? "guest"}:${role}`} />;
+  const workspace = useAuthStore((state) => state.activeWorkspaceId);
+  return <HelpChatSession key={`${token ?? "guest"}:${role}:${workspace}`} />;
 }
 
 function HelpChatSession() {
@@ -180,19 +182,28 @@ function HelpChatSession() {
 
 function ChatMessage({ message }: { message: HelpDeskMessage }) {
   const mine = message.senderType === "USER";
-  return <div className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`max-w-[88%] rounded-2xl px-3 py-2.5 text-sm leading-5 ${mine ? "bg-[#141130] text-white" : "border bg-white text-slate-800"}`}><div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold opacity-70">{message.senderType === "AI" ? <Bot className="h-3.5 w-3.5" /> : message.senderType === "AGENT" ? <Headphones className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}{message.senderType === "USER" ? "You" : message.senderType === "AGENT" ? "Support agent" : message.senderType === "SYSTEM" ? "Slickhood" : "Slickhood Help"}</div><p className="whitespace-pre-wrap">{message.content}</p></div></div>;
+  return <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+    <div className={`max-w-[88%] rounded-2xl px-3 py-2.5 text-sm leading-5 ${mine ? "bg-[#141130] text-white" : "border bg-white text-slate-800"}`}>
+      <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold opacity-70">
+        {message.senderType === "AI" ? <Bot className="h-3.5 w-3.5" /> : message.senderType === "AGENT" ? <Headphones className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
+        {mine ? "You" : message.senderType === "AGENT" ? "Support agent" : message.senderType === "SYSTEM" ? "Slickhood" : "Slickhood Help"}
+      </div>
+      <p className="whitespace-pre-wrap">{message.content}</p>
+      {message.senderType === "AI" && <HelpArticleReferences sourceIds={message.sourceArticleIds} />}
+    </div>
+  </div>;
 }
 
 function helpContext(pathname: string) {
   if (/register|verify-code|auth_select|role/.test(pathname)) return { category: "REGISTRATION", label: "registration", prompts: ["How do I complete registration?", "I did not receive my verification code", "Which role should I choose?"] };
   if (/kyc/.test(pathname)) return { category: "KYC", label: "account verification", prompts: ["Which verification documents are required?", "Why was my document not accepted?", "How is my information protected?"] };
-  if (/payment|invoice/.test(pathname)) return { category: "PAYMENTS", label: "payments", prompts: ["Why is my payment still pending?", "Where can I find my receipt?", "Which payment methods can I use?"] };
+  if (/billing|payment|invoice/.test(pathname)) return { category: "PAYMENTS", label: "payments", prompts: ["Why is my payment still pending?", "Where can I find my receipt?", "Which payment methods can I use?"] };
   if (/insurance/.test(pathname)) return { category: "INSURANCE", label: "insurance", prompts: ["How do I request an insurance quote?", "How can I renew my policy?", "How do I submit a claim?"] };
   if (/wealth/.test(pathname)) return { category: "WEALTH", label: "your wealth workspace", prompts: ["How do I add an asset?", "How are portfolio values calculated?", "Where can I save an asset document?"] };
   if (/affiliate/.test(pathname)) return { category: "AFFILIATE", label: "the affiliate programme", prompts: ["How do referral commissions work?", "When can I request a payout?", "Where can I see my referrals?"] };
   if (/visitor|smart-gate/.test(pathname)) return { category: "VISITORS", label: "visitor access", prompts: ["How do I register a visitor?", "How does gate approval work?", "How do I cancel visitor access?"] };
   if (/sale|buyer|offer/.test(pathname)) return { category: "SALES", label: "property sales", prompts: ["How do I list a property for sale?", "How does the letter of offer work?", "How can I track a sale?"] };
-  if (/soko|service/.test(pathname)) return { category: pathname.includes("soko") ? "SOKO" : "SERVICES", label: "this marketplace", prompts: ["How does delivery work?", "How do I report a problem?", "When is payment released?"] };
+  if (/soko|service/.test(pathname)) return { category: pathname.includes("soko") ? "SOKO" : "SERVICES", label: "this marketplace", prompts: ["How does delivery work?", "How do I report a problem?", "Where can I check payment status?"] };
   if (/lease|tenant|rental/.test(pathname)) return { category: "RENTALS", label: "rentals and leases", prompts: ["How does tenant onboarding work?", "Where are lease documents managed?", "How are rent reminders handled?"] };
   if (/property|unit|estate/.test(pathname)) return { category: "PROPERTY", label: "property management", prompts: ["How do I add a property or unit?", "How do I configure an estate?", "Where can I manage property staff?"] };
   return { category: "GENERAL", label: "Slickhood", prompts: ["Show me how to get started", "Where can I manage my account?", "I would like help from a person"] };

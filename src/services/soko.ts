@@ -55,9 +55,17 @@ export type SokoRider = {
   status: string;
   verified: boolean;
   verificationStatus?: string;
+  userId?: number;
+  verifiedAt?: string;
+  verificationNotes?: string;
   completedDeliveries: number;
   notes?: string;
 };
+export type RiderKycChecklist = { commonKycApproved: boolean; outstanding: string[]; uploadTypes: string[]; renewalDocumentTypes?: string[]; documents: {id:number;documentType:string;status:string;reviewNotes?:string;expiresAt?:string;downloadUrl?:string}[] };
+export const myRiderKyc = () => API.get("/soko/rider/kyc");
+export const adminRiderKyc = (id:number) => API.get(`/soko/admin/riders/${id}/kyc`);
+export const uploadRiderKyc = (documentType:string,file:File) => {const body=new FormData();body.append("file",file);body.append("documentType",documentType);return API.post("/soko/rider/kyc",body);};
+export const reviewRiderKyc = (id:number,decision:"VERIFY"|"REJECT",notes:string,expiresAt?:string) => API.put(`/soko/admin/rider-kyc/${id}/review`,{decision,notes,expiresAt});
 export type CatalogProduct = {
   product: SokoProduct;
   storeName: string;

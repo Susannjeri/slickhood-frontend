@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiErrorMessage } from "@/lib/api-error";
 import { exportReport, generateReport, listReportCatalog, OperationalReport, ReportDefinition } from "@/lib/api";
+import { useAuthStore } from "@/store/authStore";
 
 const localIsoDate = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -38,6 +39,14 @@ const datesFor = (definition: ReportDefinition) => {
 };
 
 export default function ReportsPage() {
+  const role = useAuthStore(state => state.activeRole?.title);
+  const email = useAuthStore(state => state.email);
+  const workspaceId = useAuthStore(state => state.activeWorkspaceId);
+  // Report data must not survive an account, profile or workspace switch.
+  return <ReportWorkspace key={JSON.stringify([email, role, workspaceId])} />;
+}
+
+function ReportWorkspace() {
   const [catalog, setCatalog] = useState<ReportDefinition[]>([]);
   const [selectedCode, setSelectedCode] = useState("");
   const [from, setFrom] = useState(historicalFrom);
@@ -47,7 +56,10 @@ export default function ReportsPage() {
   const [catalogFailed, setCatalogFailed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
   const requestId = useRef(0);
+  const catalogRequestId = useRef(0);
+  const mounted = useRef(true);
 
   const selected = useMemo(() => catalog.find(item => item.code === selectedCode), [catalog, selectedCode]);
   const groupedCatalog = useMemo(() => {
@@ -64,27 +76,46 @@ export default function ReportsPage() {
     }
     const currentRequest = ++requestId.current;
     setLoading(true);
+    setReport(null);
+    setReportError(null);
     try {
       const response = await generateReport(code, start, end);
-      if (currentRequest !== requestId.current) return;
-      const next = response.data?.data as OperationalReport | undefined;
-      if (!next || !Array.isArray(next.rows) || !Array.isArray(next.columns)) throw new Error("Invalid report response");
+      if (!mounted.current || currentRequest !== requestId.current) return;
+      // ResponseDTO wraps a single report in a list. Support older object
+      // envelopes too, without changing the shared API response contract.
+      const payload = response.data?.data;
+      const next = (Array.isArray(payload) ? payload[0] : payload) as OperationalReport | undefined;
+      if (response.data?.success === false || !next || next.definition?.code !== code ||
+          !Array.isArray(next.rows) || !Array.isArray(next.columns) ||
+          !next.metrics || typeof next.metrics !== "object") throw new Error("Invalid report response");
       setReport(next);
     } catch (error: unknown) {
-      if (currentRequest !== requestId.current) return;
+      if (!mounted.current || currentRequest !== requestId.current) return;
       setReport(null);
-      toast.error(apiErrorMessage(error, "The report could not be generated for this role and date range."));
+      setReportError(apiErrorMessage(error, "The report could not be generated. Check your access and date range, then try again."));
     } finally {
-      if (currentRequest === requestId.current) setLoading(false);
+      if (mounted.current && currentRequest === requestId.current) setLoading(false);
     }
   }, []);
 
   const loadCatalog = useCallback(async () => {
+    const currentRequest = ++catalogRequestId.current;
+    ++requestId.current;
+    setLoading(false);
+    setReport(null);
+    setReportError(null);
+    setCatalog([]);
+    setSelectedCode("");
     setLoadingCatalog(true);
     setCatalogFailed(false);
     try {
       const response = await listReportCatalog();
-      const items = Array.isArray(response.data?.data) ? response.data.data as ReportDefinition[] : [];
+      if (!mounted.current || currentRequest !== catalogRequestId.current) return;
+      if (response.data?.success === false || !Array.isArray(response.data?.data)) throw new Error("Invalid catalogue response");
+      const items = response.data.data as ReportDefinition[];
+      if (items.some(item => !item?.code || !item.title || !["HISTORICAL", "FORWARD", "SNAPSHOT"].includes(item.dateMode))) {
+        throw new Error("Invalid catalogue definition");
+      }
       setCatalog(items);
       if (items.length) {
         const first = items[0];
@@ -98,16 +129,23 @@ export default function ReportsPage() {
         setReport(null);
       }
     } catch (error: unknown) {
+      if (!mounted.current || currentRequest !== catalogRequestId.current) return;
       setCatalogFailed(true);
       toast.error(apiErrorMessage(error, "The report catalogue could not be loaded."));
     } finally {
-      setLoadingCatalog(false);
+      if (mounted.current && currentRequest === catalogRequestId.current) setLoadingCatalog(false);
     }
   }, [runReport]);
 
   useEffect(() => {
+    mounted.current = true;
     const timer = window.setTimeout(() => void loadCatalog(), 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      mounted.current = false;
+      ++requestId.current;
+      ++catalogRequestId.current;
+      window.clearTimeout(timer);
+    };
   }, [loadCatalog]);
 
   const selectReport = (code: string) => {
@@ -121,6 +159,14 @@ export default function ReportsPage() {
     void runReport(code, dates.from, dates.to);
   };
 
+  const changeDate = (setter: (date: string) => void, value: string) => {
+    ++requestId.current;
+    setLoading(false);
+    setReport(null);
+    setReportError(null);
+    setter(value);
+  };
+
   const reportMatchesFilters = !!report && report.definition.code === selectedCode &&
     (selected?.dateMode === "SNAPSHOT" || (report.from === from && report.to === to));
 
@@ -129,6 +175,9 @@ export default function ReportsPage() {
     setExporting(true);
     try {
       const response = await exportReport(selectedCode, from, to);
+      if (!mounted.current) return;
+      const contentType = String(response.headers["content-type"] ?? "").toLowerCase();
+      if (!contentType.includes("text/csv")) throw new Error("Invalid export response");
       const url = URL.createObjectURL(new Blob([response.data], { type: "text/csv;charset=utf-8" }));
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -142,9 +191,19 @@ export default function ReportsPage() {
         toast.warning(`The export reached its ${limit}-row safety limit. Narrow the date range for a complete export.`);
       }
     } catch (error: unknown) {
-      toast.error(apiErrorMessage(error, "The CSV export could not be downloaded."));
+      if (!mounted.current) return;
+      // Axios returns failed export bodies as blobs, not ordinary JSON.
+      const failedBody = (error as { response?: { data?: unknown } })?.response?.data;
+      let message = apiErrorMessage(error, "The CSV export could not be downloaded. Try again.");
+      if (failedBody instanceof Blob) {
+        try {
+          const body = JSON.parse(await failedBody.text()) as { description?: string };
+          if (body.description?.trim()) message = body.description.trim();
+        } catch { /* Preserve the understandable fallback for non-JSON errors. */ }
+      }
+      toast.error(message);
     } finally {
-      setExporting(false);
+      if (mounted.current) setExporting(false);
     }
   };
 
@@ -174,10 +233,10 @@ export default function ReportsPage() {
           </label>
           {selected?.supportsDateRange && <>
             <label className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-200">From
-              <input type="date" value={from} max={to} onChange={event => { setFrom(event.target.value); setReport(null); }} className="h-10 w-full rounded-md border border-slate-300 bg-background px-3 font-normal" />
+              <input type="date" value={from} max={to} onChange={event => changeDate(setFrom, event.target.value)} className="h-10 w-full rounded-md border border-slate-300 bg-background px-3 font-normal" />
             </label>
             <label className="space-y-2 text-sm font-semibold text-slate-700 dark:text-slate-200">To
-              <input type="date" value={to} min={from} max={dateMaximum} onChange={event => { setTo(event.target.value); setReport(null); }} className="h-10 w-full rounded-md border border-slate-300 bg-background px-3 font-normal" />
+              <input type="date" value={to} min={from} max={dateMaximum} onChange={event => changeDate(setTo, event.target.value)} className="h-10 w-full rounded-md border border-slate-300 bg-background px-3 font-normal" />
             </label>
           </>}
           <Button onClick={() => void runReport(selectedCode, from, to)} disabled={loading || !selectedCode} className="gap-2 bg-[#08184a] text-white hover:bg-[#11265f]">
@@ -195,6 +254,7 @@ export default function ReportsPage() {
       </Card>}
 
       {loading && <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-28" />)}</div>}
+      {!loading && reportError && <Card><CardContent role="alert" className="flex flex-col items-start gap-3 p-6"><p className="text-sm text-red-600">{reportError}</p><Button variant="outline" onClick={() => void runReport(selectedCode, from, to)}>Retry report</Button></CardContent></Card>}
 
       {!loading && report && <>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

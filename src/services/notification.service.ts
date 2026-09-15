@@ -9,6 +9,8 @@ export interface MyNotification {
   read: boolean;
   createdOn: string;
   lastUpdatedOn?: string;
+  actionPath?: string;
+  actionStatus?: string;
 }
 
 export const NOTIFICATIONS_CHANGED_EVENT = "slickhood:notifications-changed";

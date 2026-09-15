@@ -4,24 +4,26 @@ import { useState } from "react";
 import { X, MapPin, Loader2 } from "lucide-react";
 import axios from "axios";
 import { useAuthStore } from "@/store/authStore";
-import { setupServiceProviderProfile } from "@/services/serviceProvider";
+import { setupServiceProviderProfile, editServiceProviderProfile } from "@/services/serviceProvider";
 
 interface ServiceProviderProfileModalProps {
     
     onClose: () => void;
     onSuccess?: () => void;
+    initialProfile?: {businessName:string;latitude?:number;longitude?:number};
 }
 
 export default function ServiceProviderProfileModal({
     onClose,
     onSuccess,
+    initialProfile,
 }: ServiceProviderProfileModalProps) {
     const token = useAuthStore((state) => state.token);
 
-    const [businessName, setBusinessName] = useState("");
-    const [consent, setConsent] = useState(false);
-    const [latitude, setLatitude] = useState<number | null>(null);
-    const [longitude, setLongitude] = useState<number | null>(null);
+    const [businessName, setBusinessName] = useState(initialProfile?.businessName??"");
+    const [consent, setConsent] = useState(Boolean(initialProfile));
+    const [latitude, setLatitude] = useState<number | null>(initialProfile?.latitude??null);
+    const [longitude, setLongitude] = useState<number | null>(initialProfile?.longitude??null);
 
     const [isLocating, setIsLocating] = useState(false);
 
@@ -33,16 +35,6 @@ export default function ServiceProviderProfileModal({
 
     const [apiError, setApiError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Helper: Fetch public IP address for consent tracking
-    const getClientIp = async (): Promise<string> => {
-        try {
-            const res = await axios.get("https://api.ipify.org?format=json");
-            return res.data.ip || "127.0.0.1";
-        } catch {
-            return "127.0.0.1";
-        }
-    };
 
     // Helper: Get browser geolocation
     const handleDetectLocation = () => {
@@ -75,6 +67,7 @@ export default function ServiceProviderProfileModal({
     };
 
     const handleSubmit = async () => {
+        if(isSubmitting)return;
         const newErrors: typeof errors = {};
         setApiError(null);
 
@@ -83,8 +76,8 @@ export default function ServiceProviderProfileModal({
             newErrors.businessName = "Business name is required.";
         }
 
-        if (latitude === null || longitude === null) {
-            newErrors.location = "Location coordinates are required.";
+        if (latitude === null || longitude === null || !Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude)>90 || Math.abs(longitude)>180) {
+            newErrors.location = "Enter a latitude between -90 and 90 and longitude between -180 and 180.";
         }
 
         if (!consent) {
@@ -102,17 +95,14 @@ export default function ServiceProviderProfileModal({
         try {
             setIsSubmitting(true);
 
-            const clientIp = await getClientIp();
-
             const payload = {
                 businessName: businessName.trim(),
                 consent: true,
-                consentIpAddress: clientIp,
                 latitude: latitude!,
                 longitude: longitude!,
             };
 
-            const response = await setupServiceProviderProfile(token, payload);
+            const response = initialProfile?await editServiceProviderProfile(token,payload):await setupServiceProviderProfile(token, payload);
 
 
             if (response.data?.success || response.status === 200 || response.status === 201) {
@@ -148,7 +138,7 @@ export default function ServiceProviderProfileModal({
                 <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4">
                     <div>
                         <h2 className="text-lg font-semibold text-[#020B2D]">
-                            Set Up Service Provider Profile
+                            {initialProfile?"Edit Service Provider Profile":"Set Up Service Provider Profile"}
                         </h2>
                         <p className="mt-1 text-xs text-gray-500">
                             Provide your business details and location to complete setup.
@@ -303,7 +293,7 @@ export default function ServiceProviderProfileModal({
                         disabled={isSubmitting}
                         className="rounded-md bg-[#FF4B1F] px-4 py-2 text-xs font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        {isSubmitting ? "Setting Up..." : "Set Up Profile"}
+                        {isSubmitting ? "Saving…" : initialProfile ? "Save profile changes" : "Set Up Profile"}
                     </button>
                 </div>
             </div>

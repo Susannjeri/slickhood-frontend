@@ -9,13 +9,19 @@ import { NOTIFICATIONS_CHANGED_EVENT, notificationService } from "@/services/not
 const POLL_INTERVAL_MS = 60_000;
 
 export function NotificationBell() {
-  const [unreadCount, setUnreadCount] = useState(0);
+  const email = useAuthStore(state => state.email);
   const activeRoleTitle = useAuthStore(state => state.activeRole?.title);
+  const sessionReady = useAuthStore(state => state.sessionReady);
+  return <AccountNotificationBell key={JSON.stringify([email, activeRoleTitle, sessionReady])} enabled={Boolean(email && activeRoleTitle && sessionReady)} />;
+}
+
+function AccountNotificationBell({ enabled }: { enabled: boolean }) {
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  const [countError, setCountError] = useState(false);
   const requestId = useRef(0);
 
   const refresh = useCallback(async () => {
-    if (!activeRoleTitle) {
-      setUnreadCount(0);
+    if (!enabled) {
       return;
     }
 
@@ -28,11 +34,15 @@ export function NotificationBell() {
       const payload = response.data?.data as { count?: unknown } | { count?: unknown }[] | undefined;
       const value = Array.isArray(payload) ? payload[0]?.count : payload?.count;
       const count = Number(value);
-      setUnreadCount(Number.isFinite(count) && count > 0 ? Math.floor(count) : 0);
+      if (response.data?.success === false || value === undefined || !Number.isSafeInteger(count) || count < 0) throw new Error("Invalid unread count");
+      setUnreadCount(count);
+      setCountError(false);
     } catch {
-      // The notification centre remains accessible if the lightweight badge refresh fails.
+      if (currentRequest !== requestId.current) return;
+      setUnreadCount(null);
+      setCountError(true);
     }
-  }, [activeRoleTitle]);
+  }, [enabled]);
 
   useEffect(() => {
     const initialRefresh = window.setTimeout(() => void refresh(), 0);
@@ -45,6 +55,7 @@ export function NotificationBell() {
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, onFocus);
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
+      requestId.current++;
       window.clearTimeout(initialRefresh);
       window.clearInterval(interval);
       window.removeEventListener("focus", onFocus);
@@ -53,7 +64,9 @@ export function NotificationBell() {
     };
   }, [refresh]);
 
-  const accessibleLabel = unreadCount > 0
+  const accessibleLabel = unreadCount === null
+    ? `Open alerts, unread count ${countError ? "unavailable" : "loading"}`
+    : unreadCount > 0
     ? `Open alerts, ${unreadCount} unread`
     : "Open alerts, no unread notifications";
 
@@ -64,7 +77,8 @@ export function NotificationBell() {
     className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[#08184A]/70 transition-colors hover:bg-[#08184A]/5 hover:text-[#08184A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4B12] focus-visible:ring-offset-2 dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white"
   >
     <Bell className="h-5 w-5" aria-hidden="true" />
-    {unreadCount > 0 && <span
+    {countError && <span aria-hidden="true" className="absolute right-0 top-0 rounded-full bg-amber-100 px-1 text-xs font-bold text-amber-800">!</span>}
+    {unreadCount !== null && unreadCount > 0 && <span
       data-testid="notification-unread-count"
       role="status"
       aria-label={`${unreadCount} unread notifications`}

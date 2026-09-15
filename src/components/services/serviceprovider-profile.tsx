@@ -18,6 +18,8 @@ interface ServiceProviderProfileData {
     phoneNumber: string;
     email: string;
     paymentAccountId?: number;
+    latitude?:number;
+    longitude?:number;
 }
 
 interface ServiceCategory {
@@ -76,7 +78,7 @@ export default function ServiceProviderProfile({
             const response = await getServiceProviderProfile(token);
 
             if (response.data.success) {
-                setProfile(response.data.data);
+                setProfile(Array.isArray(response.data.data) ? response.data.data[0] ?? null : null);
                 return;
             }
 
@@ -685,6 +687,7 @@ export default function ServiceProviderProfile({
 
             {showProfileModal && (
                 <ServiceProviderProfileModal
+                    initialProfile={profile}
                     onClose={() => setShowProfileModal(false)}
                     onSuccess={() => {
                         setShowProfileModal(false);

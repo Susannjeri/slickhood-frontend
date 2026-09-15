@@ -119,6 +119,7 @@ export default function SokoInventoryPage() {
       ),
     }));
   const save = async () => {
+    if (busy) return;
     if (
       !form.name.trim() ||
       !form.category.trim() ||
@@ -148,6 +149,12 @@ export default function SokoInventoryPage() {
         : await createSokoProduct(payload);
       const saved: SokoProduct = response.data?.data?.[0];
       if (!saved?.id) throw new Error("Missing product id");
+      // The draft already exists even if its image upload fails. Retry that draft,
+      // not a second create request, and retain the server's variation IDs.
+      setEditingId(saved.id);
+      if (saved.variationsJson) {
+        setForm((current) => ({ ...current, variations: parseVariations(saved.variationsJson) }));
+      }
       if (images.length) await uploadSokoProductImages(saved.id, images);
       toast.success(editingId ? "Product updated." : "Product draft created.");
       reset();

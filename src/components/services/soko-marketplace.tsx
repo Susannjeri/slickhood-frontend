@@ -24,6 +24,7 @@ import {
   confirmSokoDeliveryCodeRecovery,
   createSokoProduct,
   createSokoRider,
+  updateSokoRider,
   createSokoStore,
   getSokoDeliveryCode,
   initiateSokoPayment,
@@ -1221,6 +1222,8 @@ function RiderManager({
   onChanged: () => Promise<void>;
   onError: (message: string) => void;
 }) {
+  const [editingId,setEditingId]=useState<number>();
+  const [saving,setSaving]=useState(false);
   const [form, setForm] = useState({
     riderType: "INDIVIDUAL" as "INDIVIDUAL" | "DELIVERY_COMPANY",
     displayName: "",
@@ -1231,12 +1234,15 @@ function RiderManager({
     notes: "",
   });
   const add = async () => {
-    if (!form.displayName.trim() || !form.phoneNumber.trim())
+    if(saving)return;
+    if (!form.displayName.trim() || !form.phoneNumber.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
       return onError(
-        "Enter the rider or delivery company name and phone number.",
+        "Enter the rider or delivery company name, phone number and SlickHood account email. The rider must use this email to sign in before verification.",
       );
     try {
-      await createSokoRider({ storeId, ...form });
+      setSaving(true);
+      if(editingId)await updateSokoRider(editingId,{storeId,...form});else await createSokoRider({ storeId, ...form });
+      setEditingId(undefined);
       setForm({
         ...form,
         displayName: "",
@@ -1248,7 +1254,7 @@ function RiderManager({
       await onChanged();
     } catch (e) {
       onError(errorText(e, "Preferred rider could not be saved."));
-    }
+    } finally {setSaving(false);}
   };
   const availability = async (r: SokoRider) => {
     try {
@@ -1284,8 +1290,7 @@ function RiderManager({
             Preferred delivery riders
           </h3>
           <p className="text-sm text-gray-500">
-            Save trusted riders or delivery companies and assign them repeatedly
-            to Soko orders.
+            Add the rider's SlickHood account email, then await admin verification and required KYC. Only verified, active riders can be assigned. Identity or vehicle changes require verification again.
           </p>
         </div>
       </div>
@@ -1318,7 +1323,8 @@ function RiderManager({
         <input
           value={form.email}
           onChange={(e) => setForm({ ...form, email: e.target.value })}
-          placeholder="Email (optional)"
+          type="email"
+          placeholder="Rider's SlickHood account email"
           className="rounded-xl border p-3 text-sm"
         />
         <input
@@ -1341,10 +1347,12 @@ function RiderManager({
         />
         <button
           onClick={add}
+          disabled={saving}
           className="rounded-xl bg-[#020B2D] p-3 text-sm font-semibold text-white xl:col-span-4"
         >
-          Add preferred rider
+          {saving?"Saving…":editingId?"Save rider changes":"Add preferred rider"}
         </button>
+        {editingId&&<button onClick={()=>{setEditingId(undefined);setForm({...form,displayName:"",phoneNumber:"",email:"",vehiclePlate:"",notes:""});}} disabled={saving} className="rounded-xl border p-3 text-sm">Cancel edit</button>}
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {riders.map((r) => (
@@ -1352,6 +1360,8 @@ function RiderManager({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <b>{r.displayName}</b>
+                <p className="text-xs font-semibold text-slate-600">{(r.status==="ACTIVE"?(r.verificationStatus??r.status):r.status).replaceAll("_"," ")} · {r.email||"Account email required"}</p>
+                {r.verificationNotes&&<p className="text-xs text-amber-700">Admin note: {r.verificationNotes}</p>}
                 <p className="text-sm text-gray-500">
                   {r.riderType === "DELIVERY_COMPANY"
                     ? "Delivery company"
@@ -1372,7 +1382,8 @@ function RiderManager({
               </span>
             </div>
             <div className="mt-3 flex gap-3">
-              {r.availability !== "BUSY" && (
+              <button disabled={saving||r.availability==="BUSY"} onClick={()=>{setEditingId(r.id);setForm({riderType:r.riderType,displayName:r.displayName,phoneNumber:r.phoneNumber,email:r.email??"",vehicleType:r.vehicleType??"",vehiclePlate:r.vehiclePlate??"",notes:r.notes??""});}} className="text-xs font-semibold text-blue-700 disabled:text-gray-300">Edit rider</button>
+              {r.verified&&r.status==="ACTIVE"&&r.availability !== "BUSY" && (
                 <button
                   onClick={() => availability(r)}
                   className="text-xs font-semibold text-blue-700"
@@ -1393,7 +1404,7 @@ function RiderManager({
         ))}
         {!riders.length && (
           <p className="col-span-full rounded-xl bg-slate-50 p-5 text-center text-sm text-gray-500">
-            No preferred riders yet. One-off courier dispatch remains available.
+            No registered riders yet. Add a rider and complete verification before assigning deliveries.
           </p>
         )}
       </div>
@@ -1427,17 +1438,15 @@ function OrderList({
   onChanged: () => Promise<void>;
   onError: (message: string) => void;
 }) {
-  const localEta = () => {
-    const d = new Date(Date.now() + 4 * 60 * 60 * 1000);
-    return d.toISOString().slice(0, 16);
+  const localEta = (hoursAhead = 4) => {
+    const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Africa/Nairobi", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(Date.now() + hoursAhead * 60 * 60 * 1000));
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value ?? "";
+    return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
   };
   const [dispatchOrder, setDispatchOrder] = useState<SokoOrderDetail | null>(
       null,
     ),
-    [riderId, setRiderId] = useState("one-off"),
-    [courierName, setCourierName] = useState(""),
-    [courierPhone, setCourierPhone] = useState(""),
-    [vehiclePlate, setVehiclePlate] = useState(""),
+    [riderId, setRiderId] = useState(""),
     [eta, setEta] = useState(localEta);
   const [proofOrderId, setProofOrderId] = useState<number | null>(null),
     [proof, setProof] = useState<File | null>(null),
@@ -1450,27 +1459,19 @@ function OrderList({
     const available = riders.filter(
       (r) =>
         r.storeId === order.order.storeId &&
-        r.availability === "AVAILABLE" &&
+        r.verified && Boolean(r.userId) && r.availability === "AVAILABLE" &&
         r.status === "ACTIVE",
     );
     setDispatchOrder(order);
-    setRiderId(available[0] ? String(available[0].id) : "one-off");
-    setCourierName("");
-    setCourierPhone("");
-    setVehiclePlate("");
+    setRiderId(available[0] ? String(available[0].id) : "");
     setEta(localEta());
   };
   const submitDispatch = async () => {
     if (!dispatchOrder || !eta) return;
     const details: DispatchDetails = { expectedArrivalTime: `${eta}:00` };
-    if (riderId !== "one-off") details.riderId = Number(riderId);
-    else {
-      if (!courierName.trim() || !courierPhone.trim())
-        return onError("Enter the courier name and phone number.");
-      details.courierName = courierName.trim();
-      details.courierPhone = courierPhone.trim();
-      details.vehiclePlate = vehiclePlate.trim() || undefined;
-    }
+    if (!riderId || !riders.some(r => String(r.id) === riderId && r.storeId === dispatchOrder.order.storeId && r.verified && Boolean(r.userId) && r.status === "ACTIVE" && r.availability === "AVAILABLE"))
+      return onError("Select a verified, registered and available rider for this store.");
+    details.riderId = Number(riderId);
     setBusy(true);
     try {
       await onAction(dispatchOrder.order.id, "DISPATCHED", details);
@@ -1596,7 +1597,7 @@ function OrderList({
     ? riders.filter(
         (r) =>
           r.storeId === dispatchOrder.order.storeId &&
-          r.availability === "AVAILABLE" &&
+          r.verified && Boolean(r.userId) && r.availability === "AVAILABLE" &&
           r.status === "ACTIVE",
       )
     : [];
@@ -1850,7 +1851,7 @@ function OrderList({
                   Dispatch {dispatchOrder.order.orderNumber}
                 </h3>
                 <p className="text-sm text-gray-500">
-                  Assign a trusted rider or one-off courier.
+                  Assign a verified SlickHood rider. They accept and confirm collection on their phone.
                 </p>
               </div>
               <button aria-label="Close" onClick={() => setDispatchOrder(null)}>
@@ -1859,7 +1860,7 @@ function OrderList({
             </div>
             <div className="mt-5 space-y-3">
               <label className="block text-sm font-medium">
-                Courier
+                Verified rider
                 <select
                   value={riderId}
                   onChange={(e) => setRiderId(e.target.value)}
@@ -1871,43 +1872,22 @@ function OrderList({
                       {r.vehiclePlate ? ` · ${r.vehiclePlate}` : ""}
                     </option>
                   ))}
-                  <option value="one-off">One-off courier</option>
+                  {!available.length && <option value="">No verified riders available</option>}
                 </select>
               </label>
-              {riderId === "one-off" && (
-                <>
-                  <input
-                    value={courierName}
-                    onChange={(e) => setCourierName(e.target.value)}
-                    placeholder="Courier name"
-                    className="w-full rounded-xl border p-3"
-                  />
-                  <input
-                    value={courierPhone}
-                    onChange={(e) => setCourierPhone(e.target.value)}
-                    placeholder="Courier phone"
-                    className="w-full rounded-xl border p-3"
-                  />
-                  <input
-                    value={vehiclePlate}
-                    onChange={(e) => setVehiclePlate(e.target.value)}
-                    placeholder="Vehicle plate (optional)"
-                    className="w-full rounded-xl border p-3"
-                  />
-                </>
-              )}
+              {!available.length && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Add a registered rider, complete admin verification and mark them available before dispatching.</p>}
               <label className="block text-sm font-medium">
                 Expected arrival (Nairobi)
                 <input
                   type="datetime-local"
-                  min={localEta()}
+                  min={localEta(0)}
                   value={eta}
                   onChange={(e) => setEta(e.target.value)}
                   className="mt-1 w-full rounded-xl border p-3"
                 />
               </label>
               <button
-                disabled={busy}
+                disabled={busy || !riderId || !available.length}
                 onClick={submitDispatch}
                 className="w-full rounded-xl bg-[#020B2D] p-3 font-semibold text-white disabled:opacity-50"
               >

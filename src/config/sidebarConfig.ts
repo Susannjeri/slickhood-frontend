@@ -250,6 +250,14 @@ export const sidebarLinks: SidebarLink[] = [
     protected: true,
     permissions: ["view_wealth"],
     description: "Assets, net worth, performance, compliance, goals and projections.",
+    subLinks: [
+      {label:"Advisor",href:"/dashboard/wealth#wealth-overview",permissions:["view_wealth"],protected:true},
+      {label:"Assets",href:"/dashboard/wealth#wealth-assets",permissions:["view_wealth"],protected:true},
+      {label:"Income & debt",href:"/dashboard/wealth#wealth-finance",permissions:["view_wealth"],protected:true},
+      {label:"Lifecycle",href:"/dashboard/wealth#wealth-compliance",permissions:["view_wealth"],protected:true},
+      {label:"Document vault",href:"/dashboard/wealth#wealth-vault",permissions:["view_wealth"],protected:true},
+      {label:"Goals & projections",href:"/dashboard/wealth#wealth-goals",permissions:["view_wealth"],protected:true},
+    ],
   },
   {
     icon: ShieldPlus,

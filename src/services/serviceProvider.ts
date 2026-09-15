@@ -1,6 +1,16 @@
 
 import { API } from "@/lib/api";
 
+export type ServiceReadiness = { uploadedDocumentTypes: string[]; verifiedDocumentTypes: string[]; outstandingDocumentTypes: string[]; refereeCount: number; verifiedRefereeCount: number; requiredReferees: number };
+export const getServiceReadiness = (token: string, serviceId: number) => API.get(`/sp/service/${serviceId}/readiness`, { headers: { Authorization: `Bearer ${token}` } });
+export const editServiceProviderProfile = (token:string,payload:{businessName:string;consent:boolean;latitude:number;longitude:number}) => API.put("/sp/profile",payload,{headers:{Authorization:`Bearer ${token}`}});
+export const editProviderService = (token:string,id:number,payload:{categoryId:number;amount:number;currency:string;pricingUnit:string}) => API.put(`/sp/service/${id}`,payload,{headers:{Authorization:`Bearer ${token}`}});
+export const pauseProviderService = (token:string,id:number,pause:boolean) => API.put(`/sp/service/${id}/${pause?"pause":"resume"}`,{}, {headers:{Authorization:`Bearer ${token}`}});
+export type ServiceReferee = {id:number;name:string;contact:string;verificationStatus:string};
+export const listServiceReferees = (token:string) => API.get("/sp/referee/list",{params:{size:100},headers:{Authorization:`Bearer ${token}`}});
+export const saveServiceReferee = (token:string,payload:{name:string;contact:string},id?:number) => id?API.put(`/sp/referee/${id}`,payload,{headers:{Authorization:`Bearer ${token}`}}):API.post("/sp/referee/add",payload,{headers:{Authorization:`Bearer ${token}`}});
+export const removeServiceReferee = (token:string,id:number) => API.delete(`/sp/referee/${id}`,{headers:{Authorization:`Bearer ${token}`}});
+
 export const createServiceCategory = (
     token: string,
     payload: {
@@ -92,7 +102,7 @@ export const getServiceProviderProfile = (token: string) => {
 export interface SetupServiceProviderProfilePayload {
     businessName: string;
     consent: boolean;
-    consentIpAddress: string;
+    consentIpAddress?: string; // Consent IP is recorded by the backend, not a third-party browser lookup.
     latitude: number;
     longitude: number;
 }

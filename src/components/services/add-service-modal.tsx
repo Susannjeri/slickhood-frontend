@@ -2,13 +2,18 @@
 
 import {
   createService,
+  editProviderService,
   getServicePricingUnits,
   submitServiceForReview,
   uploadServiceDocument,
+  getServiceReadiness,
+  ServiceReadiness,
 } from "@/services/serviceProvider";
 import { useAuthStore } from "@/store/authStore";
 import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
+
+import ServiceRefereeManager from "./service-referee-manager";
 
 type Category = {
   id: number;
@@ -39,6 +44,7 @@ type CreatedService = {
     | "SUBMITTED"
     | "UNDER_REVIEW"
     | "LISTED"
+    | "HIDDEN"
     | "SUSPENDED"
     | "REMOVED";
   riskLabel: "UNDER_REVIEW" | "VERIFIED" | "TRUSTED";
@@ -52,6 +58,7 @@ interface AddServiceModalProps {
   /** Quick lookup of already-used category IDs */
   takenCategoryIds?: Set<number>;
   onClose: () => void;
+  editPricing?: boolean;
   initialDraft?: {
     service: CreatedService;
     category: Category;
@@ -96,6 +103,7 @@ export default function AddServiceModal({
   takenCategoryIds = new Set<number>(),
   onClose,
   initialDraft,
+  editPricing=false,
 }: AddServiceModalProps) {
   const { token } = useAuthStore();
 
@@ -108,7 +116,7 @@ export default function AddServiceModal({
 
   // WIZARD STATE – start at documents when resuming a draft
   const [step, setStep] = useState<WizardStep>(
-    initialDraft ? "documents" : "category"
+    initialDraft ? (editPricing?"service":"documents") : "category"
   );
 
   // CATEGORY STATE
@@ -143,6 +151,20 @@ export default function AddServiceModal({
       { status: "idle" | "uploading" | "done" | "error"; error?: string }
     >
   >({});
+  const [refereeCount,setRefereeCount]=useState<number|null>(null);
+  const [readiness,setReadiness]=useState<ServiceReadiness|null>(null);
+  const [checkingReadiness,setCheckingReadiness]=useState(false);
+  useEffect(()=>{
+    if(!createdService||!token)return;
+    let current=true;setCheckingReadiness(true);setReadiness(null);
+    getServiceReadiness(token,createdService.id).then(response=>{
+      const value=Array.isArray(response.data?.data)?response.data.data[0]:null;
+      if(!value||!Array.isArray(value.uploadedDocumentTypes)||!Array.isArray(value.verifiedDocumentTypes))throw new Error("Invalid document checklist");
+      if(current)setReadiness(value);
+    }).catch(()=>{if(current)setApiError("We could not check your saved documents. Close and resume this draft to retry; your progress is saved.");})
+      .finally(()=>{if(current)setCheckingReadiness(false);});
+    return ()=>{current=false;};
+  },[createdService,token]);
 
   // UI / ERROR STATE
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -253,6 +275,7 @@ export default function AddServiceModal({
 
   // CREATE SERVICE
   const handleServiceContinue = async () => {
+    if(isSubmitting)return;
     setApiError(null);
 
     if (!validateServiceInformation()) {
@@ -265,7 +288,7 @@ export default function AddServiceModal({
     }
 
     // Final guard – category already taken
-    if (takenCategoryIds.has(selectedCategory.id)) {
+    if (!createdService && takenCategoryIds.has(selectedCategory.id)) {
       setApiError(
         "You already have a service in this category. Resume the existing one instead of creating a new one."
       );
@@ -287,7 +310,7 @@ export default function AddServiceModal({
         pricingUnit,
       };
 
-      const response = await createService(token, payload);
+      const response = createdService?await editProviderService(token,createdService.id,payload):await createService(token, payload);
 
       if (!response.data.success) {
         setApiError(
@@ -693,16 +716,18 @@ export default function AddServiceModal({
                         .toLowerCase()
                         .replace(/\b\w/g, (char) => char.toUpperCase())}
                     </p>
-                    <p className="mt-1 text-[11px] text-gray-400">Required</p>
+                    <p className="mt-1 text-[11px] text-gray-400">{checkingReadiness?"Checking saved documents…":readiness?.verifiedDocumentTypes.includes(documentType)?"Approved document reused — no upload needed":readiness?.uploadedDocumentTypes.includes(documentType)?"Saved document awaiting verification — no upload needed":"Outstanding required document"}</p>
                   </div>
                   <label className="cursor-pointer rounded-md border border-gray-300 px-3 py-1.5 text-[11px] font-medium text-[#020B2D] transition hover:bg-gray-50">
-                    {uploadedDocs[documentType]?.status === "uploading"
+                    {readiness?.uploadedDocumentTypes.includes(documentType)?"✓ Saved evidence":uploadedDocs[documentType]?.status === "uploading"
                       ? "Uploading..."
                       : uploadedDocs[documentType]?.status === "done"
                         ? "✓ Uploaded"
                         : "Choose file"}
                     <input
                       type="file"
+                      disabled={checkingReadiness||Boolean(readiness?.uploadedDocumentTypes.includes(documentType))}
+                      accept="application/pdf,image/jpeg,image/png"
                       className="hidden"
                       onChange={(e) =>
                         handleFileSelect(
@@ -738,76 +763,7 @@ export default function AddServiceModal({
   // =====================================================
   // STEP 4 — REFEREES
   // =====================================================
-  const renderRefereesStep = () => {
-    const requiredReferees =
-      selectedCategory?.requiredNumberOfReferees ?? 0;
-
-    return (
-      <>
-        <div className="mb-5">
-          <h3 className="text-sm font-semibold text-[#020B2D]">
-            Add referee information
-          </h3>
-          <p className="mt-1 text-xs leading-5 text-gray-500">
-            Add the referees required for this service.
-          </p>
-        </div>
-
-        {requiredReferees === 0 ? (
-          <div className="rounded-xl border border-green-200 bg-green-50 p-5">
-            <p className="text-sm font-semibold text-green-800">
-              No referees required
-            </p>
-            <p className="mt-1 text-xs leading-5 text-green-700">
-              This service category does not require any referees. You can
-              continue to review your service.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="mb-5 rounded-lg border border-[#020B2D]/10 bg-[#020B2D]/[0.03] px-4 py-3">
-              <p className="text-xs font-medium text-[#020B2D]">
-                Referees required: {requiredReferees}
-              </p>
-              <p className="mt-1 text-[11px] leading-5 text-gray-500">
-                Please provide accurate contact information for your
-                referees.
-              </p>
-            </div>
-
-            {/* Temporary referee UI */}
-            {Array.from({ length: requiredReferees }, (_, index) => (
-              <div
-                key={index}
-                className="mb-4 rounded-xl border border-gray-200 p-4"
-              >
-                <p className="mb-4 text-xs font-semibold text-[#020B2D]">
-                  Referee {index + 1}
-                </p>
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Full name"
-                    className="h-10 w-full rounded-lg border border-gray-300 px-3 text-xs outline-none focus:border-[#020B2D]"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Phone number"
-                    className="h-10 w-full rounded-lg border border-gray-300 px-3 text-xs outline-none focus:border-[#020B2D]"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email address"
-                    className="h-10 w-full rounded-lg border border-gray-300 px-3 text-xs outline-none focus:border-[#020B2D]"
-                  />
-                </div>
-              </div>
-            ))}
-          </>
-        )}
-      </>
-    );
-  };
+  const renderRefereesStep = () => createdService&&token ? <ServiceRefereeManager token={token} serviceId={createdService.id} required={selectedCategory?.requiredNumberOfReferees??0} onCount={setRefereeCount}/> : <p>Save the service draft first.</p>;
 
   // =====================================================
   // STEP 5 — REVIEW
@@ -927,8 +883,9 @@ export default function AddServiceModal({
     }
 
     if (step === "documents") {
+      if(checkingReadiness||!readiness){setApiError("Wait for your saved document checklist before continuing. If it could not load, close and resume this draft to retry.");return;}
       const required = selectedCategory?.requiredDocumentTypes ?? [];
-      if (required.some((type) => uploadedDocs[type]?.status !== "done")) {
+      if (required.some((type) => uploadedDocs[type]?.status !== "done"&&!readiness.uploadedDocumentTypes.includes(type))) {
         setApiError("Upload the required credential before continuing.");
         return;
       }
@@ -937,6 +894,7 @@ export default function AddServiceModal({
     }
 
     if (step === "referees") {
+      if(refereeCount===null||refereeCount<(selectedCategory?.requiredNumberOfReferees??0)){setApiError("Save the outstanding referees before continuing. Existing approved referees are reused.");return;}
       setStep("review");
       return;
     }

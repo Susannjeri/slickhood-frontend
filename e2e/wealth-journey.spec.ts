@@ -24,13 +24,13 @@ test("add wealth preserves category codes and failed form, then creates and edit
  fail=false;await page.getByRole("button",{name:"Add asset",exact:true}).click();await expect(page.getByText("Treasury savings",{exact:true})).toBeVisible();
  await page.getByRole("button",{name:"Edit",exact:true}).click();await expect(page.getByLabel("Currency",{exact:true})).toBeDisabled();await page.getByLabel("Name",{exact:true}).fill("Treasury reserve");await page.getByRole("button",{name:"Save asset",exact:true}).click();await expect.poll(()=>edited).toMatchObject({name:"Treasury reserve",assetType:"GOVERNMENT_SECURITY"});
 });
-test("income and debt history is visible and repayments update the existing debt",async({context,page})=>{
+test("income and debt history is visible and repayments update the existing debt",async({context,page},testInfo)=>{
  await authenticated(context,page,{title:"Landlord",permissions});await setup(page,[baseAsset]);let update:unknown;
  await page.route("**/wealth/assets/11/ledger",r=>r.fulfill({json:envelope({valuations:[{id:1,amount:100000,valuationDate:"2026-01-01",source:"STATEMENT"}],cashFlows:[{id:2,flowType:"INCOME",category:"INTEREST",amount:500,entryDate:"2026-01-01"}],liabilities:[{id:3,lender:"Test Bank",currency:"KES",originalPrincipal:20000,outstandingPrincipal:10000,monthlyPayment:1000,maturityDate:"2027-01-01"}],obligations:[],documents:[]})}));
  await page.route("**/wealth/liabilities/3/balance",r=>{update=r.request().postDataJSON();return r.fulfill({json:envelope({})});});
  await page.goto("/dashboard/wealth");await page.getByRole("tab",{name:"Income & debt"}).click();
  await expect(page.getByText("Valuation history",{exact:true})).toBeVisible();await expect(page.getByText("INTEREST · 2026-01-01")).toBeVisible();
- await page.screenshot({path:"D:/SlickHood-Codex/operations/wealth-finance-preview-20260907.png",fullPage:true});
+ await page.screenshot({path:testInfo.outputPath("wealth-finance-preview.png"),fullPage:true});
  await page.getByLabel("Outstanding balance for Test Bank").fill("8000");await page.getByRole("button",{name:"Update balance",exact:true}).click();await expect.poll(()=>update).toEqual({outstandingPrincipal:8000,monthlyPayment:1000,maturityDate:"2027-01-01"});
 });
 test("vault submits encoded document category and shows server failures without discarding file",async({context,page})=>{

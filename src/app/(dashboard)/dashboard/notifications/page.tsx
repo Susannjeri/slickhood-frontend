@@ -532,7 +532,8 @@ function DetailCard({
 
 export default function NotificationsPage() {
   const permissions = useAuthStore(state => state.permissions);
-  const canMonitorDelivery = permissions.includes("view_notifications");
+  const roleTitle = useAuthStore(state => state.activeRole?.title);
+  const canMonitorDelivery = roleTitle === "Superadmin" && permissions.includes("view_notifications");
   const [view, setView] = useState<"mine" | "delivery">("mine");
 
   return <div className="space-y-4">

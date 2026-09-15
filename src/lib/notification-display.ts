@@ -24,6 +24,10 @@ const FRIENDLY_NOTIFICATION_TITLES: Record<string, string> = {
   PAYMENT_RECEIVED: "Payment received",
   PARTIAL_PAYMENT_RECEIVED: "Partial payment received",
   INVITE_RECEIVED: "New invitation",
+  SOKO_ORDER_STATUS: "Order update",
+  SOKO_RIDER_STATUS: "Rider status updated",
+  SOKO_RIDER_VERIFICATION: "Rider verification update",
+  SOKO_RIDER_REVIEW_REQUIRED: "Rider review required",
 };
 
 /** Converts internal event codes into short, customer-facing alert titles. */
@@ -64,7 +68,7 @@ export function notificationText(message: string): string {
 // stored messages into an open redirect/phishing link.
 export function notificationActionUrl(message: string, applicationOrigin: string): string | undefined {
   const text = notificationText(message);
-  const candidate = text.match(/https?:\/\/[^\s<>"']+|\/(?:dashboard|lease)\/[^\s<>"']*/i)?.[0]?.replace(/[),.;]+$/, "");
+  const candidate = text.match(/https?:\/\/[^\s<>"']+|\/(?:dashboard|lease)(?:\/|\?)[^\s<>"']*/i)?.[0]?.replace(/[),.;]+$/, "");
   if (!candidate) return undefined;
   try {
     const url = new URL(candidate, applicationOrigin);
@@ -72,6 +76,7 @@ export function notificationActionUrl(message: string, applicationOrigin: string
     const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost";
     if ((url.protocol !== "https:" && !(loopback && url.protocol === "http:"))
         || url.origin !== allowedOrigin) return undefined;
+    if (!(url.pathname === "/dashboard" || /^\/dashboard\/[A-Za-z0-9_/-]+$/.test(url.pathname) || url.pathname === "/lease/onboard")) return undefined;
     return url.toString();
   } catch {
     return undefined;

@@ -404,7 +404,14 @@ export default function AppSidebar() {
                                           "data-[active=true]:bg-[#FF4B12]/10 data-[active=true]:text-[#FF4B12] data-[active=true]:font-bold data-[active=true]:border-l-2 data-[active=true]:border-[#FF4B12]"
                                         )}
                                       >
-                                        <Link href={subLink.href || '#'}>{subLink.label}</Link>
+                                        <Link href={subLink.href || '#'} onNavigate={event => {
+                                          const target = new URL(subLink.href || '#', window.location.href);
+                                          if (target.pathname === window.location.pathname && target.search === window.location.search && target.hash.startsWith('#wealth-')) {
+                                            event.preventDefault();
+                                            if (window.location.hash !== target.hash) window.history.pushState(null, '', target.hash);
+                                            window.dispatchEvent(new Event('hashchange'));
+                                          }
+                                        }}>{subLink.label}</Link>
                                       </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
                                   </Can>
