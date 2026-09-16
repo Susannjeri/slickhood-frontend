@@ -17,7 +17,7 @@ import { apiErrorMessage } from "@/lib/api-error";
 import { SubscriberRecord, getSubscribers, updateSubscriberAutoRenew } from "@/services/subscription.service";
 import { useAuthStore } from "@/store/authStore";
 
-const products = ["LANDLORD", "ESTATE_MANAGEMENT", "PROPERTY_SALES", "MY_WEALTH", "SERVICES", "SOKO", "AFFILIATE", "GATE_MANAGEMENT_ADDON", "LISTING_ADDON", "PORTFOLIO_MANAGEMENT_ADDON"];
+const products = ["LANDLORD", "ESTATE_MANAGEMENT", "PROPERTY_SALES", "MY_WEALTH", "SERVICES", "SOKO", "GATE_MANAGEMENT_ADDON", "LISTING_ADDON", "PORTFOLIO_MANAGEMENT_ADDON"];
 const statuses = ["PENDING", "ACTIVE", "EXPIRED", "SUSPENDED", "CANCELLED"];
 const label = (value?: string) => value?.toLowerCase().replaceAll("_", " ").replace(/\b\w/g, char => char.toUpperCase()) ?? "Not set";
 const date = (value?: string) => value ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(value)) : "Open-ended";

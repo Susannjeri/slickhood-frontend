@@ -73,6 +73,10 @@ export default function BusinessAreaPlans() {
       return;
     }
     if (activeRole?.title !== selectedRole.title) setActiveRole(selectedRole);
+    if (area.id === "affiliate") {
+      router.replace(area.workspaceHref);
+      return;
+    }
     setLoading(true);
     try {
       const [catalogResponse, policyResponse, currentResponse] = await Promise.all([
@@ -89,7 +93,7 @@ export default function BusinessAreaPlans() {
     } finally {
       setLoading(false);
     }
-  }, [token, area, selectedRole, subscriptionRole, activeRole?.title, setActiveRole]);
+  }, [token, area, selectedRole, subscriptionRole, activeRole?.title, setActiveRole, router]);
 
   useEffect(() => { void load(); }, [load]);
 

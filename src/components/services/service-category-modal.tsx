@@ -11,6 +11,7 @@ interface ServiceCategory {
     description: string;
     requiredDocumentTypes: string[];
     requiredNumberOfReferees?: number;
+    version?: number;
 }
 
 interface ServiceCategoryModalProps {
@@ -95,15 +96,19 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
                 requiredDocumentTypes: selectedDocuments,
                 requiredNumberOfReferees,
             };
+            if (isEditMode && typeof category?.version !== "number") {
+                setError("This category is missing its saved version. Close and reload the category list before editing.");
+                return;
+            }
             const response = isEditMode && category?.id
-                ? await updateServiceCategory(token, category.id, payload)
+                ? await updateServiceCategory(token, category.id, { ...payload, version: category.version! })
                 : await createServiceCategory(token, payload);
 
             onSuccess(response.data.data);
             onClose();
         } catch (err) {
             console.error("Failed to save service category:", err);
-            setError("Something went wrong. Please try again.");
+            setError("The category could not be saved. Another administrator may have changed it; close this form, reload the list and try again.");
         } finally {
             setSubmitting(false);
         }

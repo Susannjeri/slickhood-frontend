@@ -67,6 +67,14 @@ export async function resolveOnboardingContinuation(
       message: "Your buyer workspace is ready. Review the invited property and its Letter of Offer.",
     };
   }
+  if (normalizedRole === "affiliate") {
+    return {
+      complete: true,
+      destination: "/dashboard/affiliate",
+      areaTitle: "Affiliate Programme",
+      message: "Your free affiliate application is ready for Superadmin review. No subscription is required.",
+    };
+  }
 
   const selectedArea = selectedBusinessAreaId
     ? businessAreas.find(item => item.id === selectedBusinessAreaId && item.roleTitles.includes(normalizedRole))

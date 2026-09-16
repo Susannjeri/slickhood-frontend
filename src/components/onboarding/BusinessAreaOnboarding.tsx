@@ -113,6 +113,9 @@ export default function BusinessAreaOnboarding({ registrationMode = false }: { r
       if (kycRequired) {
         toast.info("This business area needs additional verification. Let’s complete it securely.");
         router.push("/kyc");
+      } else if (area.id === "affiliate") {
+        toast.success("Affiliate application submitted for Superadmin approval.");
+        router.push(area.workspaceHref);
       } else {
         toast.success(`${area.title} was added to your account.`);
         router.push(`/business-areas/plans?area=${area.id}`);
@@ -138,9 +141,9 @@ export default function BusinessAreaOnboarding({ registrationMode = false }: { r
       return <article key={area.id} className="flex min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-orange-300 hover:shadow-lg sm:rounded-[24px] sm:p-5 lg:p-6">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#ff4b1f] text-white sm:h-12 sm:w-12 sm:rounded-2xl"><Icon className="h-6 w-6" /></div><p className="mt-4 break-words text-[11px] font-bold uppercase tracking-[0.14em] text-[#ff4b1f] sm:mt-5 sm:text-xs">{area.eyebrow}</p><h2 className="mt-1.5 break-words text-xl font-bold leading-tight sm:text-2xl">{area.title}</h2><p className="mt-2 text-sm leading-6 text-slate-500">{area.description}</p>
         <ul className="mt-4 space-y-2 text-sm text-slate-600 sm:mt-5">{area.highlights.map(item => <li key={item} className="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" /><span className="min-w-0 break-words">{item}</span></li>)}</ul>
-        <button type="button" disabled={!available || addingArea !== null || Boolean(loadError)} onClick={() => void chooseArea(area)} className="mt-5 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#071744] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#ff4b1f] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-6">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : !registrationMode && !ownedRole && !isSuperadmin ? <PlusCircle className="h-4 w-4" /> : null}{registrationMode ? "Choose this area" : isSuperadmin ? "Open area" : ownedRole ? "Open & view plans" : "Add business area"}{!busy && <ArrowRight className="h-4 w-4 shrink-0" />}</button>
+        <button type="button" disabled={!available || addingArea !== null || Boolean(loadError)} onClick={() => void chooseArea(area)} className="mt-5 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#071744] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#ff4b1f] disabled:cursor-not-allowed disabled:opacity-50 sm:mt-6">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : !registrationMode && !ownedRole && !isSuperadmin ? <PlusCircle className="h-4 w-4" /> : null}{registrationMode ? "Choose this area" : isSuperadmin ? "Open area" : ownedRole ? area.id === "affiliate" ? "Open programme" : "Open & view plans" : area.id === "affiliate" ? "Apply to join" : "Add business area"}{!busy && <ArrowRight className="h-4 w-4 shrink-0" />}</button>
       </article>;
     })}</div>
-    {!registrationMode && <p className="mx-auto mt-8 max-w-3xl text-center text-sm text-slate-500">Adding an area never bypasses verification. If it introduces new KYC evidence, SlickHood securely pauses operational access until that evidence is reviewed.</p>}
+    {!registrationMode && <p className="mx-auto mt-8 max-w-3xl text-center text-sm text-slate-500">Adding an area never bypasses verification. Affiliate membership has no subscription fee, but referral and payout access starts only after Superadmin approval.</p>}
   </div></Wrapper>;
 }

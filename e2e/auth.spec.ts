@@ -527,6 +527,7 @@ test("a valid-looking stale cookie cannot make the sign-in page unreachable", as
 
 test("the browser session endpoint rejects malformed tokens", async ({ request }) => {
   const response = await request.post("/browser-session/set-cookie", {
+    headers: { "x-slickhood-csrf": "browser-session-v1" },
     data: { token: "not-a-jwt", refreshToken: "long-but-invalid-refresh-token" },
   });
   expect(response.status()).toBe(400);
@@ -543,6 +544,7 @@ test("a large multi-role token survives the secure cookie handoff", async ({ pag
   expect(jwt.length).toBeGreaterThan(4_096);
 
   const response = await page.request.post("/browser-session/set-cookie", {
+    headers: { "x-slickhood-csrf": "browser-session-v1" },
     data: { token: jwt, refreshToken: "refresh-token-longer-than-sixteen-characters" },
   });
   expect(response.status()).toBe(200);
@@ -574,9 +576,32 @@ test("a large multi-role token survives the secure cookie handoff", async ({ pag
   const protectedPage = await page.request.get("/continue-setup", { maxRedirects: 0 });
   expect(protectedPage.status()).toBe(200);
 
-  await page.request.post("/browser-session/clear-cookie");
+  await page.request.post("/browser-session/clear-cookie", {
+    headers: { "Content-Type": "application/json", "x-slickhood-csrf": "browser-session-v1" },
+    data: {},
+  });
   const cleared = await context.cookies();
   expect(cleared.some(cookie => cookie.name === "token" || cookie.name === "tokenChunks" || /^token\.\d+$/.test(cookie.name))).toBe(false);
+});
+
+test("browser session cookie writes reject hostile origins and non-JSON requests", async ({ request }) => {
+  const hostile = await request.post("/browser-session/set-cookie", {
+    headers: { Origin: "https://attacker.example", "x-slickhood-csrf": "browser-session-v1" },
+    data: { token: testToken([{ title: "Landlord", permissions: [] }]), refreshToken: "refresh-token-longer-than-sixteen-characters" },
+  });
+  expect(hostile.status()).toBe(403);
+
+  const formPost = await request.post("/browser-session/set-cookie", {
+    headers: { "Content-Type": "application/x-www-form-urlencoded", "x-slickhood-csrf": "browser-session-v1" },
+    data: "token=unsafe",
+  });
+  expect(formPost.status()).toBe(415);
+
+  const missingCsrf = await request.post("/browser-session/clear-cookie", {
+    headers: { "Content-Type": "application/json" },
+    data: {},
+  });
+  expect(missingCsrf.status()).toBe(403);
 });
 
 test("password reset verifies ownership and enforces the registration password policy", async ({ page }) => {

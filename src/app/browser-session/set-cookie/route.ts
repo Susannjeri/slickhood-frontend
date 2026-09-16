@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { accessTokenMaxAge } from "@/lib/session-token";
 import { writeAccessTokenCookies } from "@/lib/access-token-cookie";
+import { rejectUnsafeBrowserSessionMutation } from "@/lib/browser-session-security";
 
 export async function POST(req: Request) {
+  const rejected = rejectUnsafeBrowserSessionMutation(req);
+  if (rejected) return NextResponse.json({ success: false, description: rejected.description }, { status: rejected.status });
   const body = await req.json().catch(() => null);
   const token = typeof body?.token === "string" ? body.token : "";
   const refreshToken = typeof body?.refreshToken === "string" ? body.refreshToken : "";

@@ -584,7 +584,7 @@ export const sidebarLinks: SidebarLink[] = [
     href: "/dashboard/subscriptions",
     protected: false,
     permissions: [],
-    roles: ["Landlord", "EstateManager", "SalesAgent", "ServiceProvider", "Affiliate", "AssetPortfolioManager", "Superadmin"],
+    roles: ["Landlord", "EstateManager", "SalesAgent", "ServiceProvider", "AssetPortfolioManager", "Superadmin"],
     description: "Manage your active subscription, renewal and billing history.",
   },
   {
@@ -593,7 +593,7 @@ export const sidebarLinks: SidebarLink[] = [
     href: "/dashboard/upgrade-plan",
     protected: false,
     permissions: [],
-    roles: ["Landlord", "EstateManager", "SalesAgent", "ServiceProvider", "Affiliate", "AssetPortfolioManager"],
+    roles: ["Landlord", "EstateManager", "SalesAgent", "ServiceProvider", "AssetPortfolioManager"],
     description: "Explore plan options and upgrade your subscription.",
   },
   {

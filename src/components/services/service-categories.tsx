@@ -13,6 +13,7 @@ interface ServiceCategory {
     requiredDocumentTypes: string[];
     requiredNumberOfReferees?: number;
     active?: boolean;
+    version?: number;
 }
 
 const DESCRIPTION_TRUNCATE_LENGTH = 60;
@@ -90,9 +91,9 @@ export default function ServiceCategories() {
 
     const handleDelete = async (category: ServiceCategory) => {
         setOpenMenuId(null);
-        if (!token || !category.id || !window.confirm(`Remove “${category.name}” from active service categories? Existing service records will be preserved.`)) return;
+        if (!token || !category.id || typeof category.version !== "number" || !window.confirm(`Remove “${category.name}” from active service categories? Existing service records will be preserved.`)) return;
         try {
-            await deleteServiceCategory(token, category.id);
+            await deleteServiceCategory(token, category.id, category.version);
             await fetchCategories(page);
         } catch {
             setError("Failed to remove service category.");
@@ -219,7 +220,7 @@ export default function ServiceCategories() {
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => category.active===false ? void reactivateServiceCategory(token!,category.id!).then(()=>fetchCategories(page)).catch(()=>setError("Category could not be reactivated.")) : void handleDelete(category)}
+                                                        onClick={() => category.active===false && typeof category.version === "number" ? void reactivateServiceCategory(token!,category.id!,category.version).then(()=>fetchCategories(page)).catch(()=>setError("Category could not be reactivated. Reload the list in case another administrator changed it.")) : void handleDelete(category)}
                                                         className="block w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-gray-50"
                                                     >
                                                         {category.active===false?"Reactivate":"Deactivate"}

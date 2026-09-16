@@ -30,14 +30,14 @@ export const createServiceCategory = (
 export const updateServiceCategory = (
     token: string,
     categoryId: number,
-    payload: { name: string; description: string; requiredDocumentTypes: string[]; requiredNumberOfReferees?: number }
+    payload: { name: string; description: string; requiredDocumentTypes: string[]; requiredNumberOfReferees?: number; version: number }
 ) => API.put(`/sp/admin/category/${categoryId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
 
-export const deleteServiceCategory = (token: string, categoryId: number) =>
-    API.delete(`/sp/admin/category/${categoryId}`, { headers: { Authorization: `Bearer ${token}` } });
+export const deleteServiceCategory = (token: string, categoryId: number, version: number) =>
+    API.delete(`/sp/admin/category/${categoryId}`, { params: { version }, headers: { Authorization: `Bearer ${token}` } });
 
 export const getAdminServiceCategories = (token: string, params?: {page?:number;size?:number;active?:boolean}) => API.get("/sp/admin/category/list",{params:{page:0,size:10,sort:"name,asc",...params},headers:{Authorization:`Bearer ${token}`}});
-export const reactivateServiceCategory = (token:string,id:number) => API.put(`/sp/admin/category/${id}/reactivate`,{}, {headers:{Authorization:`Bearer ${token}`}});
+export const reactivateServiceCategory = (token:string,id:number,version:number) => API.put(`/sp/admin/category/${id}/reactivate`,{}, {params:{version},headers:{Authorization:`Bearer ${token}`}});
 export type AdminServiceDocument = {id:number;documentType:string;downloadUrl?:string;expiryDate?:string;verificationStatus:string};
 export const getAdminServiceDocuments = (token:string,id:number,page=0) => API.get(`/sp/admin/document/${id}/list`,{params:{page,size:20},headers:{Authorization:`Bearer ${token}`}});
 export const verifyAdminServiceDocument = (token:string,id:number,status:string) => API.put(`/sp/admin/document/${id}/verify`,{}, {params:{status},headers:{Authorization:`Bearer ${token}`}});

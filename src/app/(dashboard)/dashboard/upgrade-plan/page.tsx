@@ -1,7 +1,7 @@
 import UpgradePlan from "@/components/subscriptions/upgradeplan";
 import RequireRole from "@/components/auth/RequireRole";
 
-const subscriptionOwners = ["Landlord", "EstateManager", "SalesAgent", "ServiceProvider", "Affiliate", "AssetPortfolioManager", "Superadmin"];
+const subscriptionOwners = ["Landlord", "EstateManager", "SalesAgent", "ServiceProvider", "AssetPortfolioManager", "Superadmin"];
 
 
 export default function UpgradePlanPage() {

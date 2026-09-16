@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { decodeServerToken } from "@/lib/actions";
 import { useAuthStore } from "@/store/authStore";
+import { browserSessionMutationInit } from "@/lib/browser-session-security";
 
 export default function SessionHydrator() {
   useEffect(() => {
@@ -16,7 +17,7 @@ export default function SessionHydrator() {
       try {
         let response = await fetch("/browser-session/get-token", { cache: "no-store" });
         if (!response.ok) {
-          const refreshed = await fetch("/browser-session/refresh", { method: "POST", cache: "no-store" });
+          const refreshed = await fetch("/browser-session/refresh", browserSessionMutationInit());
           if (!refreshed.ok || cancelled) return;
           response = await fetch("/browser-session/get-token", { cache: "no-store" });
         }

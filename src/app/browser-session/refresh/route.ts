@@ -2,8 +2,11 @@ import axios from "axios";
 import { NextRequest, NextResponse } from "next/server";
 import { accessTokenMaxAge } from "@/lib/session-token";
 import { clearAccessTokenCookies, writeAccessTokenCookies } from "@/lib/access-token-cookie";
+import { rejectUnsafeBrowserSessionMutation } from "@/lib/browser-session-security";
 
 export async function POST(req: NextRequest) {
+  const rejected = rejectUnsafeBrowserSessionMutation(req);
+  if (rejected) return NextResponse.json({ success: false, description: rejected.description }, { status: rejected.status });
   const refreshToken = req.cookies.get("refreshToken")?.value;
   if (!refreshToken) {
     return NextResponse.json({ success: false, description: "No refresh token found", code: "i0000", data: null }, { status: 401 });

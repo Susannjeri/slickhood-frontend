@@ -30,16 +30,29 @@ test("affiliate sees a safe ledger and confirms a reserved payout",async({contex
  await expect.poll(()=>payoutRequests).toBe(1);
 });
 
+test("new affiliate sees approval status without subscription or financial controls",async({context,page})=>{
+ await authenticated(context,page,{title:"Affiliate",permissions:["view_account","view_invite_list"]});
+ let accountListRequests=0;
+ await page.route("**/account/list**",route=>{accountListRequests+=1;return route.fulfill({json:envelope([])});});
+ await page.route("**/affiliate/dashboard",route=>route.fulfill({json:envelope({profile:{referralCode:"SH-PENDING12345678",status:"PENDING_APPROVAL",commissionRate:10,minimumPayout:1000,currency:"KES",appliedAt:"2026-09-16T08:00:00Z"},totalReferrals:0,conversions:0,conversionRatePercent:0,availableBalance:0,pendingEarnings:0,lifetimeEarnings:0,pendingPayouts:0,historyLimited:false,referrals:[],commissions:[],payouts:[]})}));
+ await page.goto("/dashboard/affiliate");
+ await expect(page.getByText("Your affiliate application is under review",{exact:true})).toBeVisible();
+ await expect(page.getByText(/does not require a subscription/i)).toBeVisible();
+ await expect(page.getByRole("button",{name:"Request payout"})).toHaveCount(0);
+ await expect(page.getByText("SH-PENDING12345678")).toHaveCount(0);
+ expect(accountListRequests).toBe(0);
+});
+
 test("system owner records payout decisions through an auditable dialog",async({context,page})=>{
  await authenticated(context,page,{title:"Super Admin",permissions:[]});
  let decision:unknown;
  await page.route("**/affiliate/admin/profiles?**",route=>route.fulfill({json:{...envelope([]),totalPages:0,totalElements:0,size:20}}));
- await page.route("**/affiliate/admin/payout-queue?**",route=>route.fulfill({json:{...envelope([{payout:{id:51,payoutNumber:"AFP-51",affiliateUserId:7,amount:2200,currency:"KES",status:"PROCESSING",requestedAt:"2026-08-01T00:00:00Z",payoutAccountName:"Affiliate M-Pesa",payoutChannel:"MPESA"},affiliateName:"Fixture Affiliate",affiliateEmail:"affiliate@example.test"}]),totalPages:1,totalElements:1,size:20}}));
+ await page.route("**/affiliate/admin/payout-queue?**",route=>route.fulfill({json:{...envelope([{payout:{id:51,payoutNumber:"AFP-51",affiliateUserId:7,paymentAccountId:12,amount:2200,currency:"KES",status:"PROCESSING",requestedAt:"2026-08-01T00:00:00Z",payoutAccountName:"Affiliate M-Pesa",payoutChannel:"MPESA",version:4},affiliateName:"Fixture Affiliate",affiliateEmail:"affiliate@example.test"}]),totalPages:1,totalElements:1,size:20}}));
  await page.route("**/affiliate/admin/payouts/51",route=>{decision=route.request().postDataJSON();return route.fulfill({json:envelope({})});});
  await page.goto("/dashboard/affiliate-management");
  await expect(page.getByText("Affiliate M-Pesa")).toBeVisible();
  await page.getByRole("button",{name:"Mark paid"}).click();
  await page.getByLabel("Payment reference").fill("MPESA-SETTLED-51");
  await page.getByRole("button",{name:"Confirm paid"}).click();
- await expect.poll(()=>decision).toMatchObject({status:"PAID",paymentReference:"MPESA-SETTLED-51"});
+ await expect.poll(()=>decision).toMatchObject({status:"PAID",paymentReference:"MPESA-SETTLED-51",expectedAmount:2200,expectedCurrency:"KES",expectedVersion:4});
 });

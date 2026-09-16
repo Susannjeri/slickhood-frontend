@@ -58,13 +58,15 @@ export default function AffiliatePage() {
     setBusy(true);
     setFailed(false);
     try {
-      const [d, a] = await Promise.all([
-        affiliateDashboard(),
-        listAccounts(token, { byLandlord: true, size: 100 }),
-      ]);
+      const d = await affiliateDashboard();
       const dashboard=envelopeItem<AffiliateDashboard|undefined>(d,undefined);
       setData(dashboard?{...dashboard,referrals:Array.isArray(dashboard.referrals)?dashboard.referrals:[],commissions:Array.isArray(dashboard.commissions)?dashboard.commissions:[],payouts:Array.isArray(dashboard.payouts)?dashboard.payouts:[]}:undefined);
-      setAccounts(envelopePageList<Account>(a));
+      if (dashboard?.profile.status === "ACTIVE") {
+        const a = await listAccounts(token, { byLandlord: true, size: 100 });
+        setAccounts(envelopePageList<Account>(a));
+      } else {
+        setAccounts([]);
+      }
     } catch (e:unknown) {
       setFailed(true);
       toast.error(apiErrorMessage(e, "Affiliate workspace could not be loaded."));
@@ -122,6 +124,13 @@ export default function AffiliatePage() {
         Loading affiliate workspace…
       </div>
     );
+  if (data.profile.status !== "ACTIVE") {
+    const pending = data.profile.status === "PENDING_APPROVAL";
+    const rejected = data.profile.status === "REJECTED";
+    return <main className="flex min-h-[65vh] items-center justify-center px-4 py-10">
+      <Card className="w-full max-w-2xl"><CardHeader><Badge className="w-fit" variant="secondary">{data.profile.status.replaceAll("_"," ")}</Badge><CardTitle>{pending?"Your affiliate application is under review":rejected?"Your affiliate application was not approved":"Affiliate programme access is unavailable"}</CardTitle><CardDescription>{pending?"Affiliate membership is free and does not require a subscription. Superadmin must approve your application before referral links, commissions and payouts are activated.":rejected?"Review the decision below. You may contact Help Desk if your circumstances have changed.":"Referral and payout operations are locked while this programme status applies."}</CardDescription></CardHeader><CardContent className="space-y-3"><p className="text-sm">Applied: {date(data.profile.appliedAt)}</p>{data.profile.reviewedAt&&<p className="text-sm">Reviewed: {date(data.profile.reviewedAt)}</p>}{data.profile.reviewNotes&&<div className="rounded-xl border bg-slate-50 p-4 text-sm"><b>Review note</b><p className="mt-1">{data.profile.reviewNotes}</p></div>}<Button variant="outline" onClick={()=>void load()} disabled={busy}><RefreshCw className={`mr-2 h-4 w-4 ${busy?"animate-spin":""}`}/>Refresh status</Button></CardContent></Card>
+    </main>;
+  }
   return (
     <div className="space-y-6 px-3 py-6">
       <section className="rounded-3xl bg-gradient-to-br from-[#162B63] to-[#07163A] p-5 text-white sm:p-7">

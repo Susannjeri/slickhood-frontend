@@ -1,5 +1,6 @@
 // src/lib/api.ts
 import axios from "axios"
+import { browserSessionMutationInit } from "@/lib/browser-session-security";
 import { Channel } from "@/types";
 import { useAuthStore } from "@/store/authStore";
 
@@ -33,11 +34,7 @@ async function refreshedAccessToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
-      const refreshed = await fetch("/browser-session/refresh", {
-        method: "POST",
-        credentials: "same-origin",
-        cache: "no-store",
-      });
+      const refreshed = await fetch("/browser-session/refresh", browserSessionMutationInit());
       if (!refreshed.ok) return null;
       const tokenResponse = await fetch("/browser-session/get-token", {
         method: "GET",
@@ -224,7 +221,7 @@ API.interceptors.response.use(
     const token = await refreshedAccessToken();
     if (!token) {
       useAuthStore.getState().setToken(null);
-      await fetch("/browser-session/clear-cookie", { method: "POST", credentials: "same-origin" }).catch(() => undefined);
+      await fetch("/browser-session/clear-cookie", browserSessionMutationInit()).catch(() => undefined);
       window.location.assign("/login?reason=session-ended");
       return Promise.reject(error);
     }
@@ -1798,14 +1795,11 @@ export const listLeaseDocuments = (token:string, params: {unitId?: number; page?
 export const downloadLeaseDocumentPdf = (id:number,token:string) => API.get(`/lease/documents/${id}/pdf`,{responseType:"blob",headers:{Authorization:`Bearer ${token}`}});
 
 /* local APIs */  
-export const setCookie = (data: { token: string, refreshToken: string }) =>  fetch ("/browser-session/set-cookie", {
-  method:"POST",
-  headers: {"Content-Type": "application/json"},
-  body: JSON.stringify(data)
-});
+export const setCookie = (data: { token: string, refreshToken: string }) =>
+  fetch("/browser-session/set-cookie", browserSessionMutationInit(data));
 
-export const clearCookie = () => fetch("/browser-session/clear-cookie", { method: "POST" });
+export const clearCookie = () => fetch("/browser-session/clear-cookie", browserSessionMutationInit());
 
-export const setrefreshToken = () => fetch("/browser-session/refresh", {method: "POST"} )
+export const setrefreshToken = () => fetch("/browser-session/refresh", browserSessionMutationInit())
 
 export const retrieveRefreshToken = () => fetch("/browser-session/get-token", {method: "GET"} )

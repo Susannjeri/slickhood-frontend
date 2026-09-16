@@ -24,6 +24,8 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=moderate
       - name: Static analysis
         run: |
           node --test scripts/validate-build-env.test.mjs

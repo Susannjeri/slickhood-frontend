@@ -80,7 +80,7 @@ export const businessAreas: BusinessArea[] = [
     id: "affiliate",
     title: "Affiliate Programme",
     eyebrow: "Grow SlickHood",
-    description: "Refer landlords and service providers, track qualified conversions, commissions and payouts.",
+    description: "Apply once, receive Superadmin approval, then refer customers and track qualified commissions and payouts without a subscription.",
     roleTitles: ["affiliate"],
     registrationRoleName: "Affiliate",
     subscriptionRole: "AFFILIATE",
