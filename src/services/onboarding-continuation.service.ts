@@ -41,7 +41,7 @@ export async function resolveOnboardingContinuation(
   }
 
   const kyc = await getCurrentKyc();
-  if (kyc.status !== "APPROVED" || kyc.accountStatus !== "ACTIVE") {
+  if (kyc.accountStatus !== "ACTIVE") {
     return {
       complete: false,
       destination: "/kyc",
@@ -65,6 +65,19 @@ export async function resolveOnboardingContinuation(
       destination: PROFILE_DASHBOARD_HREF,
       areaTitle: "My Property Purchase",
       message: "Your buyer workspace is ready. Review the invited property and its Letter of Offer.",
+    };
+  }
+
+  const pendingRole = normalizedRoleTitle(kyc.pendingRoleName);
+  const selectedPendingArea = selectedBusinessAreaId && pendingRole
+    ? businessAreas.find(item => item.id === selectedBusinessAreaId && item.roleTitles.includes(pendingRole))
+    : undefined;
+  if (kyc.pendingRoleId && selectedPendingArea) {
+    return {
+      complete: false,
+      destination: "/kyc",
+      areaTitle: selectedPendingArea.title,
+      message: `Complete the additional verification for ${selectedPendingArea.title}, or return to your current workspace and resume later.`,
     };
   }
   if (normalizedRole === "affiliate") {

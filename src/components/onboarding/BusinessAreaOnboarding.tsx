@@ -106,13 +106,15 @@ export default function BusinessAreaOnboarding({ registrationMode = false }: { r
       const response = await selfAssignRole(roleId, token);
       const kycRequired = Boolean(response.data.data?.[0]?.kycRequired);
       await handleTokenRefresh();
+      if (kycRequired) {
+        toast.info("This business area needs additional verification. Your current workspace remains available while you complete it.");
+        router.push("/kyc");
+        return;
+      }
       const refreshedRole = useAuthStore.getState().roles.find(role => area.roleTitles.includes(normalizedRoleTitle(role.title)));
       if (!refreshedRole) throw new Error("The new business area was assigned but the secure session could not be refreshed.");
       useAuthStore.getState().setActiveRole(refreshedRole);
-      if (kycRequired) {
-        toast.info("This business area needs additional verification. Let’s complete it securely.");
-        router.push("/kyc");
-      } else if (area.id === "affiliate") {
+      if (area.id === "affiliate") {
         toast.success("Affiliate application submitted for Superadmin approval.");
         router.push(area.workspaceHref);
       } else {

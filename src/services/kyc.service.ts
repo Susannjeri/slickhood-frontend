@@ -68,6 +68,8 @@ export interface KycCase {
   requirements: KycRequirement[];
   missingRequirementCodes: string[];
   documents: KycDocument[];
+  pendingRoleId?: number | null;
+  pendingRoleName?: string | null;
 }
 
 export interface KycAdminCase {

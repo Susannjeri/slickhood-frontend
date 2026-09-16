@@ -24,7 +24,9 @@ export default function OperationalAccessGuard({ children }: { children: ReactNo
     let cancelled = false;
     getCurrentKyc().then(kyc => {
       if (cancelled) return;
-      if (kyc.status !== "APPROVED" || kyc.accountStatus !== "ACTIVE") router.replace("/kyc");
+      // Additional-role KYC is role-scoped. The backend withholds that pending
+      // role from the JWT, while an already-approved account remains usable.
+      if (kyc.accountStatus !== "ACTIVE") router.replace("/kyc");
       else setReady(true);
     }).catch(() => { if (!cancelled) router.replace("/kyc"); });
     return () => { cancelled = true; };

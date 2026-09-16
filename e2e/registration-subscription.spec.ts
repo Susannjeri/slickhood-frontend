@@ -265,30 +265,28 @@ test("Soko free merchant access uses free activation instead of the trial endpoi
   expect(trialCalls).toBe(0);
 });
 
-test("adding a business area rechecks KYC before exposing the new workspace", async ({ context, page }) => {
+test("additional-role KYC can be exited and resumed without replacing the active role", async ({ context, page }) => {
   const landlord = { title: "Landlord", permissions: [] };
   await authenticated(context, page, landlord);
   await page.route("**/role/list", route => route.fulfill({ json: envelope([
     { roleId: 101, roleName: "Landlord", selfAssignable: true },
     { roleId: 103, roleName: "SalesAgent", selfAssignable: true },
   ]) }));
-  let assigned = false;
+  let assignmentAttempts = 0;
   await page.route("**/role/self-assign?roleId=103", route => {
-    assigned = true;
+    assignmentAttempts += 1;
     return route.fulfill({ json: envelope([{ roleId: 103, kycRequired: true }]) });
   });
-  const expandedToken = testToken([landlord, { title: "SalesAgent", permissions: [] }]);
+  const approvedToken = testToken([landlord]);
   await page.route("**/browser-session/refresh", route => route.fulfill({
     json: envelope([]),
-    headers: { "Set-Cookie": `token=${expandedToken}; Path=/; HttpOnly; SameSite=Lax` },
+    headers: { "Set-Cookie": `token=${approvedToken}; Path=/; HttpOnly; SameSite=Lax` },
   }));
-  await page.route("**/browser-session/get-token", route => {
-    const roles = assigned ? [landlord, { title: "SalesAgent", permissions: [] }] : [landlord];
-    return route.fulfill({ json: { data: { jwt: testToken(roles) } } });
-  });
+  await page.route("**/browser-session/get-token", route => route.fulfill({ json: { data: { jwt: approvedToken } } }));
   await page.route("**/kyc/current", route => route.fulfill({ json: envelope([{
-    id: 44, status: "IN_PROGRESS", accountStatus: "PENDING_KYC", consentVersion: "2026-08",
-    phoneVerified: true, requirements: [], missingRequirements: ["SALES_AUTHORITY"], documents: [],
+    id: 44, status: "IN_PROGRESS", accountStatus: "ACTIVE", consentVersion: "2026-08",
+    phoneVerified: true, requirements: [], missingRequirementCodes: ["SALES_AUTHORITY"], documents: [],
+    pendingRoleId: 103, pendingRoleName: "SalesAgent",
   }]) }));
 
   await page.goto("/business-areas");
@@ -298,12 +296,23 @@ test("adding a business area rechecks KYC before exposing the new workspace", as
   await expect(page).toHaveURL(/\/kyc$/);
   const roleState = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state);
   expect(roleState.selectedBusinessAreaId).toBe("property-sales");
-  expect(roleState.activeRole.title).toBe("SalesAgent");
+  expect(roleState.activeRole.title).toBe("Landlord");
+
+  await page.getByRole("button", { name: "Save & return to current workspace" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  const resumedState = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state);
+  expect(resumedState.selectedBusinessAreaId).toBeNull();
+  expect(resumedState.activeRole.title).toBe("Landlord");
+
+  await page.goto("/business-areas");
+  await page.locator("article").filter({ hasText: "Property Sales" })
+    .getByRole("button", { name: "Add business area" }).click();
+  await expect(page).toHaveURL(/\/kyc$/);
+  expect(assignmentAttempts).toBe(2);
 });
 
 test("an interrupted Add Business Area journey resumes KYC instead of bypassing setup", async ({ context, page }) => {
   const landlord = { title: "Landlord", permissions: [] };
-  const sales = { title: "SalesAgent", permissions: [] };
   await authenticated(context, page, landlord);
   await page.addInitScript(() => {
     const persisted = JSON.parse(localStorage.getItem("auth-storage") || "{}");
@@ -315,25 +324,19 @@ test("an interrupted Add Business Area journey resumes KYC instead of bypassing 
     { roleId: 103, roleName: "SalesAgent", selfAssignable: true },
   ]) }));
   await page.route("**/browser-session/get-token", route => route.fulfill({
-    json: { data: { jwt: testToken([landlord, sales]) } },
+    json: { data: { jwt: testToken([landlord]) } },
   }));
   await page.route("**/kyc/current", route => route.fulfill({ json: envelope([{
-    id: 45, status: "IN_PROGRESS", accountStatus: "PENDING_KYC", consentVersion: "2026-08",
-    phoneVerified: true, requirements: [], missingRequirements: ["SALES_AUTHORITY"], documents: [],
+    id: 45, status: "IN_PROGRESS", accountStatus: "ACTIVE", consentVersion: "2026-08",
+    phoneVerified: true, requirements: [], missingRequirementCodes: ["SALES_AUTHORITY"], documents: [],
+    pendingRoleId: 103, pendingRoleName: "SalesAgent",
   }]) }));
   await page.route("**/subscription/current**", route => route.fulfill({ json: envelope([]) }));
-  await page.goto("/business-areas");
-  await page.evaluate((roles) => {
-    const persisted = JSON.parse(localStorage.getItem("auth-storage") || "{}");
-    persisted.state = { ...persisted.state, roles };
-    localStorage.setItem("auth-storage", JSON.stringify(persisted));
-  }, [landlord, sales]);
-  await page.reload();
-
-  const salesCard = page.locator("article").filter({ hasText: "Property Sales" });
-  await salesCard.getByRole("button", { name: "Open & view plans" }).click();
-  await expect(page).toHaveURL(/\/continue-setup$/);
-  await expect(page.getByText(/Complete identity verification/)).toBeVisible();
+  await page.goto("/continue-setup");
+  await expect(page.getByText(/Complete the additional verification/)).toBeVisible();
+  await page.getByRole("button", { name: "Continue setup" }).click();
+  await expect(page).toHaveURL(/\/kyc$/);
+  await expect(page.getByRole("button", { name: "Save & return to current workspace" })).toBeVisible();
 });
 
 test("Superadmin cannot add, open or switch into a customer business area", async ({ context, page }) => {

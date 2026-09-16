@@ -34,6 +34,8 @@ import { resolveOnboardingContinuation } from "@/services/onboarding-continuatio
 import { updateContact, verifyContact } from "@/lib/api";
 import { MAX_KYC_FILE_LABEL, prepareKycUpload } from "@/lib/kyc-upload";
 import { invitationUrl, safeInvitationReturnTo } from "@/lib/invitation-navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { businessAreas, normalizedRoleTitle } from "@/config/businessAreas";
 
 const label = (value: string) =>
   value
@@ -154,9 +156,13 @@ const errorMessage = (error: unknown, fallback: string) => {
 
 export default function KycPage() {
   const router = useRouter();
+  const { handleTokenRefresh } = useAuth();
   const [profileRemediation, setProfileRemediation] = useState(false);
   const token = useAuthStore((state) => state.token);
   const activeRole = useAuthStore((state) => state.activeRole);
+  const roles = useAuthStore((state) => state.roles);
+  const selectedBusinessAreaId = useAuthStore((state) => state.selectedBusinessAreaId);
+  const setSelectedBusinessAreaId = useAuthStore((state) => state.setSelectedBusinessAreaId);
   const inviteToken = useAuthStore((state) => state.inviteToken);
   const setInviteToken = useAuthStore((state) => state.setInviteToken);
   const sessionReady = useAuthStore((state) => state.sessionReady);
@@ -231,6 +237,15 @@ export default function KycPage() {
     kyc?.status === "APPROVED" &&
     kyc.accountStatus === "ACTIVE" &&
     missing.size > 0;
+  const canReturnToExistingRole = Boolean(
+    kyc?.pendingRoleId && kyc.accountStatus === "ACTIVE" && roles.length > 0,
+  );
+
+  const returnToCurrentWorkspace = () => {
+    setSelectedBusinessAreaId(null);
+    toast.success("Your progress was saved. You can resume this role from Business Areas later.");
+    router.replace("/dashboard");
+  };
 
   const begin = async () => {
     if (!kyc || !consent) return;
@@ -329,7 +344,20 @@ export default function KycPage() {
       router.replace(invitationUrl(returnTo, pendingInvite));
       return;
     }
-    const next = await resolveOnboardingContinuation(token, activeRole);
+    await handleTokenRefresh();
+    const refreshed = useAuthStore.getState();
+    const selectedArea = selectedBusinessAreaId
+      ? businessAreas.find((area) => area.id === selectedBusinessAreaId)
+      : undefined;
+    const approvedRole = selectedArea
+      ? refreshed.roles.find((role) => selectedArea.roleTitles.includes(normalizedRoleTitle(role.title)))
+      : refreshed.activeRole;
+    if (approvedRole && approvedRole !== refreshed.activeRole) refreshed.setActiveRole(approvedRole);
+    const next = await resolveOnboardingContinuation(
+      refreshed.token ?? token,
+      approvedRole ?? refreshed.activeRole,
+      selectedBusinessAreaId,
+    );
     router.replace(next.destination);
   };
 
@@ -395,6 +423,8 @@ export default function KycPage() {
         text="Your documents were submitted securely. You can leave this page and return later; we will preserve your progress."
         action="Check status"
         onAction={load}
+        secondaryAction={canReturnToExistingRole ? "Return to current workspace" : undefined}
+        onSecondaryAction={canReturnToExistingRole ? returnToCurrentWorkspace : undefined}
       />
     );
 
@@ -409,13 +439,20 @@ export default function KycPage() {
     <main className="min-h-screen bg-[#F4F6FB] px-4 py-8 text-[#071744] sm:px-8">
       <Toaster position="top-center" />
       <div className="mx-auto max-w-5xl">
-        <header className="mb-6 flex items-center justify-between">
+        <header className="mb-6 flex items-center justify-between gap-4">
           <div className="text-xl font-bold">
             Slick<span className="text-[#EF4217]">Hood</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <LockKeyhole className="h-4 w-4" />
-            Secure verification
+          <div className="flex items-center gap-3">
+            {canReturnToExistingRole && (
+              <Button type="button" variant="outline" onClick={returnToCurrentWorkspace}>
+                Save &amp; return to current workspace
+              </Button>
+            )}
+            <div className="hidden items-center gap-2 text-sm text-slate-500 sm:flex">
+              <LockKeyhole className="h-4 w-4" />
+              Secure verification
+            </div>
           </div>
         </header>
         <section className="overflow-hidden rounded-[28px] border bg-white shadow-xl shadow-slate-200/60">
@@ -980,12 +1017,16 @@ function StateCard({
   text,
   action,
   onAction,
+  secondaryAction,
+  onSecondaryAction,
 }: {
   icon: "approved" | "waiting";
   title: string;
   text: string;
   action: string;
   onAction: () => void | Promise<void>;
+  secondaryAction?: string;
+  onSecondaryAction?: () => void | Promise<void>;
 }) {
   const Icon = icon === "approved" ? FileCheck2 : RefreshCw;
   return (
@@ -1007,6 +1048,11 @@ function StateCard({
         >
           {action}
         </Button>
+        {secondaryAction && onSecondaryAction && (
+          <Button className="mt-3" variant="outline" onClick={onSecondaryAction}>
+            {secondaryAction}
+          </Button>
+        )}
       </section>
     </main>
   );
