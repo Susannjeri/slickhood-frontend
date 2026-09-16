@@ -32,3 +32,16 @@ jobs:
               /tmp/slickhood-backend-release 2>/dev/null || true
             echo 'Protected pending-release backups (KB)'
             sudo du -sk /home/silverocean/backups/pending-release-* 2>/dev/null || true
+            echo 'Backend service state'
+            sudo systemctl show pms.service \
+              --property=ActiveState,SubState,Result,NRestarts,ExecMainCode,ExecMainStatus
+            echo 'Recent backend startup error classes (counts only)'
+            journal="$(sudo journalctl -u pms.service --since '30 minutes ago' --no-pager)"
+            for signature in \
+              BeanCreationException UnsatisfiedDependencyException FlywayValidateException \
+              SQLSyntaxErrorException SchemaManagementException OutOfMemoryError BindException \
+              IllegalArgumentException ApplicationContextException; do
+              count="$(printf '%s' "$journal" | grep -cF "$signature" || true)"
+              printf '%s=%s\n' "$signature" "$count"
+            done
+            unset journal
