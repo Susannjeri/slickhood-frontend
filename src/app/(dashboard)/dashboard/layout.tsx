@@ -1,6 +1,6 @@
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { Toaster } from "@/components/ui/sonner"
-import AppSidebar from "@/components/layout/Sidebar"
+import AppSidebar, { AppSidebarFallback } from "@/components/layout/Sidebar"
 import RoleSwitchOverlay from "@/components/layout/RoleSwitchOverlay"
 import { Navbar } from "@/components/layout/Navbar"
 import { BackgroundPattern } from "@/components/layout/BackgroundPattern"
@@ -11,7 +11,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <SidebarProvider>
       <div className="flex h-screen w-screen overflow-hidden">
-        <Suspense fallback={null}>
+        <Suspense fallback={<AppSidebarFallback />}>
           <AppSidebar />
         </Suspense>
 

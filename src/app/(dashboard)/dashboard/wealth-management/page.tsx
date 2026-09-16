@@ -19,6 +19,7 @@ export default function WealthManagement(){
  const [form,setForm]=useState(blank),[editing,setEditing]=useState<number>();
  const [busy,setBusy]=useState(false),[loadError,setLoadError]=useState("");
  const mutationLock=useRef(false);
+ const initialLoadStarted=useRef(false);
  const load=useCallback(async()=>{
   setBusy(true);setLoadError("");
   const [s,t]=await Promise.allSettled([wealthService.adminSummary(),wealthService.adminAssetTypes()]);
@@ -29,7 +30,13 @@ export default function WealthManagement(){
   else errors.push("The catalogue could not be refreshed. Records shown may be out of date.");
   setLoadError(errors.join(" "));setBusy(false);
  },[]);
- useEffect(()=>{void load()},[load]);
+ useEffect(()=>{
+  // React development checks can invoke mount effects twice. Do not allow the
+  // second request to overwrite a genuine first-request failure with stale data.
+  if(initialLoadStarted.current)return;
+  initialLoadStarted.current=true;
+  void load();
+ },[load]);
  async function save(e:FormEvent){
   e.preventDefault();if(mutationLock.current||busy||loadError)return;
   mutationLock.current=true;setBusy(true);

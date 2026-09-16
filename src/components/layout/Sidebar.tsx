@@ -44,6 +44,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth";
+import { useAuthHydrated } from "@/hooks/useAuthHydrated";
 import { useApi } from "@/hooks/useApi";
 import { AlertDialogDescription } from "@radix-ui/react-alert-dialog";
 import { useAuthStore } from "@/store/authStore";
@@ -81,9 +82,23 @@ function getRoleIcon(roleName: string, className = "w-5 h-5") {
   }
 }
 
+export function AppSidebarFallback() {
+  return (
+    <aside
+      aria-busy="true"
+      className="hidden h-svh w-(--sidebar-width) shrink-0 border-r bg-white text-sidebar-foreground md:block dark:border-white/10 dark:bg-[#141130]"
+    >
+      <div className="w-full px-4 py-3">
+        <img src="/slicklogo.svg" alt="SlickHood Logo" className="h-7 w-auto" />
+      </div>
+    </aside>
+  );
+}
+
 export default function AppSidebar() {
   const { open } = useSidebar();
   const router = useRouter();
+  const authHydrated = useAuthHydrated();
 
 
   const token = useAuthStore((state) => state.token);
@@ -265,6 +280,14 @@ export default function AppSidebar() {
   };
 
   const activeRoleIndex = roles.findIndex(r => r.title === activeRole?.title);
+
+  // Persisted roles and permissions only exist in the browser. Keep the server
+  // and the browser's first render identical, then reveal governed navigation
+  // once the session store has hydrated. This prevents mobile and desktop
+  // navigation from failing because React discarded a mismatched sidebar tree.
+  if (!authHydrated) {
+    return <AppSidebarFallback />;
+  }
 
   return (
     <>

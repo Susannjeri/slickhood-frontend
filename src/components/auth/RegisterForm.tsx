@@ -410,6 +410,7 @@ export default function RegisterForm() {
                 <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 order-2 sm:order-1">
                     Already have an account?{" "}
                     <Link
+                        data-testid="registration-sign-in"
                         href={inviteToken
                             ? invitationUrl("/login", inviteToken)
                             : "/login"}

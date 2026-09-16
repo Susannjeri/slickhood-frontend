@@ -428,7 +428,7 @@ test("a new tenant can start registration directly from the unit invitation", as
   await page.getByRole("button", { name: "Create tenant account" }).click();
 
   await expect(page).toHaveURL(/\/register\?.*token=tenant-new-account-token.*returnTo=%2Flease%2Finitialize/);
-  await page.getByRole("link", { name: "Sign in" }).click();
+  await page.getByTestId("registration-sign-in").click();
   await expect(page).toHaveURL(/\/login\?.*token=tenant-new-account-token.*returnTo=%2Flease%2Finitialize/);
 });
 
