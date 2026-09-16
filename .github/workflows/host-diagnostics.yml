@@ -26,3 +26,9 @@ jobs:
             sudo du -sk /home/silverocean/deploy /home/silverocean/deploy.candidate-* /home/silverocean/deploy.rollback-* 2>/dev/null || true
             echo 'Frontend transport directory (KB)'
             sudo du -sk /tmp/slickhood-frontend-release 2>/dev/null || true
+            echo 'SlickHood backend release artifacts (KB)'
+            sudo du -sk /home/silverocean/backend/silverocean-0.0.1-SNAPSHOT.jar \
+              /home/silverocean/backups/backend-*.jar \
+              /tmp/slickhood-backend-release 2>/dev/null || true
+            echo 'Protected pending-release backups (KB)'
+            sudo du -sk /home/silverocean/backups/pending-release-* 2>/dev/null || true

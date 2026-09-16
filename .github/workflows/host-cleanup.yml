@@ -36,10 +36,16 @@ jobs:
               test "$resolved" != "$active"
               sudo rm -rf -- "$resolved"
             }
-            for stale in /home/silverocean/deploy.rollback-*; do
-              [ -d "$stale" ] || continue
-              remove_stale_release "$stale"
-            done
+            # Keep the two newest complete frontend releases for immediate
+            # recovery, and remove only older exact-prefix rollback folders.
+            find /home/silverocean -maxdepth 1 -type d -name 'deploy.rollback-*' -printf '%T@ %p\n' \
+              | sort -nr \
+              | tail -n +3 \
+              | cut -d' ' -f2- \
+              | while IFS= read -r stale; do
+                  [ -n "$stale" ] || continue
+                  remove_stale_release "$stale"
+                done
             for candidate in /home/silverocean/deploy.candidate-*; do
               [ -d "$candidate" ] || continue
               test ! -L "$candidate"
@@ -60,6 +66,29 @@ jobs:
               test ! -L "$staging"
               sudo rm -rf -- "$staging"
             fi
+            backend_staging=/tmp/slickhood-backend-release
+            test "$backend_staging" = /tmp/slickhood-backend-release
+            if [ -e "$backend_staging" ]; then
+              test ! -L "$backend_staging"
+              sudo rm -rf -- "$backend_staging"
+            fi
+            # Backend JAR rollbacks are small, immediately usable recovery
+            # artifacts. Keep the two newest and remove only older exact-name
+            # files. Protected database backups are deliberately not touched.
+            find /home/silverocean/backups -maxdepth 1 -type f -name 'backend-*.jar' -printf '%T@ %p\n' \
+              | sort -nr \
+              | tail -n +3 \
+              | cut -d' ' -f2- \
+              | while IFS= read -r old_backend; do
+                  [ -n "$old_backend" ] || continue
+                  test ! -L "$old_backend"
+                  resolved="$(realpath "$old_backend")"
+                  case "$resolved" in
+                    /home/silverocean/backups/backend-*.jar) sudo rm -f -- "$resolved" ;;
+                    *) echo "Refusing unexpected backend rollback target: $resolved" >&2; exit 1 ;;
+                  esac
+                done
             test -f "$active/server.js"
+            test -f /home/silverocean/backend/silverocean-0.0.1-SNAPSHOT.jar
             echo 'Capacity after approved cleanup (KB)'
             df -Pk /
