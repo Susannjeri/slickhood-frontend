@@ -48,6 +48,20 @@ export function rejectUnsafeBrowserSessionMutation(request: Request): BrowserSes
     }
   }
 
+  // A production build is exercised over a loopback HTTP server before it can
+  // be packaged. This exception is opt-in, restricted to loopback on both sides,
+  // and is never configured on the deployed host.
+  const loopbackHosts = new Set(["127.0.0.1", "localhost", "[::1]"]);
+  let expectedHostname = "";
+  try {
+    expectedHostname = new URL(expectedOrigin).hostname;
+  } catch {
+    return { status: 500, description: "Browser session origin is not configured correctly." };
+  }
+  const allowInsecureLoopback = process.env.BROWSER_SESSION_ALLOW_INSECURE_LOOPBACK === "true"
+    && loopbackHosts.has(requestUrl.hostname)
+    && loopbackHosts.has(expectedHostname);
+
   const origin = request.headers.get("origin");
   if (origin) {
     try {
@@ -61,7 +75,7 @@ export function rejectUnsafeBrowserSessionMutation(request: Request): BrowserSes
     return { status: 403, description: "Browser session request origin is required." };
   }
 
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && !allowInsecureLoopback) {
     if (requestProtocol !== "https" || !expectedOrigin.startsWith("https://")) {
       return { status: 403, description: "Browser sessions require HTTPS." };
     }

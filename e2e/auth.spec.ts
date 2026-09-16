@@ -527,7 +527,7 @@ test("a valid-looking stale cookie cannot make the sign-in page unreachable", as
 
 test("the browser session endpoint rejects malformed tokens", async ({ request }) => {
   const response = await request.post("/browser-session/set-cookie", {
-    headers: { "x-slickhood-csrf": "browser-session-v1" },
+    headers: { Origin: "http://127.0.0.1:3100", "x-slickhood-csrf": "browser-session-v1" },
     data: { token: "not-a-jwt", refreshToken: "long-but-invalid-refresh-token" },
   });
   expect(response.status()).toBe(400);
@@ -544,7 +544,7 @@ test("a large multi-role token survives the secure cookie handoff", async ({ pag
   expect(jwt.length).toBeGreaterThan(4_096);
 
   const response = await page.request.post("/browser-session/set-cookie", {
-    headers: { "x-slickhood-csrf": "browser-session-v1" },
+    headers: { Origin: "http://127.0.0.1:3100", "x-slickhood-csrf": "browser-session-v1" },
     data: { token: jwt, refreshToken: "refresh-token-longer-than-sixteen-characters" },
   });
   expect(response.status()).toBe(200);
@@ -577,7 +577,7 @@ test("a large multi-role token survives the secure cookie handoff", async ({ pag
   expect(protectedPage.status()).toBe(200);
 
   await page.request.post("/browser-session/clear-cookie", {
-    headers: { "Content-Type": "application/json", "x-slickhood-csrf": "browser-session-v1" },
+    headers: { Origin: "http://127.0.0.1:3100", "Content-Type": "application/json", "x-slickhood-csrf": "browser-session-v1" },
     data: {},
   });
   const cleared = await context.cookies();
