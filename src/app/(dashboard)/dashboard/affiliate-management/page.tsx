@@ -11,14 +11,17 @@ import {Dialog,DialogContent,DialogDescription,DialogFooter,DialogHeader,DialogT
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {Textarea} from "@/components/ui/textarea";
+import {envelopePageList} from "@/lib/api-envelope";
 type Row=AffiliateAdminPayout&{affiliateName?:string;affiliateEmail?:string};
-const money=(n:number,c:string)=>new Intl.NumberFormat("en-KE",{style:"currency",currency:c}).format(n);
+type QueueRow={payout?:AffiliateAdminPayout;affiliateName?:string;affiliateEmail?:string};
+const money=(n:number,c?:string)=>{const amount=Number.isFinite(Number(n))?Number(n):0;const currency=/^[A-Z]{3}$/.test(c??"")?c!:"KES";try{return new Intl.NumberFormat("en-KE",{style:"currency",currency}).format(amount)}catch{return `${currency} ${amount.toLocaleString("en-KE")}`}};
+const normalizePayout=(value:QueueRow|AffiliateAdminPayout):Row|null=>{const nested="payout" in value&&value.payout?value.payout:value as AffiliateAdminPayout;if(!Number.isFinite(Number(nested?.id))||!nested?.payoutNumber)return null;return {...nested,affiliateName:(value as QueueRow).affiliateName,affiliateEmail:(value as QueueRow).affiliateEmail}};
 function Workspace(){
  const loadRequest=useRef(0);
  const [rows,setRows]=useState<Row[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null);
  const [query,setQuery]=useState(""),[search,setSearch]=useState(""),[status,setStatus]=useState(""),[page,setPage]=useState(0),[pages,setPages]=useState(0),[total,setTotal]=useState(0);
  const [decision,setDecision]=useState<{row:Row;status:"PAID"|"REJECTED"}|null>(null),[paymentReference,setPaymentReference]=useState(""),[notes,setNotes]=useState("");
- const load=useCallback(async()=>{const request=++loadRequest.current;setBusy(true);setError(null);try{const r=await affiliatePayoutQueue({query:search||undefined,status:status||undefined,page});if(request!==loadRequest.current)return;setRows((r.data?.data??[]).map((row:{payout:AffiliateAdminPayout;affiliateName?:string;affiliateEmail?:string})=>({...row.payout,affiliateName:row.affiliateName,affiliateEmail:row.affiliateEmail})));setPages(r.data?.totalPages??0);setTotal(r.data?.totalElements??0);}catch(e){if(request===loadRequest.current)setError(apiErrorMessage(e,"Affiliate payout queue could not be loaded."));}finally{if(request===loadRequest.current)setBusy(false)}},[search,status,page]);
+ const load=useCallback(async()=>{const request=++loadRequest.current;setBusy(true);setError(null);try{const r=await affiliatePayoutQueue({query:search||undefined,status:status||undefined,page});if(request!==loadRequest.current)return;setRows(envelopePageList<QueueRow|AffiliateAdminPayout>(r).map(normalizePayout).filter((row):row is Row=>row!==null));setPages(r.data?.totalPages??0);setTotal(r.data?.totalElements??0);}catch(e){if(request===loadRequest.current)setError(apiErrorMessage(e,"Affiliate payout queue could not be loaded."));}finally{if(request===loadRequest.current)setBusy(false)}},[search,status,page]);
  useEffect(()=>{void load();return()=>{loadRequest.current++}},[load]);
  async function start(row:Row){if(busy)return;setBusy(true);try{await decideAffiliatePayout(row,"PROCESSING");await load();toast.success("Payout moved to processing.");}catch(e){toast.error(apiErrorMessage(e,"Payout changed or could not be updated. Refresh and verify the amount before trying again."));}finally{setBusy(false)}}
  function openDecision(row:Row,status:"PAID"|"REJECTED"){setDecision({row,status});setPaymentReference("");setNotes("")}
