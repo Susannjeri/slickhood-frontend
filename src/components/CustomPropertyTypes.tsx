@@ -4,11 +4,12 @@ import {API,TypeCatalogOption} from "@/lib/api";
 import {apiErrorMessage} from "@/lib/api-error";
 import {Button} from "@/components/ui/button";
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from "@/components/ui/dialog";
+import {envelopeList} from "@/lib/api-envelope";
 type Custom={code:string;name:string;description?:string;category:string;active:boolean;unitTypes:string[];version:number};
 const categories=["RESIDENTIAL","COMMERCIAL","MIXED","INDUSTRIAL","HOSPITALITY","LAND"];
 export default function CustomPropertyTypes({unitTypes,onChanged,disabled}:{unitTypes:TypeCatalogOption[];onChanged:()=>void;disabled:boolean}){
  const [rows,setRows]=useState<Custom[]>([]),[draft,setDraft]=useState<Custom|null>(null),[isNew,setIsNew]=useState(false),[reason,setReason]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null);
- async function load(){setBusy(true);setError(null);try{const r=await API.get("/property/type/custom");setRows(r.data.data??[])}catch(e){setError(apiErrorMessage(e,"Custom property types could not be loaded."))}finally{setBusy(false)}}
+ async function load(){setBusy(true);setError(null);try{const r=await API.get("/property/type/custom");setRows(envelopeList<Custom>(r).filter(row=>row&&typeof row.code==="string"&&typeof row.name==="string"&&Array.isArray(row.unitTypes)))}catch(e){setError(apiErrorMessage(e,"Custom property types could not be loaded."))}finally{setBusy(false)}}
  useEffect(()=>{void load()},[]);
  async function save(e:FormEvent){e.preventDefault();if(!draft||busy)return;setBusy(true);setError(null);try{const payload={...draft,reason:reason.trim()};if(isNew)await API.post("/property/type/custom",payload);else await API.put(`/property/type/custom/${encodeURIComponent(draft.code)}`,payload);setDraft(null);await load();onChanged()}catch(e){setError(apiErrorMessage(e,"Property type could not be saved. Its code may already exist or its saved version may have changed. Close and reload to check."))}finally{setBusy(false)}}
  function open(row?:Custom){setIsNew(!row);setReason("");setError(null);setDraft(row?{...row,unitTypes:[...row.unitTypes]}:{code:"CUSTOM_",name:"",description:"",category:"RESIDENTIAL",active:true,unitTypes:[],version:0})}

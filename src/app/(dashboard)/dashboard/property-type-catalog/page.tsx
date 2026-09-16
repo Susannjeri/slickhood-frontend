@@ -9,6 +9,33 @@ import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getUnitTypeCatalog, PropertyUnitTypeCatalog, TypeCatalogOption, UnitTypeCatalog, updateUnitTypeCatalog } from "@/lib/api";
+import { envelopeItem } from "@/lib/api-envelope";
+
+const textValue = (value: unknown, fallback = "") => typeof value === "string" ? value : fallback;
+const numberValue = (value: unknown, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+function optionValue(value: unknown): TypeCatalogOption | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const source = value as Record<string, unknown>;
+  const id = textValue(source.id), name = textValue(source.name);
+  if (!id || !name) return null;
+  return { id, name, description: textValue(source.description), category: textValue(source.category, "OTHER"), displayOrder: numberValue(source.displayOrder), common: source.common === true };
+}
+function catalogValue(value: unknown): UnitTypeCatalog | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const source = value as Record<string, unknown>;
+  const availableUnitTypes = Array.isArray(source.availableUnitTypes) ? source.availableUnitTypes.map(optionValue).filter((item): item is TypeCatalogOption => item !== null) : [];
+  const validIds = new Set(availableUnitTypes.map(item => item.id));
+  const propertyTypes = Array.isArray(source.propertyTypes) ? source.propertyTypes.flatMap(item => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const row = item as Record<string, unknown>, propertyType = optionValue(row.propertyType);
+    if (!propertyType) return [];
+    const enabledUnitTypeIds = Array.isArray(row.enabledUnitTypeIds)
+      ? [...new Set(row.enabledUnitTypeIds.filter((id): id is string => typeof id === "string" && validIds.has(id)))]
+      : [];
+    return [{ propertyType, enabledUnitTypeIds }];
+  }) : [];
+  return propertyTypes.length && availableUnitTypes.length ? { propertyTypes, availableUnitTypes } : null;
+}
 
 function Catalogue() {
   const [catalog, setCatalog] = useState<PropertyUnitTypeCatalog[]>([]);
@@ -42,10 +69,11 @@ function Catalogue() {
       setLoading(true);
       setError(null);
       const response = await getUnitTypeCatalog();
-      const data = response.data?.data as UnitTypeCatalog | undefined;
-      const properties = data?.propertyTypes ?? [];
+      const data = catalogValue(envelopeItem<unknown | null>(response, null));
+      if (!data) throw new Error("Property type catalogue response was empty or invalid");
+      const properties = data.propertyTypes;
       setCatalog(properties);
-      setAvailableUnitTypes(data?.availableUnitTypes ?? []);
+      setAvailableUnitTypes(data.availableUnitTypes);
       if (properties.length > 0) choose(properties.some(p=>p.propertyType.id===selectedProperty)?selectedProperty:properties[0].propertyType.id, properties);
     } catch {
       setError("The property type catalogue could not be loaded. Retry to view its current configuration.");

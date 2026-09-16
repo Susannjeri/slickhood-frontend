@@ -47,8 +47,8 @@ test("system owner records payout decisions through an auditable dialog",async({
  await authenticated(context,page,{title:"Super Admin",permissions:[]});
  let decision:unknown;
  await page.route("**/affiliate/admin/policy",route=>route.fulfill({json:envelope([{commissionRate:25,eligiblePaymentCount:3,minimumPayout:1000,holdDays:14,version:2}])}));
- await page.route("**/affiliate/admin/profiles?**",route=>route.fulfill({json:{...envelope([]),totalPages:0,totalElements:0,size:20}}));
- await page.route("**/affiliate/admin/payout-queue?**",route=>route.fulfill({json:{...envelope([{payout:{id:51,payoutNumber:"AFP-51",affiliateUserId:7,paymentAccountId:12,amount:2200,currency:"KES",status:"PROCESSING",requestedAt:"2026-08-01T00:00:00Z",payoutAccountName:"Affiliate M-Pesa",payoutChannel:"MPESA",version:4},affiliateName:"Fixture Affiliate",affiliateEmail:"affiliate@example.test"},{id:52,payoutNumber:"AFP-52",affiliateUserId:8,amount:500,currency:"legacy",status:"PAID",requestedAt:"2026-08-01T00:00:00Z",version:1}]),totalPages:1,totalElements:2,size:20}}));
+ await page.route("**/affiliate/admin/profiles?**",route=>route.fulfill({json:{...envelope([null,"legacy",{userId:99,profile:null}]),totalPages:"invalid",totalElements:"invalid",size:20}}));
+ await page.route("**/affiliate/admin/payout-queue?**",route=>route.fulfill({json:{...envelope([null,"legacy",{payout:{id:51,payoutNumber:"AFP-51",affiliateUserId:7,paymentAccountId:12,amount:2200,currency:"KES",status:"PROCESSING",requestedAt:"2026-08-01T00:00:00Z",payoutAccountName:"Affiliate M-Pesa",payoutChannel:"MPESA",version:4},affiliateName:"Fixture Affiliate",affiliateEmail:"affiliate@example.test"},{id:52,payoutNumber:"AFP-52",affiliateUserId:8,amount:500,currency:{legacy:true},status:"PAID",requestedAt:"2026-08-01T00:00:00Z",version:1}]),totalPages:"1",totalElements:"2",size:20}}));
  await page.route("**/affiliate/admin/payouts/51",route=>{decision=route.request().postDataJSON();return route.fulfill({json:envelope({})});});
  await page.goto("/dashboard/affiliate-management");
  await expect(page.getByText("25",{exact:true})).toBeVisible();
