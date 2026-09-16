@@ -36,7 +36,7 @@ jobs:
             sudo systemctl show pms.service \
               --property=ActiveState,SubState,Result,NRestarts,ExecMainCode,ExecMainStatus
             echo 'Recent backend startup error classes (counts only)'
-            journal="$(sudo journalctl -u pms.service --since '30 minutes ago' --no-pager)"
+            journal="$(sudo journalctl -u pms.service --since '90 minutes ago' --no-pager)"
             for signature in \
               BeanCreationException UnsatisfiedDependencyException FlywayValidateException \
               SQLSyntaxErrorException SchemaManagementException OutOfMemoryError BindException \
@@ -44,4 +44,10 @@ jobs:
               count="$(printf '%s' "$journal" | grep -cF "$signature" || true)"
               printf '%s=%s\n' "$signature" "$count"
             done
+            echo 'Recent Java exception classes (names only)'
+            printf '%s' "$journal" \
+              | grep -Eo '([A-Za-z_][A-Za-z0-9_$]*\.)+[A-Za-z_][A-Za-z0-9_$]*(Exception|Error)' \
+              | sort \
+              | uniq -c \
+              | tail -n 80 || true
             unset journal
