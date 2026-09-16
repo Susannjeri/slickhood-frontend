@@ -157,6 +157,16 @@ jobs:
             sudo chown -R silverocean:silverocean "$candidate"
             test -f "$candidate/deploy/server.js"
             grep -RqsF '${{ github.sha }}' "$candidate/deploy/.next/static/chunks"
+            # Keep recently served immutable assets available across a cutover.
+            # Browsers with an open SlickHood tab may still request the prior
+            # build's hashed route chunks. Files older than seven days are not
+            # carried forward, which bounds disk use while providing a safe
+            # grace period for active sessions.
+            if [ -d /home/silverocean/deploy/.next/static ]; then
+              sudo find /home/silverocean/deploy/.next/static -type f -mtime +7 -delete
+              sudo cp -a -n /home/silverocean/deploy/.next/static/. "$candidate/deploy/.next/static/"
+              sudo chown -R silverocean:silverocean "$candidate/deploy/.next/static"
+            fi
             # Never let an orphaned server satisfy a different release's smoke test.
             test -z "$(sudo ss -H -ltn 'sport = :3101')"
             sudo systemd-run --unit="$candidate_unit" --collect \

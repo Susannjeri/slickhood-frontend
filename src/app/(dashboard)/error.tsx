@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, RefreshCw, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const staleAssetPattern = /ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module|CSS_CHUNK_LOAD_FAILED/i;
+
 export default function DashboardError({
   error,
   reset,
@@ -13,10 +15,22 @@ export default function DashboardError({
   reset: () => void;
 }) {
   const router = useRouter();
+  const staleAssetFailure = staleAssetPattern.test(`${error?.name ?? ""} ${error?.message ?? ""}`);
 
   useEffect(() => {
     console.error("Dashboard route failed to render", error?.digest ?? "no-digest");
-  }, [error]);
+    if (!staleAssetFailure) return;
+
+    // A browser that stayed open during a deployment may still reference an
+    // older immutable route chunk. Reload once so it receives the current
+    // build manifest; the session-scoped marker prevents a reload loop if the
+    // failure has another cause.
+    const buildRevision = process.env.NEXT_PUBLIC_COMMIT_HASH ?? "unknown";
+    const recoveryKey = `slickhood:asset-recovery:${buildRevision}:${window.location.pathname}`;
+    if (window.sessionStorage.getItem(recoveryKey)) return;
+    window.sessionStorage.setItem(recoveryKey, "attempted");
+    window.location.reload();
+  }, [error, staleAssetFailure]);
 
   return (
     <main className="min-h-screen bg-gray-50 px-6 py-16">
@@ -26,11 +40,13 @@ export default function DashboardError({
         </div>
         <h1 className="text-xl font-semibold text-[#141130]">We couldn’t load this workspace</h1>
         <p className="mt-2 text-sm text-gray-600">
-          This page could not be displayed. Try again or return to the dashboard to continue.
+          {staleAssetFailure
+            ? "The application was updated while this page was open. Reload to continue with the latest version."
+            : "This page could not be displayed. Try again or return to the dashboard to continue."}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Button type="button" onClick={() => reset()}>
-            <RefreshCw className="mr-2 h-4 w-4" /> Try again
+          <Button type="button" onClick={() => staleAssetFailure ? window.location.reload() : reset()}>
+            <RefreshCw className="mr-2 h-4 w-4" /> {staleAssetFailure ? "Reload application" : "Try again"}
           </Button>
           <Button type="button" variant="outline" onClick={() => router.push("/dashboard")}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to dashboard
