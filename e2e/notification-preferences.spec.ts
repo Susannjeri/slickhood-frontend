@@ -14,7 +14,7 @@ const categories = (phoneVerified = true) => ["BILLING", "PROPERTY", "MARKETPLAC
 test("user explicitly consents and selects independent notification channels", async ({ context, page }) => {
   await authenticated(context, page, { title: "Tenant", permissions: [] });
   let saved: Record<string, unknown> | undefined;
-  await context.route("http://127.0.0.1:8989/notification/preferences", async route => {
+  await context.route("**/notification/preferences", async route => {
     if (route.request().method() === "PUT") {
       saved = route.request().postDataJSON();
       return route.fulfill({ json: envelope([{ inAppRequired: true, phoneVerified: true, maskedPhone: "********8650", whatsappConsented: true, consentVersion: "whatsapp-notifications-v1-2026-09", categories: categories(true).map(item => item.category === "PROPERTY" ? { ...item, whatsappEnabled: true, version: item.version + 1 } : item) }]) });
@@ -39,7 +39,7 @@ test("user explicitly consents and selects independent notification channels", a
 
 test("unverified users are directed to Profile and cannot enable phone channels", async ({ context, page }) => {
   await authenticated(context, page, { title: "Tenant", permissions: [] });
-  await context.route("http://127.0.0.1:8989/notification/preferences", route => route.fulfill({ json: envelope([{
+  await context.route("**/notification/preferences", route => route.fulfill({ json: envelope([{
     inAppRequired: true, phoneVerified: false, maskedPhone: "********8650", whatsappConsented: false,
     consentVersion: "whatsapp-notifications-v1-2026-09", categories: categories(false),
   }]) }));
@@ -48,4 +48,19 @@ test("unverified users are directed to Profile and cannot enable phone channels"
   await expect(page.getByRole("link", { name: "Open Profile" })).toHaveAttribute("href", "/dashboard/user");
   await expect(page.getByRole("switch", { name: "SMS for Billing" })).toBeDisabled();
   await expect(page.getByRole("checkbox", { name: "Consent to WhatsApp notifications" })).toBeDisabled();
+});
+
+test("WhatsApp remains visibly on hold when no approved category template is available", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: [] });
+  await context.route("**/notification/preferences", route => route.fulfill({ json: envelope([{
+    inAppRequired: true, phoneVerified: true, maskedPhone: "********8650", whatsappConsented: false,
+    consentVersion: "whatsapp-notifications-v1-2026-09", categories: categories(false).map(item => ({
+      ...item,
+      smsAvailable: true,
+    })),
+  }]) }));
+  await page.goto("/dashboard/settings");
+  await expect(page.getByText("WhatsApp notifications are on hold")).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Consent to WhatsApp notifications" })).toBeDisabled();
+  await expect(page.getByRole("switch", { name: "WhatsApp for Property" })).toBeDisabled();
 });
