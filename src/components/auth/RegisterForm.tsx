@@ -40,7 +40,12 @@ interface GoogleIdentityApi {
 
 const googleIdentity = () => (window as unknown as { google?: GoogleIdentityApi }).google;
 
-export default function RegisterForm() {
+type RegisterFormProps = {
+    initialInviteToken?: string | null;
+    initialReturnTo?: string | null;
+};
+
+export default function RegisterForm({ initialInviteToken, initialReturnTo }: RegisterFormProps) {
 
     // State (unchanged, plus googleReady for the render effect)
     const [error, setError]                 = useState<string | null>(null);
@@ -59,6 +64,7 @@ export default function RegisterForm() {
     const { inviteToken, setStep, setInviteToken, setToken, setmfaEnabled, settotpEnabled } = useAuthStore();
     const authHydrated = useAuthHydrated();
     const { register, handleGoogleRegister } = useAuth();
+    const linkInviteToken = initialInviteToken || inviteToken;
 
     const form = useForm<RegisterSchema>({
         resolver: zodResolver(registerSchema),
@@ -411,8 +417,8 @@ export default function RegisterForm() {
                     Already have an account?{" "}
                     <Link
                         data-testid="registration-sign-in"
-                        href={inviteToken
-                            ? invitationUrl("/login", inviteToken)
+                        href={linkInviteToken
+                            ? invitationUrl("/login", linkInviteToken, initialReturnTo)
                             : "/login"}
                         onClick={preserveInvitationOnSignIn}
                         className="font-semibold text-[#EF4217] hover:text-[#d63600] transition-colors"
