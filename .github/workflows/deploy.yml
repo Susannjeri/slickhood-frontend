@@ -96,9 +96,18 @@ jobs:
             set -eu
             staging=/tmp/slickhood-frontend-release
             test "$staging" = /tmp/slickhood-frontend-release
+            test "$(readlink -f /home/silverocean/deploy)" = /home/silverocean/deploy
+            for candidate in /home/silverocean/deploy.candidate-*; do
+              [ -d "$candidate" ] || continue
+              if [ -z "$(find "$candidate" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+                case "$candidate" in
+                  /home/silverocean/deploy.candidate-*) sudo rmdir -- "$candidate" ;;
+                  *) echo "Unsafe candidate cleanup target" >&2; exit 1 ;;
+                esac
+              fi
+            done
             rollback_count="$(find /home/silverocean -maxdepth 1 -type d -name 'deploy.rollback-*' -printf '.' | wc -c)"
             echo "Retained frontend rollback releases: $rollback_count"
-            test "$rollback_count" -le 5
             available_kb="$(df -Pk /tmp | awk 'NR == 2 { print $4 }')"
             test "${available_kb:-0}" -ge 524288
             sudo rm -rf -- "$staging"
@@ -197,6 +206,20 @@ jobs:
             cutover_started=false
             sudo rm -rf -- /tmp/slickhood-frontend-release
             sudo rmdir "$candidate" 2>/dev/null || true
+            # Keep the two newest complete rollbacks for rapid recovery and
+            # remove only older directories with the exact release prefix.
+            retained=0
+            find /home/silverocean -maxdepth 1 -type d -name 'deploy.rollback-*' -print \
+              | sort -r \
+              | while IFS= read -r old_rollback; do
+                  retained=$((retained + 1))
+                  if [ "$retained" -gt 2 ]; then
+                    case "$old_rollback" in
+                      /home/silverocean/deploy.rollback-*) sudo rm -rf -- "$old_rollback" ;;
+                      *) echo "Unsafe rollback cleanup target" >&2; exit 1 ;;
+                    esac
+                  fi
+                done
 
       - name: Verify production authentication contract
         run: bash ./scripts/verify-auth-production.sh
