@@ -82,6 +82,10 @@ export default function SettingsPage() {
 
     {error ? <Alert variant="destructive"><Bell/><AlertTitle>Preferences could not be loaded</AlertTitle><AlertDescription><p>{error}</p><Button className="mt-2" variant="outline" onClick={() => void load()}>Try again</Button></AlertDescription></Alert> :
       loading || !value ? <div className="flex justify-center rounded-xl border bg-white py-20"><Loader2 className="size-8 animate-spin text-[#EF4217]" /></div> : <>
+        {(() => {
+          const whatsappAvailable = value.categories.some(item => item.whatsappAvailable);
+          const canChangeWhatsappConsent = value.phoneVerified && (whatsappAvailable || value.whatsappConsented);
+          return <>
         <Alert className="border-emerald-200 bg-emerald-50/60"><ShieldCheck/><AlertTitle>Important in-app notifications stay on</AlertTitle><AlertDescription>Security, payment and active-service events always remain available in your notification centre, even if an external channel fails.</AlertDescription></Alert>
 
         <Card>
@@ -98,9 +102,10 @@ export default function SettingsPage() {
         <Card>
           <CardHeader><CardTitle className="flex items-center gap-2"><MessageSquareText className="size-5 text-emerald-600"/><h2>WhatsApp consent</h2></CardTitle><CardDescription>WhatsApp is a separate channel and is never used for OTP unless a dedicated Meta authentication template is approved.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
+            {!whatsappAvailable && <Alert><MessageSquareText/><AlertTitle>WhatsApp notifications are on hold</AlertTitle><AlertDescription>The channel is not active yet. Email, SMS and in-app notifications remain available.</AlertDescription></Alert>}
             {!value.phoneVerified && <Alert><Phone/><AlertTitle>Verify your phone first</AlertTitle><AlertDescription>Your saved number {value.maskedPhone || "is not verified"}. <Link className="font-semibold text-[#EF4217] underline" href="/dashboard/user">Open Profile</Link> to add or verify it.</AlertDescription></Alert>}
-            <label className={`flex items-start gap-3 rounded-xl border p-4 ${!value.phoneVerified ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
-              <Checkbox checked={value.whatsappConsented} disabled={!value.phoneVerified} onCheckedChange={checked => consent(checked === true)} aria-label="Consent to WhatsApp notifications" />
+            <label className={`flex items-start gap-3 rounded-xl border p-4 ${!canChangeWhatsappConsent ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
+              <Checkbox checked={value.whatsappConsented} disabled={!canChangeWhatsappConsent} onCheckedChange={checked => consent(checked === true)} aria-label="Consent to WhatsApp notifications" />
               <span><strong className="block">I agree to receive selected SlickHood notifications on WhatsApp</strong><span className="mt-1 block text-sm text-muted-foreground">You can withdraw consent here at any time. Every change is retained in the security audit history.</span></span>
             </label>
             <p className="text-xs text-muted-foreground">Only approved Meta templates can be enabled. Unavailable switches indicate that the matching category template is not approved or configured yet.</p>
@@ -108,6 +113,8 @@ export default function SettingsPage() {
         </Card>
 
         <div className="flex justify-end"><Button size="lg" disabled={saving} onClick={() => void save()}>{saving ? <Loader2 className="mr-2 size-4 animate-spin"/> : <CheckCircle2 className="mr-2 size-4"/>}Save preferences</Button></div>
+          </>;
+        })()}
       </>}
   </main>;
 }
