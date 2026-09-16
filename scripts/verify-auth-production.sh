@@ -18,8 +18,25 @@ test "$unknown_status" = "401"
 
 malformed_status="$(curl --silent --show-error --retry 3 \
   --header 'Content-Type: application/json' \
+  --header "Origin: $origin" \
+  --header 'x-slickhood-csrf: browser-session-v1' \
   --data '{"token":"not-a-jwt","refreshToken":"long-but-invalid-refresh-token"}' \
   --output "$tmp_dir/malformed.json" --write-out '%{http_code}' "$origin/browser-session/set-cookie")"
 test "$malformed_status" = "400"
+
+hostile_status="$(curl --silent --show-error --retry 3 \
+  --header 'Content-Type: application/json' \
+  --header 'Origin: https://attacker.example' \
+  --header 'x-slickhood-csrf: browser-session-v1' \
+  --data '{"token":"not-a-jwt","refreshToken":"long-but-invalid-refresh-token"}' \
+  --output "$tmp_dir/hostile.json" --write-out '%{http_code}' "$origin/browser-session/set-cookie")"
+test "$hostile_status" = "403"
+
+missing_csrf_status="$(curl --silent --show-error --retry 3 \
+  --header 'Content-Type: application/json' \
+  --header "Origin: $origin" \
+  --data '{}' \
+  --output "$tmp_dir/missing-csrf.json" --write-out '%{http_code}' "$origin/browser-session/clear-cookie")"
+test "$missing_csrf_status" = "403"
 
 echo "Production authentication smoke checks passed."
