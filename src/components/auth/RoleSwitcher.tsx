@@ -1,11 +1,11 @@
 "use client";
 
-import { useAuthStore } from "@/store/authStore";
+import { isolateSuperadminRoles, useAuthStore } from "@/store/authStore";
 import type { Role } from "@/store/authStore";
 import { roleDisplayName } from "@/config/businessAreas";
 
 export default function RoleSwitcher() {
-  const roles = useAuthStore((s) => s.roles);
+  const roles = isolateSuperadminRoles(useAuthStore((s) => s.roles));
   const activeRole = useAuthStore((s) => s.activeRole);
   const setActiveRole = useAuthStore((s) => s.setActiveRole);
 

@@ -12,6 +12,13 @@ export interface Role {
   propertyIds?: number[];
   propertyNames?: string[];
 }
+
+const normalizedRole = (title?: string | null) => (title ?? "").toLowerCase().replace(/[\s_-]/g, "");
+
+export function isolateSuperadminRoles(roles: Role[]): Role[] {
+  const superadmin = roles.find(role => normalizedRole(role.title) === "superadmin");
+  return superadmin ? [superadmin] : roles;
+}
 interface AuthState {
   token: string | null;
   mfaEnabled: boolean | null;
@@ -62,7 +69,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       token: null,
       mfaEnabled: false,
       totpEnabled: false,
@@ -90,25 +97,44 @@ export const useAuthStore = create<AuthState>()(
       setSelectedBusinessAreaId: (selectedBusinessAreaId) => set({ selectedBusinessAreaId }),
       setActiveWorkspaceId: (activeWorkspaceId) => set({ activeWorkspaceId }),
       setInviteToken: (inviteToken) => set({ inviteToken }),
-      setRoleName: (roleName) => set({ roleName }),
+      setRoleName: (roleName) => set({
+        roleName: get().roles.some(role => normalizedRole(role.title) === "superadmin")
+          ? [get().roles.find(role => normalizedRole(role.title) === "superadmin")!.title]
+          : roleName,
+      }),
       setPermissions: (permissions) => set({ permissions }),
-      setRoles: (roles) => set({ roles }),
+      setRoles: (roles) => {
+        const isolated = isolateSuperadminRoles(roles);
+        const superadmin = isolated.find(role => normalizedRole(role.title) === "superadmin");
+        set(superadmin ? {
+          roles: isolated,
+          roleName: [superadmin.title],
+          activeRole: { ...superadmin, propertyIds: [], propertyNames: [] },
+          permissions: Array.from(new Set(superadmin.permissions)),
+          propertyIds: [],
+          propertyNames: [],
+          selectedBusinessAreaId: null,
+          activeWorkspaceId: null,
+        } : { roles: isolated });
+      },
       setSessionReady: (sessionReady) => set({ sessionReady }),
       setPropertyIds: (propertyIds) => set({ propertyIds }),
       setPropertyNames: (propertyNames) => set({ propertyNames }),
       setSwitching: (switching) => set({ switching }),
 
       setActiveRole: (role) => {
-        const propertyIds = role.properties?.map((p) => p.id) || [];
-        const propertyNames = role.properties?.map((p) => p.name) || [];
+        const superadmin = get().roles.find(candidate => normalizedRole(candidate.title) === "superadmin");
+        const effectiveRole = superadmin ?? role;
+        const propertyIds = effectiveRole.properties?.map((p) => p.id) || [];
+        const propertyNames = effectiveRole.properties?.map((p) => p.name) || [];
         
         set({
           activeRole: { 
-            ...role,
+            ...effectiveRole,
             propertyIds,
             propertyNames,
           },
-          permissions: Array.from(new Set(role.permissions)),
+          permissions: Array.from(new Set(effectiveRole.permissions)),
           propertyIds: Array.from(new Set(propertyIds)),
           propertyNames: Array.from(new Set(propertyNames)),
         })},
@@ -154,6 +180,23 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "auth-storage",
+      merge: (persisted, current) => {
+        const merged = { ...current, ...(persisted as Partial<AuthState>) };
+        const isolated = isolateSuperadminRoles(merged.roles ?? []);
+        const superadmin = isolated.find(role => normalizedRole(role.title) === "superadmin");
+        if (!superadmin) return { ...merged, roles: isolated };
+        return {
+          ...merged,
+          roles: isolated,
+          roleName: [superadmin.title],
+          activeRole: { ...superadmin, propertyIds: [], propertyNames: [] },
+          permissions: Array.from(new Set(superadmin.permissions)),
+          propertyIds: [],
+          propertyNames: [],
+          selectedBusinessAreaId: null,
+          activeWorkspaceId: null,
+        };
+      },
       partialize: (state) => ({
         mfaEnabled: state.mfaEnabled,
         totpEnabled: state.totpEnabled,

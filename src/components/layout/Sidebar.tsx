@@ -47,13 +47,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAuthHydrated } from "@/hooks/useAuthHydrated";
 import { useApi } from "@/hooks/useApi";
 import { AlertDialogDescription } from "@radix-ui/react-alert-dialog";
-import { useAuthStore } from "@/store/authStore";
+import { isolateSuperadminRoles, useAuthStore } from "@/store/authStore";
 import { decodeServerToken } from "@/lib/actions";
 import { ChevronUp, User, Briefcase, ChevronDown, Power, Check, UserCog, UserPlus, ArrowRightLeft } from "lucide-react";
 import { FaUserTie, FaBuilding, FaTools, FaHandshake } from "react-icons/fa";
 import JobsDrawer from "@/components/JobsDrawer";
 import { cn } from "@/lib/utils";
-import { businessAreaForRoleTitle, PROFILE_DASHBOARD_HREF, roleDisplayName } from "@/config/businessAreas";
+import { businessAreaForRoleTitle, normalizedRoleTitle, PROFILE_DASHBOARD_HREF, roleDisplayName } from "@/config/businessAreas";
 import { getSubscriptionOverview, subscriptionRoleForTitle } from "@/services/subscription.service";
 import { getTeamWorkspaces, TeamWorkspaceOption } from "@/lib/api";
 
@@ -112,7 +112,7 @@ export default function AppSidebar() {
   const { hasPermission, hasRole, hasExcludedRole } = usePermissions();
   const canAccessJobs = hasPermission(["create_unit"]);
 
-  const roles = useAuthStore((s) => s.roles);
+  const roles = isolateSuperadminRoles(useAuthStore((s) => s.roles));
   const activeRole = useAuthStore((s) => s.activeRole);
   const setActiveRole = useAuthStore((s) => s.setActiveRole);
   const setSelectedBusinessAreaId = useAuthStore((s) => s.setSelectedBusinessAreaId);
@@ -134,6 +134,7 @@ export default function AppSidebar() {
   const [workspaces, setWorkspaces] = useState<TeamWorkspaceOption[]>([]);
   const workspaceRequestId = useRef(0);
   const activeBusinessArea = businessAreaForRoleTitle(activeRole?.title);
+  const isSuperadminAccount = roles.some(role => normalizedRoleTitle(role.title) === "superadmin");
   const entitlementScope = activeBusinessArea ? `${activeRole?.title}:${activeBusinessArea.subscriptionProduct}` : null;
 
   useEffect(() => {
@@ -194,6 +195,7 @@ export default function AppSidebar() {
     && (!link.subLinks?.length || visibleSubLinks(link).length > 0);
 
   const handleRoleSwitch = (role: typeof roles[0]) => {
+    if (isSuperadminAccount) { setRoleSwitcherOpen(false); return; }
     if (role.title === activeRole?.title) { setRoleSwitcherOpen(false); return; }
     setRoleSwitcherOpen(false);
     setSwitching(true);
@@ -321,7 +323,7 @@ export default function AppSidebar() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => setRoleSwitcherOpen(true)}
+                    onClick={() => { if (roles.length > 1 && !isSuperadminAccount) setRoleSwitcherOpen(true); }}
                     className={cn(
                       "w-full flex items-center gap-2.5 rounded-lg border transition-all duration-200 group",
                       "border-[#EF4217]/25 bg-[#EF4217]/5 hover:bg-[#EF4217]/10 hover:border-[#EF4217]/50",
@@ -620,13 +622,13 @@ export default function AppSidebar() {
 
           <div className="px-4 py-3 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">Switching roles reloads your permissions.</p>
-            <button
+            {!isSuperadminAccount && <button
               onClick={() => { setRoleSwitcherOpen(false); router.push("/business-areas?intent=add"); }}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-[#EF4217] text-[#EF4217] hover:bg-[#EF4217] hover:text-white"
             >
               <UserPlus className="w-3.5 h-3.5" />
               Add Business Area
-            </button>
+            </button>}
           </div>
         </DialogContent>
       </Dialog>

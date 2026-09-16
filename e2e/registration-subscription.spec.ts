@@ -336,6 +336,37 @@ test("an interrupted Add Business Area journey resumes KYC instead of bypassing 
   await expect(page.getByText(/Complete identity verification/)).toBeVisible();
 });
 
+test("Superadmin cannot add, open or switch into a customer business area", async ({ context, page }) => {
+  const superadmin = { title: "Superadmin", permissions: ["manage_users"] };
+  const landlord = { title: "Landlord", permissions: ["create_property"] };
+  await authenticated(context, page, superadmin, {
+    roles: [superadmin, landlord],
+    roleName: ["Superadmin", "Landlord"],
+    activeRole: landlord,
+    permissions: landlord.permissions,
+  });
+  await page.route("**/role/list", route => route.fulfill({ json: envelope([
+    { roleId: 101, roleName: "Landlord", selfAssignable: true },
+  ]) }));
+  let assignmentAttempts = 0;
+  await page.route("**/role/self-assign**", route => {
+    assignmentAttempts += 1;
+    return route.fulfill({ status: 403, json: { success: false, code: "S00363" } });
+  });
+
+  await page.goto("/business-areas");
+
+  await expect(page.getByRole("heading", { name: "Superadmin access is isolated" })).toBeVisible();
+  await expect(page.getByText(/cannot add, receive or assume Landlord/)).toBeVisible();
+  await expect(page.locator("article")).toHaveCount(0);
+  expect(assignmentAttempts).toBe(0);
+
+  const roleState = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state);
+  expect(roleState.roles.map((role: { title: string }) => role.title)).toEqual(["Superadmin"]);
+  expect(roleState.activeRole.title).toBe("Superadmin");
+  expect(roleState.selectedBusinessAreaId).toBeNull();
+});
+
 test("participant roles are invitation-only and never appear as self-service business areas", async ({ page }) => {
   await page.route("**/role/list", route => route.fulfill({ json: envelope([
     { roleId: 101, roleName: "Landlord", selfAssignable: true },
