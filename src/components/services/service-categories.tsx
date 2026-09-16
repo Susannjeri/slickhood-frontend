@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import ServiceCategoryModal from "./service-category-modal";
 import { useAuthStore } from "@/store/authStore";
-import { deleteServiceCategory, getServiceCategories } from "@/services/serviceProvider";
+import { deleteServiceCategory, getAdminServiceCategories, reactivateServiceCategory } from "@/services/serviceProvider";
 import ServiceCategoryViewModal from "./service-category-view-modal";
 
 interface ServiceCategory {
@@ -11,6 +11,8 @@ interface ServiceCategory {
     name: string;
     description: string;
     requiredDocumentTypes: string[];
+    requiredNumberOfReferees?: number;
+    active?: boolean;
 }
 
 const DESCRIPTION_TRUNCATE_LENGTH = 60;
@@ -30,6 +32,7 @@ export default function ServiceCategories() {
     const [page, setPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
+    const [activeFilter,setActiveFilter] = useState("active");
     const PAGE_SIZE = 10;
 
     const [viewingCategory, setViewingCategory] = useState<ServiceCategory | null>(null);
@@ -47,9 +50,10 @@ export default function ServiceCategories() {
             setLoading(true);
             setError(null);
 
-            const response = await getServiceCategories(token, {
+            const response = await getAdminServiceCategories(token, {
                 page: targetPage,
                 size: PAGE_SIZE,
+                active: activeFilter==="all"?undefined:activeFilter==="active",
             });
 
             setCategories(response.data.data ?? []);
@@ -66,7 +70,7 @@ export default function ServiceCategories() {
 
     useEffect(() => {
         fetchCategories(page);
-    }, [token, page]);
+    }, [token, page,activeFilter]);
 
     const handleCategoryCreated = () => {
         setPage(0);       // jump back to first page so the new category is visible
@@ -108,6 +112,8 @@ export default function ServiceCategories() {
                         </p>
                     </div>
 
+                    <select aria-label="Category status" value={activeFilter} onChange={e=>{setActiveFilter(e.target.value);setPage(0)}} className="rounded-md border px-3 py-2"><option value="active">Active categories</option><option value="inactive">Inactive categories</option><option value="all">All categories</option></select>
+
                     <button
                         type="button"
                         onClick={() => { setEditingCategory(null); setIsCategoryModalOpen(true); }}
@@ -124,9 +130,7 @@ export default function ServiceCategories() {
                             Loading service categories...
                         </p>
                     ) : error ? (
-                        <p className="py-8 text-center text-sm text-red-500">
-                            {error}
-                        </p>
+                        <div className="py-8 text-center text-sm text-red-500"><p>{error}</p><button type="button" onClick={()=>void fetchCategories(page)} className="mt-3 rounded border px-3 py-2">Try again</button></div>
                     ) : categories.length === 0 ? (
                         <p className="py-8 text-center text-sm text-gray-500">
                             No service categories yet.
@@ -215,10 +219,10 @@ export default function ServiceCategories() {
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleDelete(category)}
+                                                        onClick={() => category.active===false ? void reactivateServiceCategory(token!,category.id!).then(()=>fetchCategories(page)).catch(()=>setError("Category could not be reactivated.")) : void handleDelete(category)}
                                                         className="block w-full px-3 py-1.5 text-left text-xs text-red-600 hover:bg-gray-50"
                                                     >
-                                                        Delete
+                                                        {category.active===false?"Reactivate":"Deactivate"}
                                                     </button>
                                                 </div>
                                             )}

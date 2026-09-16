@@ -10,6 +10,7 @@ interface ServiceCategory {
     name: string;
     description: string;
     requiredDocumentTypes: string[];
+    requiredNumberOfReferees?: number;
 }
 
 interface ServiceCategoryModalProps {
@@ -35,6 +36,7 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
 
     const [name, setName] = useState(category?.name ?? "");
     const [description, setDescription] = useState(category?.description ?? "");
+    const [requiredNumberOfReferees, setRequiredNumberOfReferees] = useState(category?.requiredNumberOfReferees ?? 0);
 
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -55,8 +57,8 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
                 setLoadingDocuments(true);
                 const response = await getServiceDocumentTypes(token);
                 setDocumentTypes(response.data.data ?? []);
-            } catch (error) {
-                console.error("Failed to fetch document types:", error);
+            } catch {
+                setError("Document options could not be loaded. Close and reopen this form to retry; existing selections are preserved.");
             } finally {
                 setLoadingDocuments(false);
             }
@@ -71,14 +73,15 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
         setName(category?.name ?? "");
         setDescription(category?.description ?? "");
         setSelectedDocuments(category?.requiredDocumentTypes ?? []);
+        setRequiredNumberOfReferees(category?.requiredNumberOfReferees ?? 0);
         setError(null);
     }, [open, category]);
 
     const handleSubmit = async () => {
         if (!token) return;
 
-        if (!name.trim() || !description.trim() || selectedDocuments.length === 0) {
-            setError("Please fill in all fields and select at least one document.");
+        if (!name.trim() || !Number.isInteger(requiredNumberOfReferees) || requiredNumberOfReferees < 0 || requiredNumberOfReferees > 100) {
+            setError("Enter a category name and a referee requirement between 0 and 100.");
             return;
         }
 
@@ -87,10 +90,10 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
             setError(null);
 
             const payload = {
-                name,
-                description,
+                name: name.trim(),
+                description: description.trim(),
                 requiredDocumentTypes: selectedDocuments,
-                requiredNumberOfReferees: 0,
+                requiredNumberOfReferees,
             };
             const response = isEditMode && category?.id
                 ? await updateServiceCategory(token, category.id, payload)
@@ -148,6 +151,8 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
                             type="text"
                             placeholder="e.g. Nanny Services"
                             value={name}
+                            maxLength={160}
+                            disabled={submitting}
                             onChange={(e) => setName(e.target.value)}
                             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-xs outline-none transition focus:border-[#08184A] focus:ring-1 focus:ring-[#08184A] dark:border-white/10 dark:bg-white/5 dark:text-white"
                         />
@@ -160,7 +165,8 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
 
                         <textarea
                             rows={3}
-                            maxLength={250}
+                            maxLength={1000}
+                            disabled={submitting}
                             placeholder="Describe this service category"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
@@ -169,13 +175,13 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
 
                         <div className="mt-1 flex justify-end">
                             <span className="text-[11px] text-gray-400">
-                                {description.length}/250
+                                {description.length}/1000
                             </span>
                         </div>
                     </div>
                     <div>
                         <label className="mb-2 block text-sm font-medium text-[#020B2D] dark:text-white">
-                            Required Documents <span className="text-red-500">*</span>
+                            Additional category documents (optional)
                         </label>
                         <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3 dark:border-white/10">
                             {loadingDocuments ? (
@@ -190,6 +196,7 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
                                             type="checkbox"
                                             value={doc.id}
                                             checked={selectedDocuments.includes(doc.id)}
+                                            disabled={submitting || loadingDocuments}
                                             onChange={() => toggleDocument(doc.id)}
                                             className="h-4 w-4 rounded border-gray-300 accent-[#08184A]"
                                         />
@@ -201,6 +208,11 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
                             )}
                         </div>
                     </div>
+                    <div>
+                        <label htmlFor="service-category-referees" className="mb-2 block text-sm font-medium">Required referees</label>
+                        <input id="service-category-referees" type="number" min={0} max={100} step={1} disabled={submitting} value={requiredNumberOfReferees} onChange={e=>setRequiredNumberOfReferees(Number(e.target.value))} className="w-full rounded-lg border px-3 py-2" />
+                        <p className="mt-1 text-xs text-gray-500">0 means no extra referees. Common KYC and the published KYC matrix remain enforced.</p>
+                    </div>
                 </div>
 
                 {/* Footer */}
@@ -208,7 +220,7 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
                     <button
                         type="button"
                         onClick={onClose}
-                        disabled={submitting}
+                        disabled={submitting || loadingDocuments}
                         className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-white/10 dark:text-white dark:hover:bg-white/10"
                     >
                         Cancel
@@ -217,7 +229,7 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
                     <button
                         type="button"
                         onClick={handleSubmit}
-                        disabled={submitting}
+                        disabled={submitting || loadingDocuments}
                         className="rounded-lg bg-[#08184A] px-4 py-2 text-sm font-medium text-white hover:bg-[#08184A]/90 disabled:opacity-50"
                     >
                         {submitting

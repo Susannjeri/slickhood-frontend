@@ -1354,8 +1354,8 @@ export interface UnitTypeCatalog {
 }
 
 export const getUnitTypeCatalog = () => API.get("/property/unit/type/catalog");
-export const updateUnitTypeCatalog = (propertyType: string, unitTypeIds: string[]) =>
-  API.put(`/property/unit/type/catalog/${encodeURIComponent(propertyType)}`, unitTypeIds);
+export const updateUnitTypeCatalog = (propertyType: string, unitTypeIds: string[], baseline?:string[]) =>
+  API.put(`/property/unit/type/catalog/${encodeURIComponent(propertyType)}`, unitTypeIds,baseline?{headers:{"X-Catalog-Baseline":baseline.join(",")}}:undefined);
 
 export interface ActiveLease {
   moveInDate?: string;

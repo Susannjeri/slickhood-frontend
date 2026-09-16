@@ -18,7 +18,9 @@ export default function ServiceApproval({ onCountChange }: ServiceApprovalProps)
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [page] = useState<number>(0);
+  const [page,setPage] = useState<number>(0);
+  const [totalPages,setTotalPages] = useState(0);
+  const [totalElements,setTotalElements] = useState(0);
   const [pageSize] = useState<number>(20);
 
   // State to control the Review Modal
@@ -40,7 +42,10 @@ export default function ServiceApproval({ onCountChange }: ServiceApprovalProps)
       if (response.data?.success) {
         const fetchedServices = response.data.data || [];
         setServices(fetchedServices);
-        onCountChange?.(fetchedServices.length);
+        setTotalPages(response.data.totalPages??0);
+        setTotalElements(response.data.totalElements??fetchedServices.length);
+        onCountChange?.(response.data.totalElements??fetchedServices.length);
+        if(fetchedServices.length===0&&page>0)setPage(page-1);
       } else {
         setError(response.data?.description || "Failed to retrieve pending services.");
       }
@@ -117,7 +122,7 @@ export default function ServiceApproval({ onCountChange }: ServiceApprovalProps)
                 </td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200/60">
-                    {service.riskLabel.replace("_", " ")}
+                    {(service.riskLabel??"Not assessed").replace("_", " ")}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right">
@@ -167,6 +172,8 @@ export default function ServiceApproval({ onCountChange }: ServiceApprovalProps)
           </tbody>
         </table>
       </div>
+
+      <div className="mt-4 flex items-center justify-between gap-3"><p>{totalElements} pending services · Page {totalPages?page+1:0} of {totalPages}</p><div className="flex gap-2"><button type="button" className="rounded border px-3 py-2 disabled:opacity-40" disabled={page===0} onClick={()=>setPage(page-1)}>Previous approvals</button><button type="button" className="rounded border px-3 py-2 disabled:opacity-40" disabled={page+1>=totalPages} onClick={()=>setPage(page+1)}>Next approvals</button></div></div>
 
       {/* Render the Review Modal when a service is selected */}
       {selectedService && (

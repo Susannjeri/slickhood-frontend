@@ -38,6 +38,8 @@ import AccountDetailDrawer from "@/components/accounts/AccountDetailDrawer";
 import type { Account } from "@/types/account";
 import {envelopeItem,envelopePageList} from "@/lib/api-envelope";
 import {DistributionChart} from "@/components/dashboard/DashboardCharts";
+import AffiliateHistory from "@/components/affiliate/AffiliateHistory";
+import AffiliateBalances from "@/components/affiliate/AffiliateBalances";
 const money = (n: number, c = "KES") =>
   new Intl.NumberFormat("en-KE", {
     style: "currency",
@@ -187,7 +189,8 @@ export default function AffiliatePage() {
           value={money(data.pendingPayouts,data.profile.currency)}
         />
       </div>
-      <Card><CardHeader><CardTitle>Referral funnel</CardTitle><CardDescription>A clear view of registrations progressing into eligible paid customers.</CardDescription></CardHeader><CardContent><DistributionChart ariaLabel="Affiliate referral conversion funnel" data={[{label:"Registered referrals",value:data.totalReferrals},{label:"Converted customers",value:data.referrals.filter(item=>item.status==="CONVERTED").length,color:"#10B981"}]}/></CardContent></Card>
+      <Card><CardHeader><CardTitle>Your reward terms</CardTitle><CardDescription>Current terms for future qualifying payments; existing earned commissions keep their recorded terms.</CardDescription></CardHeader><CardContent><p>Commission: {data.profile.commissionRate}%. Minimum payout: {money(data.profile.minimumPayout,data.profile.currency)}.</p>{data.rewardTerms&&<p>Up to {data.rewardTerms.eligiblePaymentCount} eligible subscription payments per referred user. Clearance hold: {data.rewardTerms.holdDays} days.</p>}</CardContent></Card>
+      <Card><CardHeader><CardTitle>Referral funnel</CardTitle><CardDescription>A clear view of registrations progressing into eligible paid customers.</CardDescription></CardHeader><CardContent><DistributionChart ariaLabel="Affiliate referral conversion funnel" data={[{label:"Registered referrals",value:data.totalReferrals},{label:"Converted customers",value:data.conversions,color:"#10B981"}]}/></CardContent></Card>
       <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
         <div className="space-y-6">
           <Card>
@@ -307,6 +310,7 @@ export default function AffiliatePage() {
                 onClick={()=>setPayoutOpen(true)}
                 disabled={
                   busy ||
+                  data.profile.status !== "ACTIVE" ||
                   data.availableBalance < data.profile.minimumPayout ||
                   !data.profile.payoutAccountId
                 }
@@ -360,7 +364,9 @@ export default function AffiliatePage() {
           </Card>
         </aside>
       </div>
-      {data.historyLimited&&<p className="text-center text-xs text-slate-500">Showing the 100 most recent records in each ledger. Full financial history remains available through reports.</p>}
+      {data.historyLimited&&<p className="text-center text-xs text-slate-500">Showing the 100 most recent records above. Browse the full paginated history below.</p>}
+      <AffiliateHistory/>
+      <AffiliateBalances/>
       <CreateAccountDialog
         open={createAccountOpen}
         onClose={() => setCreateAccountOpen(false)}

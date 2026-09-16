@@ -110,6 +110,9 @@ export default function EditUnitPage() {
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const {isLoadingTypes, unitTypeOptions, getUnitTypes } = usePropertyMetadata();
+  // Existing units may retain their disabled type; new units still use the active catalogue.
+  const editUnitTypeOptions=unit?.unitType&&!unitTypeOptions.some(option=>option.value===unit.unitType)
+    ? [...unitTypeOptions,{value:unit.unitType,label:`${unit.unitType} (current legacy type)`}]:unitTypeOptions;
 
   // Form
   const {
@@ -719,8 +722,8 @@ export default function EditUnitPage() {
                 control={control}
                 render={({ field }) => (
                   <Select
-                    options={unitTypeOptions}
-                    value={unitTypeOptions.find(opt => opt.value === field.value) || null}
+                    options={editUnitTypeOptions}
+                    value={editUnitTypeOptions.find(opt => opt.value === field.value) || null}
                     onChange={(opt: any) => field.onChange(opt?.value)}
                     isSearchable
                     isLoading={isLoadingTypes}

@@ -17,6 +17,7 @@ export const createServiceCategory = (
         name: string;
         description: string;
         requiredDocumentTypes: string[];
+        requiredNumberOfReferees?: number;
     }
 ) => {
     return API.post("/sp/admin/category/create", payload, {
@@ -34,6 +35,15 @@ export const updateServiceCategory = (
 
 export const deleteServiceCategory = (token: string, categoryId: number) =>
     API.delete(`/sp/admin/category/${categoryId}`, { headers: { Authorization: `Bearer ${token}` } });
+
+export const getAdminServiceCategories = (token: string, params?: {page?:number;size?:number;active?:boolean}) => API.get("/sp/admin/category/list",{params:{page:0,size:10,sort:"name,asc",...params},headers:{Authorization:`Bearer ${token}`}});
+export const reactivateServiceCategory = (token:string,id:number) => API.put(`/sp/admin/category/${id}/reactivate`,{}, {headers:{Authorization:`Bearer ${token}`}});
+export type AdminServiceDocument = {id:number;documentType:string;downloadUrl?:string;expiryDate?:string;verificationStatus:string};
+export const getAdminServiceDocuments = (token:string,id:number,page=0) => API.get(`/sp/admin/document/${id}/list`,{params:{page,size:20},headers:{Authorization:`Bearer ${token}`}});
+export const verifyAdminServiceDocument = (token:string,id:number,status:string) => API.put(`/sp/admin/document/${id}/verify`,{}, {params:{status},headers:{Authorization:`Bearer ${token}`}});
+export const getAdminServiceReferees = (token:string,id:number,page=0) => API.get(`/sp/admin/referee/${id}/list`,{params:{page,size:20},headers:{Authorization:`Bearer ${token}`}});
+export const verifyAdminServiceReferee = (token:string,id:number,status:string) => API.put(`/sp/admin/referee/${id}/verify`,{}, {params:{status},headers:{Authorization:`Bearer ${token}`}});
+export const getAdminServiceTiers = (token:string) => API.get("/sp/admin/tier/list",{params:{size:100},headers:{Authorization:`Bearer ${token}`}});
 
 export const getServiceDocumentTypes = (token: string) => {
     return API.get("/sp/admin/document/type/list", {
@@ -241,9 +251,8 @@ export const getAdminProviderProfile = (token: string, profileId: number) => {
 export const updateServiceTier = (token: string, serviceId: number, tier: string) => {
   return API.put(
     `/sp/admin/service/${serviceId}/tier`,
-    {},
+    {tier},
     {
-      params: { tier },
       headers: { Authorization: `Bearer ${token}` },
     }
   );

@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect,useState } from "react";
+import {useAuthStore} from "@/store/authStore";
+import {getPendingServices} from "@/services/serviceProvider";
 import { Layers, Clock, Inbox } from "lucide-react";
 import ServiceCategories from "./service-categories";
 import ServiceApproval from "./serviceapproval";
@@ -16,7 +18,11 @@ const TABS: { id: Tab; label: string; icon: typeof Layers }[] = [
 export default function ServiceManagement() {
   const [activeTab, setActiveTab] = useState<Tab>("categories");
   // State for dynamic pending-approvals count
-  const [approvalsCount, setApprovalsCount] = useState<number>(0);
+  const [approvalsCount, setApprovalsCount] = useState<number|null>(null);
+  const [countFailed,setCountFailed]=useState(false),[countRetry,setCountRetry]=useState(0);
+  const {token,permissions}=useAuthStore();
+  const canApprove=permissions.includes("approve_sp_service"),canManageCategories=permissions.includes("manage_sp_categories");
+  useEffect(()=>{let current=true;setCountFailed(false);if(token&&canApprove)void getPendingServices(token,{size:1}).then(r=>{if(current)setApprovalsCount(r.data?.totalElements??0)}).catch(()=>{if(current){setApprovalsCount(null);setCountFailed(true)}});return()=>{current=false}},[token,canApprove,activeTab,countRetry]);
 
   return (
     <div className="px-3 py-6">
@@ -27,7 +33,7 @@ export default function ServiceManagement() {
           aria-label="Service management sections"
           className="flex gap-1 overflow-x-auto border-b border-gray-200 px-4 pt-3 sm:px-6"
         >
-          {TABS.map((tab) => {
+          {TABS.filter(tab=>tab.id==="categories"?canManageCategories:canApprove).map((tab) => {
             const isActive = activeTab === tab.id;
             const Icon = tab.icon;
             const count = tab.id === "approvals" ? approvalsCount : null;
@@ -70,7 +76,8 @@ export default function ServiceManagement() {
 
         {/* Tab Content */}
         <div className="p-4 sm:p-6" role="tabpanel">
-          {activeTab === "categories" && (
+          {countFailed&&<p role="alert" className="mb-3 text-sm text-amber-700">The pending approval count could not be loaded. <button type="button" onClick={()=>setCountRetry(v=>v+1)} className="underline">Retry count</button></p>}
+          {activeTab === "categories" && canManageCategories && (
             <>
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-[#020B2D]">
@@ -85,7 +92,7 @@ export default function ServiceManagement() {
             </>
           )}
 
-          {activeTab === "approvals" && (
+          {(activeTab === "approvals" || !canManageCategories) && canApprove && (
             <>
               <div className="mb-4">
                 <h2 className="text-lg font-semibold text-[#020B2D]">

@@ -14,6 +14,8 @@ test("referral attribution is validated and timestamped before registration",asy
 test("affiliate sees a safe ledger and confirms a reserved payout",async({context,page})=>{
  await authenticated(context,page,{title:"Affiliate",permissions:["view_account","view_invite_list"]});
  let payoutRequests=0;
+ await page.route("**/affiliate/history/**",route=>route.fulfill({json:{...envelope([]),totalPages:0,totalElements:0,size:20}}));
+ await page.route("**/affiliate/balances",route=>route.fulfill({json:envelope([{currency:"KES",available:1600,pending:200,lifetime:1800,pendingPayouts:0,payoutSupported:true}])}));
  await page.route("**/account/list**",route=>route.fulfill({json:envelope([{id:12,name:"Affiliate M-Pesa",channel:"MPESA",verified:true,active:true}])}));
  await page.route("**/affiliate/dashboard",route=>route.fulfill({json:envelope({profile:{referralCode:"SH-1234567890ABCDEF",status:"ACTIVE",commissionRate:10,minimumPayout:1000,currency:"KES",payoutAccountId:12},totalReferrals:2,conversions:1,conversionRatePercent:50,availableBalance:1600,pendingEarnings:200,lifetimeEarnings:1800,pendingPayouts:0,historyLimited:false,referrals:[{id:21,status:"CONVERTED",campaign:"whatsapp",registeredAt:"2026-08-01T00:00:00Z",convertedAt:"2026-08-02T00:00:00Z"}],commissions:[{id:31,invoiceRef:"INV-31",qualifyingAmount:16000,commissionRate:10,commissionAmount:1600,currency:"KES",status:"EARNED",earnedAt:"2026-08-02T00:00:00Z"}],payouts:[]})}));
  await page.route("**/affiliate/payout",route=>{payoutRequests+=1;return route.fulfill({json:envelope({id:41,payoutNumber:"AFP-123",amount:1600,currency:"KES",status:"REQUESTED"})});});
@@ -31,7 +33,8 @@ test("affiliate sees a safe ledger and confirms a reserved payout",async({contex
 test("system owner records payout decisions through an auditable dialog",async({context,page})=>{
  await authenticated(context,page,{title:"Super Admin",permissions:[]});
  let decision:unknown;
- await page.route("**/affiliate/admin/payouts",route=>route.fulfill({json:envelope([{id:51,payoutNumber:"AFP-51",affiliateUserId:7,amount:2200,currency:"KES",status:"PROCESSING",requestedAt:"2026-08-01T00:00:00Z",payoutAccountName:"Affiliate M-Pesa",payoutChannel:"MPESA"}])}));
+ await page.route("**/affiliate/admin/profiles?**",route=>route.fulfill({json:{...envelope([]),totalPages:0,totalElements:0,size:20}}));
+ await page.route("**/affiliate/admin/payout-queue?**",route=>route.fulfill({json:{...envelope([{payout:{id:51,payoutNumber:"AFP-51",affiliateUserId:7,amount:2200,currency:"KES",status:"PROCESSING",requestedAt:"2026-08-01T00:00:00Z",payoutAccountName:"Affiliate M-Pesa",payoutChannel:"MPESA"},affiliateName:"Fixture Affiliate",affiliateEmail:"affiliate@example.test"}]),totalPages:1,totalElements:1,size:20}}));
  await page.route("**/affiliate/admin/payouts/51",route=>{decision=route.request().postDataJSON();return route.fulfill({json:envelope({})});});
  await page.goto("/dashboard/affiliate-management");
  await expect(page.getByText("Affiliate M-Pesa")).toBeVisible();

@@ -639,7 +639,7 @@ export const sidebarLinks: SidebarLink[] = [
     href: "/dashboard/service-management",
     description:
       "Manage service categories and services available to service providers.",
-    permissions: ["manage_sp_categories"],
+    permissions: ["manage_sp_categories","approve_sp_service"],
     protected: true,
   },
 

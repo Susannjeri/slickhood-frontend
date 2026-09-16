@@ -64,6 +64,7 @@ export default function EditPropertyForm() {
 
 
   const [isLoadingProperty, setIsLoadingProperty] = useState(true);
+  const [originalType,setOriginalType]=useState("");
 
   // Image state
   const [image, setImage] = useState<File | null>(null);
@@ -90,6 +91,7 @@ export default function EditPropertyForm() {
 
   const mapLocation = watch("mapLocation");
   const { propertyTypeOptions, isLoadingTypes } = usePropertyMetadata();
+  const editPropertyTypeOptions=originalType&&!propertyTypeOptions.some(t=>t.value===originalType)?[...propertyTypeOptions,{value:originalType,label:originalType.replaceAll("_"," ")+" (saved type)",description:"Retained on this property; unavailable for new properties.",category:"",common:false}]:propertyTypeOptions;
 
     // Load existing property data
   useEffect(() => {
@@ -110,6 +112,7 @@ export default function EditPropertyForm() {
         // Set form values
         setValue("name", property.name);
         setValue("type", property.type);
+        setOriginalType(property.type);
         setValue("address", property.address);
         setValue("mapLocation", property.mapLocation);
         setValue("currency", property.currency || "KES");
@@ -411,13 +414,13 @@ export default function EditPropertyForm() {
                 render={({ field }) => (
 
                   <Select
-                    options={propertyTypeOptions}
+                    options={editPropertyTypeOptions}
                     isClearable
                     isSearchable
                     isLoading={isLoadingTypes}
                     classNamePrefix={"rs"}
                     placeholder={isLoadingTypes ? "Loading types..." : "Select property type"}
-                    value={propertyTypeOptions.find(opt => opt.value === field.value) || null}
+                    value={editPropertyTypeOptions.find(opt => opt.value === field.value) || null}
                     onChange={(selectedOption: any) => 
                       field.onChange(selectedOption ? selectedOption.value : "")
                     }
