@@ -56,7 +56,10 @@ export function decodeServerToken(token: string): ServerToken | null {
   }
 }
 
-export const currencyOptions = currencyData.map((c: any) => ({
+// Financial storage currently guarantees exact two-decimal amounts. Keep every
+// ISO currency with that precision available; zero/three/four-decimal currencies
+// are introduced only with their matching ledger migration.
+export const currencyOptions = currencyData.filter(c => c.digits === 2).map(c => ({
   value: c.code,
   label: `${c.code} - ${c.currency}`,
 }));

@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { apiErrorMessage } from "@/lib/api-error";
 import { NotificationCategory, NotificationCategoryPreference, NotificationPreferences, notificationService } from "@/services/notification.service";
+import CurrencyPreferencesCard from "@/components/settings/CurrencyPreferencesCard";
 
 const descriptions: Record<NotificationCategory, { label: string; detail: string }> = {
   BILLING: { label: "Billing", detail: "Invoices, payment confirmations, late fees and overdue balances." },
@@ -76,6 +77,8 @@ export default function SettingsPage() {
       <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-[#EF4217]"><Bell /></div>
       <div><h1 className="text-3xl font-bold text-[#141130]">Settings</h1><p className="mt-1 text-sm text-muted-foreground">Choose how SlickHood sends non-secret account and business updates.</p></div>
     </header>
+
+    <CurrencyPreferencesCard />
 
     {error ? <Alert variant="destructive"><Bell/><AlertTitle>Preferences could not be loaded</AlertTitle><AlertDescription><p>{error}</p><Button className="mt-2" variant="outline" onClick={() => void load()}>Try again</Button></AlertDescription></Alert> :
       loading || !value ? <div className="flex justify-center rounded-xl border bg-white py-20"><Loader2 className="size-8 animate-spin text-[#EF4217]" /></div> : <>

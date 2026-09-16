@@ -19,7 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useApi, ProfileGateResult } from "@/hooks/useApi";
 import { useAuth } from "@/hooks/useAuth";
-import { currencyOptions } from "@/lib/actions";
+import { currencyOptions as allCurrencyOptions } from "@/lib/actions";
+import { currencyService } from "@/services/currency.service";
 import { usePropertyMetadata } from "@/app/(dashboard)/dashboard/property/propertyMetadata";
 import { useAuthStore } from "@/store/authStore";
 import {
@@ -68,6 +69,7 @@ export default function CreatePropertyPage() {
   const [mapCenter, setMapCenter] = useState(DEFAULT_LOCATION);
   const [profileGate, setProfileGate] = useState<ProfileGateFields | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [currencyOptions, setCurrencyOptions] = useState(allCurrencyOptions);
 
   const {
     register,
@@ -93,6 +95,18 @@ export default function CreatePropertyPage() {
   useEffect(() => () => {
     if (imagePreview) URL.revokeObjectURL(imagePreview);
   }, [imagePreview]);
+
+  useEffect(() => {
+    let active = true;
+    void currencyService.preferences().then(response => {
+      const preferences = response.data?.data?.[0];
+      if (!active || !preferences?.enabledCurrencies) return;
+      const enabled = new Set<string>(preferences.enabledCurrencies);
+      setCurrencyOptions(allCurrencyOptions.filter(option => enabled.has(option.value)));
+      setValue("currency", preferences.defaultCurrency || "KES", { shouldValidate: true });
+    }).catch(() => { /* The safe KES default remains available while settings reload. */ });
+    return () => { active = false; };
+  }, [setValue]);
 
   const selectJourney = (mode: PropertyManagementMode) => {
     setValue("managementMode", mode, { shouldValidate: true });
