@@ -14,8 +14,31 @@ test("public navigation keeps property discovery secondary and available",async(
   await page.goto("/");
   const navigation=page.getByRole("navigation",{name:"Main navigation"});
   await expect(navigation.getByRole("link",{name:"Ecosystem"})).toHaveAttribute("href","/#ecosystem");
-  await expect(navigation.getByRole("link",{name:"Search property"})).toHaveAttribute("href","/properties/rent");
-  await expect(page.getByRole("heading",{name:"Search remains part of the ecosystem."})).toBeVisible();
-  await expect(page.getByRole("link",{name:"Rent",exact:true})).toHaveAttribute("href","/properties/rent");
-  await expect(page.getByRole("link",{name:"Buy",exact:true})).toHaveAttribute("href","/properties/buy");
+  await expect(navigation.getByRole("link",{name:"Who it’s for"})).toHaveAttribute("href","/#businesses");
+  await expect(navigation.getByRole("link",{name:"Properties",exact:true})).toHaveAttribute("href","/properties/rent");
+  await expect(navigation.getByRole("link",{name:"Search property",exact:true})).toHaveCount(0);
+  await expect(page.getByRole("heading",{name:"Find a property to rent or buy."})).toBeVisible();
+  await expect(page.getByRole("link",{name:"Homes to rent",exact:true}).first()).toHaveAttribute("href","/properties/rent");
+  await expect(page.getByRole("link",{name:"Property for sale",exact:true}).first()).toHaveAttribute("href","/properties/buy");
+  await expect(page.locator("main")).toHaveCount(1);
+});
+
+test("property catalogue makes rental and sale journeys explicit",async({page})=>{
+  await page.goto("/properties/rent");
+  await expect(page.getByRole("heading",{name:"Homes to rent"})).toBeVisible();
+  const listingTypes=page.getByRole("navigation",{name:"Property listing type"});
+  await expect(listingTypes.getByRole("link",{name:"Homes to rent"})).toHaveAttribute("aria-current","page");
+  await expect(listingTypes.getByRole("link",{name:"Property for sale"})).toHaveAttribute("href","/properties/buy");
+  await expect(page.getByLabel("Minimum price")).toBeVisible();
+  await expect(page.getByLabel("Maximum price")).toBeVisible();
+  await expect(page.getByRole("link",{name:"Clear",exact:true})).toHaveAttribute("href","/properties/rent");
+});
+
+test("mobile navigation has one clear property entry",async({page})=>{
+  await page.setViewportSize({width:390,height:844});
+  await page.goto("/");
+  await page.locator('summary[aria-label="Open navigation"]').click();
+  const navigation=page.getByRole("navigation",{name:"Mobile navigation"});
+  await expect(navigation.getByRole("link",{name:"Properties",exact:true})).toHaveAttribute("href","/properties/rent");
+  await expect(navigation.getByRole("link",{name:"Search property",exact:true})).toHaveCount(0);
 });

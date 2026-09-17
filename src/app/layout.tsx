@@ -14,7 +14,19 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://slickhood.com"),
   title: { default: "Slickhood | Property, community and everyday services", template: "%s | Slickhood" },
   description: "Slickhood connects property management, estates, property sales, wealth, visitors, Marketplace: Soko & Services, affiliates and partner insurance in one trusted ecosystem.",
-  openGraph: { siteName: "Slickhood", type: "website" },
+  openGraph: {
+    title: "Slickhood | Property, community and everyday services",
+    description: "Manage property, enable communities and access everyday services through one connected ecosystem.",
+    url: "/",
+    siteName: "Slickhood",
+    locale: "en_KE",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Slickhood | Property, community and everyday services",
+    description: "Manage property, enable communities and access everyday services through one connected ecosystem.",
+  },
 };
 
 export default function RootLayout({
@@ -26,9 +38,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${roboto.className} antialiased flex items-start justify-between`}>
         <SessionHydrator />
-        <main className="w-full h-full">
+        <div className="h-full w-full">
           {children}
-        </main>
+        </div>
         <HelpChatBox />
 </body>
     </html>

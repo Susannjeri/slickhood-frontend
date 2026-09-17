@@ -39,21 +39,29 @@ export default async function PropertyCatalogue({ type, searchParams }: {
     <PublicHeader />
     <main>
       <section className="bg-[#141130] px-5 py-16 text-white">
-        <div className="mx-auto max-w-7xl lg:px-3">
-          <p className="text-sm font-bold uppercase tracking-[.2em] text-[#ff8d68]">Slickhood property</p>
-          <h1 className="mt-3 text-4xl font-black sm:text-5xl">{rent ? "Homes to rent" : "Property for sale"}</h1>
-          <p className="mt-4 max-w-2xl text-white/65">Browse active listings published from managed property records and contact the responsible property team directly.</p>
+        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-8 lg:flex-row lg:items-end lg:px-3">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[.2em] text-[#ff8d68]">Slickhood property listings</p>
+            <h1 className="mt-3 text-4xl font-black sm:text-5xl">{rent ? "Homes to rent" : "Property for sale"}</h1>
+            <p className="mt-4 max-w-2xl text-white/65">Browse available properties and contact the responsible property team directly.</p>
+          </div>
+          <nav aria-label="Property listing type" className="flex w-fit rounded-full border border-white/15 bg-white/10 p-1">
+            <Link href="/properties/rent" aria-current={rent ? "page" : undefined} className={`rounded-full px-5 py-2.5 text-sm font-bold ${rent ? "bg-white text-[#141130]" : "text-white/75 hover:text-white"}`}>Homes to rent</Link>
+            <Link href="/properties/buy" aria-current={!rent ? "page" : undefined} className={`rounded-full px-5 py-2.5 text-sm font-bold ${!rent ? "bg-white text-[#141130]" : "text-white/75 hover:text-white"}`}>Property for sale</Link>
+          </nav>
         </div>
       </section>
       <section className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
-        <form className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-5">
-          <input name="location" defaultValue={one("location")} maxLength={80} placeholder="Town or neighbourhood" aria-label="Town or neighbourhood" className="rounded-xl border border-slate-300 px-3 py-3 sm:col-span-2" />
+        <form aria-label="Filter property listings" className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-7">
+          <input name="location" defaultValue={one("location")} maxLength={80} placeholder="Town or neighbourhood" aria-label="Town or neighbourhood" className="rounded-xl border border-slate-300 px-3 py-3 lg:col-span-2" />
           <select name="unitType" defaultValue={one("unitType") || ""} aria-label="Unit type" className="rounded-xl border border-slate-300 bg-white px-3 py-3">
             <option value="">Any unit type</option>
             {filters.unitTypes.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
+          <input name="minPrice" type="number" min="0" defaultValue={one("minPrice")} placeholder="Minimum price" aria-label="Minimum price" className="rounded-xl border border-slate-300 px-3 py-3" />
           <input name="maxPrice" type="number" min="0" defaultValue={one("maxPrice")} placeholder="Maximum price" aria-label="Maximum price" className="rounded-xl border border-slate-300 px-3 py-3" />
-          <button className="rounded-xl bg-[#EF4217] px-5 py-3 font-bold text-white">Search</button>
+          <button type="submit" className="rounded-xl bg-[#EF4217] px-5 py-3 font-bold text-white">Search</button>
+          <Link href={rent ? "/properties/rent" : "/properties/buy"} className="rounded-xl border border-slate-300 px-5 py-3 text-center font-bold text-slate-700">Clear</Link>
         </form>
         <div className="mt-10">
           <h2 className="text-2xl font-black">{result.totalElements} {result.totalElements === 1 ? "property" : "properties"}</h2>
