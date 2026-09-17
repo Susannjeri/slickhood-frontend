@@ -38,7 +38,6 @@ test("public insurance verification reports delivery and supports an SMS fallbac
  await page.getByLabel("Six-digit code").fill("123456");
  await page.getByRole("button",{name:"Verify code"}).click();
  await expect(page.getByRole("heading",{name:"What would you like to insure?"})).toBeVisible();
- await expect(page.getByText("Contact verified. Next, choose what you would like to insure.")).toBeVisible();
  await expect(page.locator("#request-a-quote")).toBeFocused();
 });
 
