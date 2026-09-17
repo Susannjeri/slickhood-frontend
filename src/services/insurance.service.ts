@@ -24,8 +24,24 @@ export type InsuranceDocument={id:number;caseId?:number;policyId?:number;claimId
 export type InsuranceOperationsSummary={openCases:number;unassignedCases:number;paymentsAwaitingVerification:number;openClaims:number;renewalsDue:number};
 export type InsuranceStaff={id:number;fullName:string;email:string;roleName:string};
 export type PageResult<T>={content:T[];totalElements:number;totalPages:number;number:number;size:number};
+export type InsuranceGuestChallenge={challengeId:string;message:string};
+export type InsuranceGuestAccess={accessToken:string;expiresAt:string;caseId?:number};
+export type InsuranceGuestCase={insuranceCase?:InsuranceCase;accountRequiredForPayment:boolean};
+
+const guestHeaders=(accessToken:string)=>({"X-Insurance-Access":accessToken});
 
 export const insuranceService={
+ publicAgency:async()=>envelopeItem<InsuranceAgency>(await API.get("/public/insurance/agency"),{code:"SILVERWOOD",name:"Silverwood Insurance Agency"}),
+ publicProducts:async()=>envelopeList<InsuranceProduct>(await API.get("/public/insurance/products")),
+ publicCompanies:async()=>envelopeList<InsuranceCompany>(await API.get("/public/insurance/companies")),
+ requestGuestAccess:async(payload:{fullName:string;email:string;phone:string})=>envelopeItem<InsuranceGuestChallenge>(await API.post("/public/insurance/access/request",payload),{} as InsuranceGuestChallenge),
+ verifyGuestAccess:async(payload:{challengeId:string;code:string})=>envelopeItem<InsuranceGuestAccess>(await API.post("/public/insurance/access/verify",payload),{} as InsuranceGuestAccess),
+ guestCase:async(accessToken:string)=>envelopeItem<InsuranceGuestCase>(await API.get("/public/insurance/case",{headers:guestHeaders(accessToken)}),{accountRequiredForPayment:true}),
+ createGuestCase:async(accessToken:string,payload:Record<string,unknown>)=>envelopeItem<InsuranceGuestCase>(await API.post("/public/insurance/cases",payload,{headers:guestHeaders(accessToken)}),{accountRequiredForPayment:true}),
+ selectGuestQuote:async(accessToken:string,caseId:number,quoteId:number)=>envelopeItem<InsuranceGuestCase>(await API.post(`/public/insurance/cases/${caseId}/select-quote`,{quoteId},{headers:guestHeaders(accessToken)}),{accountRequiredForPayment:true}),
+ uploadGuestProposal:async(accessToken:string,caseId:number,file:File)=>{const f=new FormData();f.append("file",file);return envelopeItem<InsuranceDocument>(await API.post(`/public/insurance/cases/${caseId}/proposal`,f,{headers:guestHeaders(accessToken)}),{} as InsuranceDocument)},
+ extractGuestMarineIdf:async(accessToken:string,file:File)=>{const f=new FormData();f.append("file",file);return envelopeItem<MarineIdfOcrResult>(await API.post("/public/insurance/proposal-ocr/marine-idf",f,{headers:guestHeaders(accessToken)}),{} as MarineIdfOcrResult)},
+ claimGuestCase:async(accessToken:string)=>envelopeItem<InsuranceCase>(await API.post("/insurance/cases/claim-guest",{accessToken}),{} as InsuranceCase),
  companies:async()=>envelopeList<InsuranceCompany>(await API.get("/insurance/companies")),
  agency:async()=>envelopeItem<InsuranceAgency>(await API.get("/insurance/agency"),{code:"SILVERWOOD",name:"Silverwood Insurance Agency"}),
  adminCompanies:async()=>envelopeList<InsuranceCompanyAdmin>(await API.get("/insurance/admin/companies")),

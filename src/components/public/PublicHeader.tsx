@@ -6,6 +6,7 @@ const publicLinks = [
   ["Ecosystem", "/#ecosystem"],
   ["Who it’s for", "/#businesses"],
   ["Properties", "/properties/rent"],
+  ["Insurance", "/insurance"],
 ] as const;
 
 export default function PublicHeader() {
