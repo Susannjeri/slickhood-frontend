@@ -1,18 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
+import { ChevronDown, Menu } from "lucide-react";
+
+const publicLinks = [
+  ["Ecosystem", "/#ecosystem"],
+  ["For businesses", "/#businesses"],
+  ["Properties", "/#properties"],
+] as const;
 
 export default function PublicHeader() {
-  return <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-    <div className="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 lg:px-8">
-      <Link href="/" aria-label="Slickhood home" className="flex items-center gap-3">
-        <Image src="/slicklogo.svg" width={142} height={40} alt="Slickhood" priority />
-      </Link>
-      <nav aria-label="Main navigation" className="flex items-center gap-2 sm:gap-6 text-sm font-medium text-[#141130]">
-        <Link href="/properties/rent" className="hover:text-[#EF4217]">Rent</Link>
-        <Link href="/properties/buy" className="hover:text-[#EF4217]">Buy</Link>
-        <Link href="/login" className="hidden sm:inline hover:text-[#EF4217]">Sign in</Link>
-        <Link href="/role" className="rounded-full bg-[#EF4217] px-4 py-2.5 text-white shadow-sm hover:bg-[#d93612]">List a property</Link>
-      </nav>
+  return <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
+    <div className="mx-auto flex h-[76px] max-w-7xl items-center justify-between px-5 lg:px-8">
+      <Link href="/" aria-label="Slickhood corporate home" className="flex items-center gap-3"><Image src="/slicklogo.svg" width={142} height={40} alt="Slickhood" priority /></Link>
+      <nav aria-label="Main navigation" className="hidden items-center gap-7 text-sm font-semibold text-[#101b3f] md:flex">{publicLinks.map(([label,href])=><Link key={label} href={href} className="transition hover:text-[#EF4217]">{label}</Link>)}<Link href="/properties/rent" className="transition hover:text-[#EF4217]">Search property</Link></nav>
+      <div className="hidden items-center gap-3 md:flex"><Link href="/login" className="px-3 py-2 text-sm font-bold text-[#101b3f] hover:text-[#EF4217]">Sign in</Link><Link href="/role" className="rounded-full bg-[#EF4217] px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[#d93612]">Get started</Link></div>
+      <details className="group relative md:hidden"><summary aria-label="Open navigation" className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full border border-slate-200 bg-white"><Menu className="h-5 w-5"/></summary><div className="absolute right-0 mt-3 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl"><div className="flex flex-col">{publicLinks.map(([label,href])=><Link key={label} href={href} className="rounded-xl px-4 py-3 text-sm font-semibold hover:bg-slate-50">{label}</Link>)}<Link href="/properties/rent" className="flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold hover:bg-slate-50">Search property <ChevronDown className="h-4 w-4 -rotate-90"/></Link><div className="my-2 border-t"/><Link href="/login" className="rounded-xl px-4 py-3 text-sm font-semibold">Sign in</Link><Link href="/role" className="mt-1 rounded-xl bg-[#EF4217] px-4 py-3 text-center text-sm font-bold text-white">Get started</Link></div></div></details>
     </div>
   </header>;
 }

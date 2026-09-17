@@ -12,8 +12,8 @@ const roboto = Roboto({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://slickhood.com"),
-  title: { default: "Slickhood | Find and manage property", template: "%s | Slickhood" },
-  description: "Discover active property to rent and buy, or manage and publish your property with Slickhood.",
+  title: { default: "Slickhood | Property, community and everyday services", template: "%s | Slickhood" },
+  description: "Slickhood connects property management, estates, property sales, wealth, visitors, Marketplace: Soko & Services, affiliates and partner insurance in one trusted ecosystem.",
   openGraph: { siteName: "Slickhood", type: "website" },
 };
 
