@@ -21,6 +21,9 @@ test("public insurance verification reports delivery and supports an SMS fallbac
  await page.route("**/public/insurance/case",r=>r.fulfill({json:envelope({insuranceCase:null,accountRequiredForPayment:true})}));
 
  await page.goto("/insurance");
+ await expect(page).toHaveTitle("Silverwood Insurance Agency | Request a Quote");
+ await expect(page.getByRole("heading",{name:"Request insurance cover online."})).toBeVisible();
+ await expect(page.getByText("SlickHood",{exact:false})).toHaveCount(0);
  await page.getByLabel("Full name").fill("Susan Wanjohi");
  await page.getByRole("textbox",{name:"Email"}).fill("susan@example.com");
  await page.getByLabel("Phone number").fill("0722788650");
