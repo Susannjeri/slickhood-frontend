@@ -37,7 +37,7 @@ export const insuranceService={
  publicAgency:async()=>envelopeItem<InsuranceAgency>(await API.get("/public/insurance/agency"),{code:"SILVERWOOD",name:"Silverwood Insurance Agency"}),
  publicProducts:async()=>envelopeList<InsuranceProduct>(await API.get("/public/insurance/products")),
  publicCompanies:async()=>envelopeList<InsuranceCompany>(await API.get("/public/insurance/companies")),
- publicGuestDeliveryOptions:async()=>envelopeItem<InsuranceGuestDeliveryOptions>(await API.get("/public/insurance/access/channels"),{email:true,sms:false}),
+ publicGuestDeliveryOptions:async()=>{const options=envelopeItem<InsuranceGuestDeliveryOptions|null>(await API.get("/public/insurance/access/channels"),null);if(!options||typeof options.email!=="boolean"||typeof options.sms!=="boolean")throw new Error("Delivery methods could not be confirmed");return options},
  requestGuestAccess:async(payload:{fullName:string;email:string;phone:string;deliveryChannel:InsuranceDeliveryChannel})=>envelopeItem<InsuranceGuestChallenge>(await API.post("/public/insurance/access/request",payload),{} as InsuranceGuestChallenge),
  resendGuestAccess:async(payload:{challengeId:string;deliveryChannel:InsuranceDeliveryChannel})=>envelopeItem<InsuranceGuestChallenge>(await API.post("/public/insurance/access/resend",payload),{} as InsuranceGuestChallenge),
  guestDeliveryStatus:async(challengeId:string)=>envelopeItem<InsuranceGuestDeliveryStatus>(await API.post("/public/insurance/access/status",{challengeId}),{} as InsuranceGuestDeliveryStatus),
