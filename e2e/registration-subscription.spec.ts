@@ -225,7 +225,7 @@ test("trial duration comes from policy and activation remains attached to the se
   await expect(page.getByText("Choose your Rental Management package")).toBeVisible();
   await expect(page.getByText(/21-day free trial/i)).toBeVisible();
   await page.getByRole("button", { name: "Start Free Trial" }).click();
-  await expect(page.getByText(/Subscription active for Landlord/i)).toBeVisible();
+  await expect(page.getByText(/Subscription active for your property portfolio/i)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Bronze" })).toBeVisible();
   expect(trialRequest).toEqual({ role: "LANDLORD", planCode: "LANDLORD_BRONZE_MONTHLY" });
 });
