@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -176,19 +176,25 @@ export default function KycPage() {
   const [changingPhone, setChangingPhone] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [phoneVerificationMessage, setPhoneVerificationMessage] = useState("");
+  const loadRequest = useRef(0);
+  const hasLoadedKyc = useRef(false);
 
   const load = useCallback(async () => {
-    setLoading(true);
+    const request = ++loadRequest.current;
+    if (!hasLoadedKyc.current) setLoading(true);
     try {
       const current = await getCurrentKyc();
+      if (request !== loadRequest.current) return;
+      hasLoadedKyc.current = true;
       setKyc(current);
       if (current.verifiedPhoneNumber) setPhone(current.verifiedPhoneNumber);
     } catch (error) {
+      if (request !== loadRequest.current) return;
       toast.error(
         errorMessage(error, "Identity verification could not be loaded."),
       );
     } finally {
-      setLoading(false);
+      if (request === loadRequest.current) setLoading(false);
     }
   }, []);
 

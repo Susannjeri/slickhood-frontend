@@ -440,6 +440,49 @@ test("an approved legacy tenant can securely add a newly required KRA PIN withou
   await expect(page.getByRole("button", { name: "Recheck stored documents" })).toHaveCount(0);
 });
 
+test("KYC background refresh keeps the current business-area verification screen stable", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Landlord", permissions: [] });
+  await page.unroute("**/kyc/current");
+  let reads = 0;
+  const kyc = {
+    id: 245,
+    status: "IN_PROGRESS",
+    accountStatus: "ACTIVE",
+    pendingRoleId: 103,
+    pendingRoleName: "Property Sale Management",
+    consentVersion: "2026-08",
+    phoneVerified: true,
+    verifiedPhoneNumber: "+254700000000",
+    registryStatus: "NOT_CHECKED",
+    ocrEnabled: true,
+    requirements: [{ code: "TAX", label: "KRA PIN certificate", required: true, acceptedTypes: ["KRA_PIN_CERTIFICATE"] }],
+    missingRequirementCodes: [],
+    documents: [{
+      id: 91,
+      documentType: "KRA_PIN_CERTIFICATE",
+      status: "UPLOADED",
+      uploadedAt: "2026-09-20T08:00:00Z",
+      extractedFields: { fullName: "Test User", taxPin: "A000000000A" },
+    }],
+  };
+  await page.route("**/kyc/current", async route => {
+    reads++;
+    if (reads > 1) await new Promise(resolve => setTimeout(resolve, 700));
+    await route.fulfill({ json: envelope([kyc]) });
+  });
+  await page.route("**/kyc/documents/91/confirm", route =>
+    route.fulfill({ json: envelope([{ ...kyc.documents[0], registrantConfirmedAt: "2026-09-20T08:01:00Z" }]) }),
+  );
+
+  await page.goto("/kyc");
+  await expect(page.getByRole("heading", { name: "KRA PIN certificate" })).toBeVisible();
+  await page.getByRole("button", { name: "Confirm these details" }).click();
+
+  await expect(page.getByRole("heading", { name: "KRA PIN certificate" })).toBeVisible({ timeout: 300 });
+  await expect(page.getByText("Loading your secure verification…")).toHaveCount(0);
+  await expect.poll(() => reads).toBeGreaterThan(1);
+});
+
 test("KYC phone verification accepts Kenyan 01 ranges and offers a protected resend flow", async ({ context, page }) => {
   await authenticated(context, page, { title: "Landlord", permissions: [] });
   await page.unroute("**/kyc/current");
