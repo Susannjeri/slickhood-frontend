@@ -315,7 +315,9 @@ test("customer sees the exact rejection reason, retains accepted evidence and re
   ).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Submit verification" })).toBeDisabled();
   await page.getByRole("button", { name: "Confirm these details" }).first().click();
+  await expect(page.getByRole("button", { name: "Confirm these details" })).toHaveCount(1);
   await page.getByRole("button", { name: "Confirm these details" }).first().click();
+  await expect(page.getByRole("button", { name: "Confirm these details" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Submit verification" })).toBeEnabled();
   await page.getByRole("button", { name: "Submit verification" }).click();
   await expect(
