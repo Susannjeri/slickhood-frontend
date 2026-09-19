@@ -57,7 +57,7 @@ export function LateFeePolicySetup({ billingType, compact = false, onReadyChange
     return () => { cancelled = true; };
   }, [billingType, onReadyChange]);
 
-  async function save() {
+  async function save(desiredEnabled = enabled) {
     const rate = Number(percentageRate), grace = Number(graceDays);
     const cap = maximumFee.trim() === "" ? null : Number(maximumFee);
     if (!Number.isFinite(rate) || rate < 0 || rate > 100) {
@@ -69,13 +69,13 @@ export function LateFeePolicySetup({ billingType, compact = false, onReadyChange
     if (cap !== null && (!Number.isFinite(cap) || cap <= 0)) {
       toast.error("Enter a maximum fee above zero, or leave it blank for no cap."); return;
     }
-    if (enabled && rate <= 0) {
-      toast.error("Enter a percentage above 0, or switch the late fee off."); return;
+    if (desiredEnabled && rate <= 0) {
+      toast.error("Enter a percentage above 0 before turning on the late fee."); return;
     }
     setSaving(true);
     try {
       const response = await API.put(`/billing/late-fee-policy/${billingType}`, {
-        percentageRate: rate, graceDays: grace, maximumFee: cap, enabled,
+        percentageRate: rate, graceDays: grace, maximumFee: cap, enabled: desiredEnabled,
       });
       const saved = unwrapPolicy(response.data);
       if (!saved) throw new Error("The saved late-fee rule was not returned by the server.");
@@ -85,7 +85,9 @@ export function LateFeePolicySetup({ billingType, compact = false, onReadyChange
       setEnabled(Boolean(saved.enabled));
       setEffectiveFrom(saved?.effectiveFrom ?? effectiveFrom);
       onReadyChange?.(true);
-      toast.success(enabled ? `Late fee saved at ${rate}%.` : "Late fees are switched off for this billing area.");
+      toast.success(saved.enabled
+        ? `Late fee is active at ${saved.percentageRate ?? rate}% after ${saved.graceDays ?? grace} grace day${Number(saved.graceDays ?? grace) === 1 ? "" : "s"}.`
+        : "Late fees are now switched off for this billing area.");
     } catch (error: unknown) {
       toast.error(apiErrorMessage(error, "Late-fee settings could not be saved."));
     } finally { setSaving(false); }
@@ -95,11 +97,13 @@ export function LateFeePolicySetup({ billingType, compact = false, onReadyChange
     <p className="font-semibold">Late payment fee</p>
     <p className="mt-1 text-sm text-muted-foreground">Optional. Applied once to unpaid principal after the grace period; it never compounds on another late fee.</p>
     {effectiveFrom && <p className="mt-2 text-xs text-muted-foreground">Current rule applies prospectively to invoices due on or after {new Date(`${effectiveFrom}T00:00:00`).toLocaleDateString("en-KE", { dateStyle: "long" })}.</p>}
-    {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading late-fee settings…</p> : <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading late-fee settings…</p> : <><div role="status" className={`mt-3 rounded-lg border p-3 text-sm ${enabled ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+      <strong>{enabled ? "Late fee is active." : "Late fee is currently off."}</strong> {enabled ? `Customers are charged ${percentageRate || 0}% once, after ${graceDays || 0} grace day${Number(graceDays) === 1 ? "" : "s"}.` : "Complete the rule below, then select “Turn on and save”."}
+    </div><div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <div className="space-y-1"><Label htmlFor={`late-fee-rate-${billingType}`}>Fee percentage</Label><div className="relative"><Input id={`late-fee-rate-${billingType}`} type="number" min="0" max="100" step="0.01" value={percentageRate} onChange={event => setPercentageRate(event.target.value)} className="pr-8"/><span className="absolute right-3 top-2 text-sm text-muted-foreground">%</span></div></div>
       <div className="space-y-1"><Label htmlFor={`late-fee-grace-${billingType}`}>Grace days</Label><Input id={`late-fee-grace-${billingType}`} type="number" min="0" max="365" step="1" value={graceDays} onChange={event => setGraceDays(event.target.value)}/></div>
       <div className="space-y-1"><Label htmlFor={`late-fee-cap-${billingType}`}>Maximum fee (optional)</Label><Input id={`late-fee-cap-${billingType}`} type="number" min="0.01" step="0.01" placeholder="No cap" value={maximumFee} onChange={event => setMaximumFee(event.target.value)}/><p className="text-xs text-muted-foreground">Applied in the same currency as the invoice.</p></div>
-      <div className="flex items-end gap-2"><Button type="button" variant={enabled ? "default" : "outline"} aria-pressed={enabled} onClick={() => setEnabled(value => !value)}>{enabled ? "Fee on" : "Fee off"}</Button><Button type="button" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button></div>
-    </div>}
+      <div className="flex items-end gap-2">{enabled ? <><Button type="button" onClick={() => save(true)} disabled={saving}>{saving ? "Saving…" : "Save changes"}</Button><Button type="button" variant="outline" onClick={() => save(false)} disabled={saving}>Turn off</Button></> : <Button type="button" onClick={() => save(true)} disabled={saving}>{saving ? "Saving…" : "Turn on and save"}</Button>}</div>
+    </div></>}
   </div>;
 }
