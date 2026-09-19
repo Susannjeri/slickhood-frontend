@@ -45,6 +45,7 @@ export function notificationTitle(type: string): string {
 
 export function notificationActionLabel(type: string): string {
   const normalized = type.toUpperCase();
+  if (normalized.includes("PROPERTY_LISTING_INQUIRY")) return "View property";
   if (normalized.includes("INVITE")) return "Review invitation";
   if (normalized.includes("INVOICE") || normalized.includes("PAYMENT") || normalized.includes("FEE") || normalized.includes("CHARGE")) return "Review billing";
   if (normalized.includes("LEASE") || normalized.includes("TERMINAT")) return "Review notice";
@@ -68,15 +69,20 @@ export function notificationText(message: string): string {
 // stored messages into an open redirect/phishing link.
 export function notificationActionUrl(message: string, applicationOrigin: string): string | undefined {
   const text = notificationText(message);
-  const candidate = text.match(/https?:\/\/[^\s<>"']+|\/(?:dashboard|lease)(?:\/|\?)[^\s<>"']*/i)?.[0]?.replace(/[),.;]+$/, "");
+  const linkedCandidate = message.match(/href\s*=\s*["']([^"']+)["']/i)?.[1];
+  const candidate = (linkedCandidate ?? text.match(/https?:\/\/[^\s<>"']+|\/(?:dashboard|lease)(?:\/|\?)[^\s<>"']*/i)?.[0])?.replace(/[),.;]+$/, "");
   if (!candidate) return undefined;
   try {
     const url = new URL(candidate, applicationOrigin);
     const allowedOrigin = new URL(applicationOrigin).origin;
+    const publicPropertyOrigin = "https://slickhood.com";
     const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost";
-    if ((url.protocol !== "https:" && !(loopback && url.protocol === "http:"))
-        || url.origin !== allowedOrigin) return undefined;
-    if (!(url.pathname === "/dashboard" || /^\/dashboard\/[A-Za-z0-9_/-]+$/.test(url.pathname) || url.pathname === "/lease/onboard")) return undefined;
+    if (url.protocol !== "https:" && !(loopback && url.protocol === "http:")) return undefined;
+    const internalAction = url.origin === allowedOrigin
+      && (url.pathname === "/dashboard" || /^\/dashboard\/[A-Za-z0-9_/-]+$/.test(url.pathname) || url.pathname === "/lease/onboard");
+    const publicPropertyAction = url.origin === publicPropertyOrigin
+      && /^\/property\/[A-Za-z0-9-]+$/.test(url.pathname);
+    if (!internalAction && !publicPropertyAction) return undefined;
     return url.toString();
   } catch {
     return undefined;

@@ -4,7 +4,7 @@ import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useSta
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FilePlus2, Pencil, Send, Signature } from "lucide-react";
+import { Eye, FilePlus2, Pencil, Send, Signature } from "lucide-react";
 import { ProtectedPdfButton } from "@/components/documents/ProtectedPdfButton";
 import { leaseDocumentService } from "@/services/lease-document.service";
 import { GenerateLeaseDocumentRequest, LeaseDocument, LeaseDocumentTemplate, LeaseDocumentType } from "@/types/lease-document";
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiErrorMessage } from "@/lib/api-error";
 import { ActiveLease, listActiveLeases } from "@/lib/api";
 import { estateService, salesService } from "@/services/business-workflows.service";
@@ -100,6 +101,7 @@ function DocumentsWorkspace() {
   const [currency, setCurrency] = useState(searchParams.get("currency") ?? "KES");
   const [reason, setReason] = useState("");
   const [editing, setEditing] = useState<LeaseDocumentTemplate | null>(null);
+  const [previewing, setPreviewing] = useState<LeaseDocumentTemplate | null>(null);
 
   const canCreate = permissions.includes("create_lease_document");
   const canIssue = permissions.includes("issue_lease_document");
@@ -323,12 +325,20 @@ function DocumentsWorkspace() {
     </CardContent></Card>
 
     {(canCreate || canEditTemplates) && <Card id="document-templates"><CardHeader><CardTitle>Document templates</CardTitle><CardDescription>Templates available to your active role and workspace, covering rental, property-sale and estate documents as appropriate. Existing issued documents never change when a new version is created.</CardDescription></CardHeader>
-      <CardContent>{!editing ? <div className="space-y-2">{templates.filter(template => visibleTypes.includes(template.documentType)).map((template) => <div key={template.id} className="flex items-center justify-between rounded border p-3"><span>{template.displayName} · v{template.version} · {template.legalReviewRequired ? "Review required" : `Manual approval recorded${template.legalReviewedAt ? ` ${new Date(template.legalReviewedAt).toLocaleDateString()}` : ""}`}</span>
-        {canEditTemplates && <Button size="sm" variant="outline" onClick={() => setEditing({...template, legalReviewRequired: true})}><Pencil className="mr-1 h-4 w-4" />Edit</Button>}</div>)}</div> :
+      <CardContent>{!editing ? <div className="space-y-2">{templates.filter(template => visibleTypes.includes(template.documentType)).length === 0 && <div className="rounded-lg border border-dashed p-6 text-center"><p className="font-medium">No templates are available for this workspace</p><p className="mt-1 text-sm text-muted-foreground">Templates appear here according to your active role and business area.</p></div>}{templates.filter(template => visibleTypes.includes(template.documentType)).map((template) => <div key={template.id} className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">{template.displayName}</p><p className="text-sm text-muted-foreground">{label(template.documentType)} · Version {template.version}</p><Badge variant={template.legalReviewRequired ? "outline" : "secondary"} className="mt-2">{template.legalReviewRequired ? "Legal review required" : `Approved${template.legalReviewedAt ? ` ${new Date(template.legalReviewedAt).toLocaleDateString()}` : ""}`}</Badge></div><div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={() => setPreviewing(template)}><Eye className="mr-1 h-4 w-4" />View template</Button>
+        {canEditTemplates && <Button size="sm" variant="outline" onClick={() => setEditing({...template, legalReviewRequired: true})}><Pencil className="mr-1 h-4 w-4" />Edit</Button>}</div></div>)}</div> :
         <form onSubmit={saveTemplate} className="space-y-4"><div className="space-y-2"><Label>Name</Label><Input value={editing.displayName} onChange={(e) => setEditing({...editing, displayName: e.target.value})} /></div>
           <div className="space-y-2"><Label>Template HTML with Mustache fields</Label><Textarea className="min-h-80 font-mono text-xs" value={editing.bodyHtml} onChange={(e) => setEditing({...editing, bodyHtml: e.target.value})} /></div>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!editing.legalReviewRequired} onChange={(e) => setEditing({...editing, legalReviewRequired: !e.target.checked})} />Approved for issue after legal review</label>
           <div className="flex gap-2"><Button disabled={busy}>Save new version</Button><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button></div></form>}
       </CardContent></Card>}
+    <Dialog open={Boolean(previewing)} onOpenChange={(open) => { if (!open) setPreviewing(null); }}>
+      <DialogContent className="flex h-[90vh] max-w-5xl flex-col">
+        <DialogHeader><DialogTitle>{previewing?.displayName ?? "Document template"}</DialogTitle><DialogDescription>{previewing ? `${label(previewing.documentType)} · Version ${previewing.version}. Preview only; generated documents take an immutable snapshot of the selected version.` : "Review this document template."}</DialogDescription></DialogHeader>
+        {previewing && <div className="flex flex-wrap gap-2"><Badge variant="outline">{label(previewing.documentType)}</Badge><Badge variant={previewing.legalReviewRequired ? "outline" : "secondary"}>{previewing.legalReviewRequired ? "Legal review required" : "Approved for use"}</Badge></div>}
+        <div className="min-h-0 flex-1 overflow-hidden rounded-lg border bg-white">{previewing && <iframe title={`${previewing.displayName} template preview`} sandbox="" srcDoc={previewing.bodyHtml} className="h-full w-full" />}</div>
+      </DialogContent>
+    </Dialog>
   </div>;
 }
