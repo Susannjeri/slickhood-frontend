@@ -3,6 +3,7 @@ import { Roboto } from "next/font/google";
 import "./globals.css";
 import SessionHydrator from "@/components/auth/SessionHydrator";
 import HelpChatBox from "@/components/helpdesk/HelpChatBox";
+import SessionIdleGuard from "@/components/auth/SessionIdleGuard";
 
 const roboto = Roboto({
   subsets: ["latin"],
@@ -38,6 +39,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${roboto.className} antialiased flex items-start justify-between`}>
         <SessionHydrator />
+        <SessionIdleGuard />
         <div className="h-full w-full">
           {children}
         </div>

@@ -23,6 +23,9 @@ import { currencyOptions as allCurrencyOptions } from "@/lib/actions";
 import { currencyService } from "@/services/currency.service";
 import { usePropertyMetadata } from "@/app/(dashboard)/dashboard/property/propertyMetadata";
 import { useAuthStore } from "@/store/authStore";
+import { listAccounts } from "@/lib/api";
+import type { Account, AccountCategory } from "@/types/account";
+import Link from "next/link";
 import {
   managementJourneys,
   parseCoordinates,
@@ -57,6 +60,7 @@ export default function CreatePropertyPage() {
   const imageInput = useRef<HTMLInputElement>(null);
   const { handleTokenRefresh } = useAuth();
   const roles = useAuthStore(state => state.roles);
+  const token = useAuthStore(state => state.token);
   const { createNewProperty } = useApi();
   const { isLoadingTypes, propertyTypeOptions } = usePropertyMetadata();
   const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY?.trim() ?? "";
@@ -70,6 +74,8 @@ export default function CreatePropertyPage() {
   const [profileGate, setProfileGate] = useState<ProfileGateFields | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [currencyOptions, setCurrencyOptions] = useState(allCurrencyOptions);
+  const [paymentAccounts, setPaymentAccounts] = useState<Account[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(false);
 
   const {
     register,
@@ -107,6 +113,20 @@ export default function CreatePropertyPage() {
     }).catch(() => { /* The safe KES default remains available while settings reload. */ });
     return () => { active = false; };
   }, [setValue]);
+
+  useEffect(() => {
+    if (!token || !managementMode) return;
+    let active = true;
+    const category: Record<PropertyManagementMode, AccountCategory> = { RENTAL: "LANDLORD", SALE: "PROPERTY_SALES", SERVICE_CHARGE: "ESTATE_MANAGEMENT" };
+    setAccountsLoading(true);
+    setValue("paymentAccountId", 0, { shouldValidate: false });
+    void listAccounts(token, { byLandlord: true, size: 100 }).then(response => {
+      if (!active) return;
+      const rows = (response.data?.data ?? []) as Account[];
+      setPaymentAccounts(rows.filter(account => account.category === category[managementMode] && account.active && account.verified));
+    }).catch(() => { if (active) setPaymentAccounts([]); }).finally(() => { if (active) setAccountsLoading(false); });
+    return () => { active = false; };
+  }, [managementMode, setValue, token]);
 
   const selectJourney = (mode: PropertyManagementMode) => {
     setValue("managementMode", mode, { shouldValidate: true });
@@ -271,6 +291,14 @@ export default function CreatePropertyPage() {
                   {currencyOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </Field>
+              <Field htmlFor="paymentAccountId" label="Receiving payment account" required error={errors.paymentAccountId?.message}>
+                <select id="paymentAccountId" disabled={accountsLoading} aria-invalid={!!errors.paymentAccountId} {...register("paymentAccountId", { valueAsNumber: true })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50">
+                  <option value="">{accountsLoading ? "Loading verified accounts…" : "Select a verified account"}</option>
+                  {paymentAccounts.map(account => <option key={account.id} value={account.id}>{account.name} · {account.channelDisplayName ?? account.channel}</option>)}
+                </select>
+                {!accountsLoading && paymentAccounts.length === 0 && <p className="text-sm text-amber-700">No compatible payment-ready account is available. <Link className="font-medium underline" href="/dashboard/accounts">Create or complete an account first</Link>, then return here.</p>}
+                <p className="text-xs text-slate-500">This account is attached automatically so invoices for the property have a valid payment destination.</p>
+              </Field>
             </section>
 
             <section className="space-y-5 rounded-xl border bg-white p-5 shadow-sm">
@@ -290,7 +318,7 @@ export default function CreatePropertyPage() {
 
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => router.push("/dashboard/property/properties")}>Cancel</Button>
-            <Button type="submit" disabled={isSubmitting || isLoadingTypes} className="min-w-44 bg-[#EF4217] hover:bg-[#d93712]">{isSubmitting ? <><Loader2 className="mr-2 size-4 animate-spin" />Creating property…</> : "Create property"}</Button>
+            <Button type="submit" disabled={isSubmitting || isLoadingTypes || accountsLoading || paymentAccounts.length === 0} className="min-w-44 bg-[#EF4217] hover:bg-[#d93712]">{isSubmitting ? <><Loader2 className="mr-2 size-4 animate-spin" />Creating property…</> : "Create property"}</Button>
           </div>
         </form>
       )}

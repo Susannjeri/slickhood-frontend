@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BillingNavigation } from "@/components/invoices/BillingNavigation";
+import { apiErrorMessage } from "@/lib/api-error";
 
 interface PaymentRow {
   id: number;
@@ -46,8 +47,8 @@ export default function PaymentsPage() {
       setRows((response.data?.data ?? []) as PaymentRow[]);
       setTotalPages(Math.max(1, Number(response.data?.totalPages ?? 1)));
       setTotalElements(Number(response.data?.totalElements ?? response.data?.data?.length ?? 0));
-    } catch {
-      toast.error("Payments could not be loaded.");
+    } catch (error: unknown) {
+      toast.error(apiErrorMessage(error, "Payments could not be loaded. Check that this role has permission to view its payment history."));
     } finally {
       setLoading(false);
     }

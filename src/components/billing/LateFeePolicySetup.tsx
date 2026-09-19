@@ -19,6 +19,12 @@ type Policy = {
   effectiveFrom?: string | null;
 };
 
+const unwrapPolicy = (value: unknown): Policy | undefined => {
+  const data = (value as { data?: unknown } | undefined)?.data;
+  const policy = Array.isArray(data) ? data[0] : data;
+  return policy && typeof policy === "object" ? policy as Policy : undefined;
+};
+
 export function LateFeePolicySetup({ billingType, compact = false, onReadyChange }: {
   billingType: LateFeeBillingType;
   compact?: boolean;
@@ -37,7 +43,7 @@ export function LateFeePolicySetup({ billingType, compact = false, onReadyChange
     void API.get(`/billing/late-fee-policy/${billingType}`)
       .then(response => {
         if (cancelled) return;
-        const policy = response.data?.data as Policy | undefined;
+        const policy = unwrapPolicy(response.data);
         if (!policy) return;
         setPercentageRate(String(policy.percentageRate ?? 0));
         setGraceDays(String(policy.graceDays ?? 0));
@@ -71,7 +77,12 @@ export function LateFeePolicySetup({ billingType, compact = false, onReadyChange
       const response = await API.put(`/billing/late-fee-policy/${billingType}`, {
         percentageRate: rate, graceDays: grace, maximumFee: cap, enabled,
       });
-      const saved = response.data?.data as Policy | undefined;
+      const saved = unwrapPolicy(response.data);
+      if (!saved) throw new Error("The saved late-fee rule was not returned by the server.");
+      setPercentageRate(String(saved.percentageRate ?? rate));
+      setGraceDays(String(saved.graceDays ?? grace));
+      setMaximumFee(saved.maximumFee == null ? "" : String(saved.maximumFee));
+      setEnabled(Boolean(saved.enabled));
       setEffectiveFrom(saved?.effectiveFrom ?? effectiveFrom);
       onReadyChange?.(true);
       toast.success(enabled ? `Late fee saved at ${rate}%.` : "Late fees are switched off for this billing area.");

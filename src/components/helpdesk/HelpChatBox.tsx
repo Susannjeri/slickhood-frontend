@@ -89,7 +89,7 @@ function HelpChatSession() {
     if (!open || !token || conversation) return;
     listHelpConversations(false).then(async (response) => {
       const latest = unwrapMany<HelpDeskConversation>(response)[0];
-      if (!latest) return;
+      if (!latest || latest.status === "RESOLVED") return;
       const detail = await getHelpConversation(latest.id);
       setConversation(unwrapOne<HelpDeskConversation>(detail));
     }).catch(() => undefined);
@@ -172,6 +172,7 @@ function HelpChatSession() {
       </div>
       {error && <p role="alert" className="border-t bg-red-50 px-4 py-2 text-xs text-red-700">{error}</p>}
       <footer className="border-t bg-white p-3">
+        {conversation?.status === "RESOLVED" && <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"><p>This support conversation is resolved.</p><Button className="mt-2" size="sm" onClick={() => { setConversation(undefined); setMessage(""); setError(undefined); }}>Start a new conversation</Button></div>}
         {<div className="mb-2 flex items-center justify-between text-xs text-slate-500"><span>{conversation ? `${conversation.ticketNumber} · ${statusLabel(conversation.status)}` : "Private support"}</span><button onClick={humanSupport} disabled={sending || ["ESCALATED","WAITING_FOR_SUPPORT","ASSIGNED"].includes(conversation?.status ?? "")} className="flex items-center gap-1 font-medium text-[#EF4217] disabled:text-slate-400"><Headphones className="h-3.5 w-3.5" />Talk to a person</button></div>}
         <div className="flex items-end gap-2"><Textarea aria-label="Message Slickhood Help" value={message} onChange={(event) => setMessage(event.target.value)} disabled={conversation?.status === "RESOLVED"} maxLength={4000} placeholder="Type your question…" className="min-h-12 max-h-28 resize-none" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} /><Button size="icon" className="h-11 w-11 shrink-0 bg-[#EF4217] hover:bg-[#d93a13]" onClick={() => send()} disabled={!message.trim() || sending || conversation?.status === "RESOLVED"}>{sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button></div>
         <p className="mt-2 text-center text-[11px] text-slate-400">AI guidance may be inaccurate. Important decisions are transferred to authorised staff.</p>

@@ -8,7 +8,8 @@ import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from "@
 import {Button} from "@/components/ui/button";
 import {getServiceDetails,approveService,rejectService,getAdminServiceDocuments,verifyAdminServiceDocument,getAdminServiceReferees,verifyAdminServiceReferee,getAdminServiceTiers,updateServiceTier,AdminServiceDocument,ServiceReferee,ServiceReadiness} from "@/services/serviceProvider";
 
-type Details={service:PendingService;readiness:ServiceReadiness;outstandingMatrixRequirements?:string[]};
+type Details={service:PendingService&{tier?:string};readiness:ServiceReadiness;outstandingMatrixRequirements?:string[]};
+const first=<T,>(data:T[]|T|undefined):T|undefined=>Array.isArray(data)?data[0]:data;
 type Props={service:PendingService|null;onClose:()=>void;onSuccess:()=>void};
 export default function ServiceReviewModal({service,onClose,onSuccess}:Props){
  const {token,permissions}=useAuthStore();
@@ -26,8 +27,9 @@ export default function ServiceReviewModal({service,onClose,onSuccess}:Props){
     canVerifyReferees?getAdminServiceReferees(token,service.profileId,refereePage):Promise.resolve(null),
     canAssignTier?getAdminServiceTiers(token):Promise.resolve(null),
    ]);
-   if(!review.data?.data?.service||!review.data?.data?.readiness)throw new Error("The review response is incomplete.");
-   setDetails(review.data.data);setTier(review.data.data.service.tier??"");
+   const reviewDetails=first<Details>(review.data?.data);
+   if(!reviewDetails?.service||!reviewDetails?.readiness)throw new Error("The review response is incomplete.");
+   setDetails(reviewDetails);setTier(reviewDetails.service.tier??"");
    setDocuments(docs?.data?.data??[]);setDocumentPages(docs?.data?.totalPages??0);
    setReferees(refs?.data?.data??[]);setRefereePages(refs?.data?.totalPages??0);setTiers(tierOptions?.data?.data??[]);
   }catch(e){setError(apiErrorMessage(e,"Review details could not be loaded. Retry before making a decision."));}

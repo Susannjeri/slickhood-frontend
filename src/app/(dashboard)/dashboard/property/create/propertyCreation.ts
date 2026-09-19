@@ -52,6 +52,7 @@ export const propertySchema = z.object({
     message: "Enter valid coordinates between -90/90 latitude and -180/180 longitude",
   }),
   currency: z.string().trim().length(3, "Select a valid currency"),
+  paymentAccountId: z.number().int().positive("Select a verified payment account"),
 });
 
 export type PropertyFormData = z.infer<typeof propertySchema>;

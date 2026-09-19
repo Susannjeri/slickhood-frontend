@@ -170,7 +170,7 @@ export function useApi() {
           if (!token) throw new Error("No token");
         }
 
-      const createNewProperty = async (data: {image: File, name: string, type: string, managementMode: "RENTAL" | "SALE" | "SERVICE_CHARGE", address: string,mapLocation: string, currency:string}) => {
+      const createNewProperty = async (data: {image: File, name: string, type: string, managementMode: "RENTAL" | "SALE" | "SERVICE_CHARGE", address: string,mapLocation: string, currency:string, paymentAccountId:number}) => {
         try {
           const { token } = useAuthStore.getState();
           if (!token) throw new Error("No token available");

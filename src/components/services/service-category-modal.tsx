@@ -104,7 +104,9 @@ export default function ServiceCategoryModal({ open, onClose, category, onSucces
                 ? await updateServiceCategory(token, category.id, { ...payload, version: category.version! })
                 : await createServiceCategory(token, payload);
 
-            onSuccess(response.data.data);
+            const saved = Array.isArray(response.data.data) ? response.data.data[0] : response.data.data;
+            if (!saved) throw new Error("The saved category was not returned by the server.");
+            onSuccess(saved);
             onClose();
         } catch (err) {
             console.error("Failed to save service category:", err);

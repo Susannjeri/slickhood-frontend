@@ -377,6 +377,7 @@ export const createProperty = (data: {
   address: string;
   currency: string;
   mapLocation: string;
+  paymentAccountId: number;
 }, token: string) => {
   const formData = new FormData();
   formData.append("image", data.image);
@@ -386,6 +387,7 @@ export const createProperty = (data: {
   formData.append("address", data.address);
   formData.append("currency", data.currency);
   formData.append("mapLocation", data.mapLocation);
+  formData.append("paymentAccountId", String(data.paymentAccountId));
 
   return API.post("/property/create", formData, {
     headers: {
