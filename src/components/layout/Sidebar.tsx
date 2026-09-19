@@ -131,6 +131,7 @@ export default function AppSidebar() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [roleSwitcherOpen, setRoleSwitcherOpen] = useState(false);
   const [subscriptionEntitlements, setSubscriptionEntitlements] = useState<{ scope: string; features: Set<string> } | null>(null);
+  const [unavailableEntitlementScope, setUnavailableEntitlementScope] = useState<string | null>(null);
   const [workspaces, setWorkspaces] = useState<TeamWorkspaceOption[]>([]);
   const workspaceRequestId = useRef(0);
   const activeBusinessArea = businessAreaForRoleTitle(activeRole?.title);
@@ -160,10 +161,11 @@ export default function AppSidebar() {
           ?.filter(feature => feature.enabled)
           .map(feature => feature.featureKey) ?? [];
         setSubscriptionEntitlements({ scope, features: new Set(enabled) });
+        setUnavailableEntitlementScope(null);
       })
       // The backend remains authoritative. A temporary entitlement lookup error
       // must not make navigation disappear while the rest of the session works.
-      .catch(() => { /* Preserve permission navigation; backend remains authoritative. */ });
+      .catch(() => { if (current) setUnavailableEntitlementScope(scope); });
     return () => { current = false; };
   }, [activeBusinessArea, activeRole?.title, token]);
 
@@ -183,8 +185,9 @@ export default function AppSidebar() {
 
   const subscriptionAllows = (link: SidebarLink) => !link.subscriptionFeatures?.length
     || entitlementScope === null
-    || subscriptionEntitlements?.scope !== entitlementScope
-    || link.subscriptionFeatures.some(feature => subscriptionEntitlements.features.has(feature));
+    || unavailableEntitlementScope === entitlementScope
+    || (subscriptionEntitlements?.scope === entitlementScope
+      && link.subscriptionFeatures.some(feature => subscriptionEntitlements.features.has(feature)));
   const permissionAllows = (link: SidebarLink) => hasPermission(link.permissions || [])
     && hasRole(link.roles || [])
     && !hasExcludedRole(link.excludedRoles || []);

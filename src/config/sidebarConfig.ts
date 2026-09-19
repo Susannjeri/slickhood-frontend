@@ -388,14 +388,14 @@ export const sidebarLinks: SidebarLink[] = [
     label: "Properties",
     permissions: ["create_property", "view_property"],
     excludedRoles: ["Tenant", "Buyer", "Homeowner"],
-    subscriptionFeatures: ["PROPERTY_AND_UNIT_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT", "PROPERTY_SALES"],
+    subscriptionFeatures: ["PROPERTY_RENTALS", "ESTATE_MANAGEMENT", "PROPERTY_SALES", "PROPERTY_AND_UNIT_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT"],
     protected: true,
     subLinks: [
       {
         label: "All Properties",
         href: "/dashboard/property/properties",
         permissions: ["create_property", "view_property"],
-        subscriptionFeatures: ["PROPERTY_AND_UNIT_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT", "PROPERTY_SALES"],
+        subscriptionFeatures: ["PROPERTY_RENTALS", "ESTATE_MANAGEMENT", "PROPERTY_SALES", "PROPERTY_AND_UNIT_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT"],
         protected: true,
       },
       {
@@ -409,14 +409,15 @@ export const sidebarLinks: SidebarLink[] = [
         label: "Rentals",
         href: "/dashboard/property/rentals",
         permissions: ["create_property", "view_property"],
-        subscriptionFeatures: ["PROPERTY_AND_UNIT_MANAGEMENT"],
+        excludedRoles: ["EstateManager", "EstateOperationsManager", "SalesAgent", "SalesCoordinator", "ListingAgent"],
+        subscriptionFeatures: ["PROPERTY_RENTALS", "PROPERTY_AND_UNIT_MANAGEMENT"],
         protected: true,
       },
       {
         label: "Create Unit",
         href: "/dashboard/unit/create",
         permissions: ["create_unit"],
-        subscriptionFeatures: ["PROPERTY_AND_UNIT_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT", "PROPERTY_SALES"],
+        subscriptionFeatures: ["PROPERTY_RENTALS", "ESTATE_MANAGEMENT", "PROPERTY_SALES", "PROPERTY_AND_UNIT_MANAGEMENT", "ESTATE_AND_HOMEOWNER_MANAGEMENT"],
         protected: true,
       },
       {
@@ -441,7 +442,8 @@ export const sidebarLinks: SidebarLink[] = [
     icon: FileSignature,
     label: "Leases",
     permissions: ["view_active_lease", "view_lease_template", "create_lease_template", "edit_lease_template", "delete_lease_template"],
-    subscriptionFeatures: ["LEASE_MANAGEMENT"],
+    excludedRoles: ["EstateManager", "EstateOperationsManager", "SalesAgent", "SalesCoordinator", "ListingAgent"],
+    subscriptionFeatures: ["PROPERTY_RENTALS", "LEASE_MANAGEMENT"],
     protected: true,
     subLinks: [
       { label: "Lease operations", href: "/dashboard/lease/operations", permissions: ["view_active_lease"], protected: true },

@@ -20,7 +20,7 @@ export const businessAreas: BusinessArea[] = [
     id: "property-management",
     title: "Rental Management",
     eyebrow: "SlickHood PMS",
-    description: "Manage rental properties, units, tenants, leases, payments, gates, listings and reporting.",
+    description: "Manage rental properties, units, tenants, leases, payments, gates, listings and reporting under your shared property subscription.",
     roleTitles: ["landlord"],
     registrationRoleName: "Landlord",
     subscriptionRole: "LANDLORD",
