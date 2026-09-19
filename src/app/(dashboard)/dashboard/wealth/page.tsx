@@ -99,6 +99,29 @@ const emptyAsset: AssetPayload = {
   status: "ACTIVE",
   pricingMode: "MANUAL",
 };
+type KnownInstrument = {
+  key: string;
+  label: string;
+  exchangeCode: string;
+  instrumentSymbol: string;
+};
+const knownInstruments: Record<string, KnownInstrument[]> = {
+  LISTED_SECURITY: [
+    { key: "NSE:SCOM", label: "Safaricom (SCOM · NSE)", exchangeCode: "NSE", instrumentSymbol: "SCOM" },
+    { key: "NSE:EQTY", label: "Equity Group (EQTY · NSE)", exchangeCode: "NSE", instrumentSymbol: "EQTY" },
+    { key: "NSE:KCB", label: "KCB Group (KCB · NSE)", exchangeCode: "NSE", instrumentSymbol: "KCB" },
+    { key: "NSE:COOP", label: "Co-operative Bank (COOP · NSE)", exchangeCode: "NSE", instrumentSymbol: "COOP" },
+    { key: "NASDAQ:AAPL", label: "Apple (AAPL · NASDAQ)", exchangeCode: "NASDAQ", instrumentSymbol: "AAPL" },
+    { key: "NASDAQ:MSFT", label: "Microsoft (MSFT · NASDAQ)", exchangeCode: "NASDAQ", instrumentSymbol: "MSFT" },
+  ],
+  DIGITAL_ASSET: [
+    { key: "DIGITAL:BTC", label: "Bitcoin (BTC)", exchangeCode: "DIGITAL", instrumentSymbol: "BTC" },
+    { key: "DIGITAL:ETH", label: "Ethereum (ETH)", exchangeCode: "DIGITAL", instrumentSymbol: "ETH" },
+    { key: "DIGITAL:USDT", label: "Tether (USDT)", exchangeCode: "DIGITAL", instrumentSymbol: "USDT" },
+    { key: "DIGITAL:SOL", label: "Solana (SOL)", exchangeCode: "DIGITAL", instrumentSymbol: "SOL" },
+    { key: "DIGITAL:XRP", label: "XRP (XRP)", exchangeCode: "DIGITAL", instrumentSymbol: "XRP" },
+  ],
+};
 type Run = (
   action: () => Promise<unknown>,
   message: string,
@@ -129,7 +152,8 @@ export default function WealthPage() {
     tokenRefresh = useRef(handleTokenRefresh);
   const [selected, setSelected] = useState<number | undefined>(),
     [assetForm, setAssetForm] = useState<AssetPayload>(emptyAsset),
-    [editing, setEditing] = useState<number>();
+    [editing, setEditing] = useState<number>(),
+    [knownInstrumentKey, setKnownInstrumentKey] = useState("");
   const [years, setYears] = useState(5),
     [valueGrowth, setValueGrowth] = useState(5),
     [incomeGrowth, setIncomeGrowth] = useState(3),
@@ -322,6 +346,7 @@ export default function WealthPage() {
         assetType: assetTypes[0]?.code ?? "",
       });
       setEditing(undefined);
+      setKnownInstrumentKey("");
     }
   }
   function editAsset(a: WealthAsset) {
@@ -744,15 +769,18 @@ export default function WealthPage() {
                     className="h-9 w-full rounded-md border bg-transparent px-3"
                     value={assetForm.assetType}
                     onChange={(e) =>
-                      setAssetForm({
-                        ...assetForm,
-                        assetType: e.target.value,
-                        pricingMode: "MANUAL",
-                        exchangeCode: undefined,
-                        instrumentSymbol: undefined,
-                        quantity: undefined,
-                        averageUnitCost: undefined,
-                      })
+                      {
+                        setKnownInstrumentKey("");
+                        setAssetForm({
+                          ...assetForm,
+                          assetType: e.target.value,
+                          pricingMode: "MANUAL",
+                          exchangeCode: undefined,
+                          instrumentSymbol: undefined,
+                          quantity: undefined,
+                          averageUnitCost: undefined,
+                        });
+                      }
                     }
                   >
                     <option value="">Choose a category</option>
@@ -774,16 +802,63 @@ export default function WealthPage() {
                     {selectedType.description}
                   </p>
                 )}
+                {(knownInstruments[assetForm.assetType]?.length ?? 0) > 0 && (
+                  <Field label="Known instrument (optional)">
+                    <select
+                      aria-label="Known instrument"
+                      className="h-9 w-full rounded-md border bg-transparent px-3"
+                      value={knownInstrumentKey}
+                      onChange={(e) => {
+                        const key = e.target.value;
+                        const instrument = knownInstruments[assetForm.assetType]?.find(
+                          (item) => item.key === key,
+                        );
+                        setKnownInstrumentKey(key);
+                        setAssetForm({
+                          ...assetForm,
+                          reference: instrument?.instrumentSymbol ?? assetForm.reference,
+                          exchangeCode:
+                            assetForm.pricingMode === "MARKET"
+                              ? instrument?.exchangeCode
+                              : undefined,
+                          instrumentSymbol:
+                            assetForm.pricingMode === "MARKET"
+                              ? instrument?.instrumentSymbol
+                              : undefined,
+                        });
+                      }}
+                    >
+                      <option value="">Other / enter details manually</option>
+                      {knownInstruments[assetForm.assetType].map((instrument) => (
+                        <option key={instrument.key} value={instrument.key}>
+                          {instrument.label}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
                 <Field label="Pricing">
                   <select
                     className="h-9 w-full rounded-md border bg-transparent px-3"
                     value={assetForm.pricingMode}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const pricingMode = e.target.value as "MANUAL" | "MARKET";
+                      const instrument = knownInstruments[assetForm.assetType]?.find(
+                        (item) => item.key === knownInstrumentKey,
+                      );
                       setAssetForm({
                         ...assetForm,
-                        pricingMode: e.target.value as "MANUAL" | "MARKET",
-                      })
-                    }
+                        pricingMode,
+                        exchangeCode:
+                          pricingMode === "MARKET"
+                            ? instrument?.exchangeCode ?? assetForm.exchangeCode
+                            : undefined,
+                        instrumentSymbol:
+                          pricingMode === "MARKET"
+                            ? instrument?.instrumentSymbol ?? assetForm.instrumentSymbol
+                            : undefined,
+                      });
+                    }}
                   >
                     <option value="MANUAL">Manual valuation</option>
                     {(selectedType?.marketPricingAllowed ||
