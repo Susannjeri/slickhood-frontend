@@ -31,7 +31,6 @@ import {
   Calendar, 
   Clock, 
   MapPin,
-  Mailbox,
   Globe, 
   Shield,
   CheckCircle2,
@@ -72,10 +71,11 @@ interface UserDetails {
   profileType: ProfileType;
   identificationNumber: string | null;
   taxPin: string | null;
+  organizationName: string | null;
+  userTypes: string[];
   active: boolean;
   completedProfile: boolean;
   verified: boolean;
-  postalAddress: string | null;
 }
 
 interface ProfileEditForm {
@@ -83,7 +83,6 @@ interface ProfileEditForm {
   profileType: "INDIVIDUAL" | "COMPANY";
   identificationNumber: string;
   taxPin: string;
-  postalAddress: string;
 }
 
 export default function UserDetailsPage() {
@@ -111,7 +110,6 @@ export default function UserDetailsPage() {
     profileType: "INDIVIDUAL",
     identificationNumber: "",
     taxPin: "",
-    postalAddress: "",
   });
   const [updatingProfile, setUpdatingProfile] = useState(false);
 
@@ -140,7 +138,6 @@ export default function UserDetailsPage() {
           profileType: userData.profileType.id,
           identificationNumber: userData.identificationNumber || "",
           taxPin: userData.taxPin || "",
-          postalAddress: userData.postalAddress || "",
         });
       } else {
         setError("Failed to load user details");
@@ -270,7 +267,6 @@ export default function UserDetailsPage() {
         profileType: userDetails.profileType.id,
         identificationNumber: userDetails.identificationNumber || "",
         taxPin: userDetails.taxPin || "",
-        postalAddress: userDetails.postalAddress || "",
       });
     }
     setShowProfileDialog(true);
@@ -291,11 +287,6 @@ export default function UserDetailsPage() {
       }
       if (!profileForm.taxPin.trim()) {
         toast.error("Tax PIN is required");
-        return;
-      }
-
-      if (!profileForm.postalAddress.trim()) {
-        toast.error("Postal Address is required");
         return;
       }
 
@@ -431,12 +422,21 @@ export default function UserDetailsPage() {
                 </Label>
                 <p className="text-base font-medium">{userDetails.taxPin || "Not provided"}</p>
               </div>
+              {userDetails.organizationName && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Building2 className="w-4 h-4" /> Organization
+                  </Label>
+                  <p className="text-base font-medium">{userDetails.organizationName}</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Mailbox className="w-4 h-4" />
-                  Postal Address
+                  <Shield className="w-4 h-4" /> Active roles
                 </Label>
-                <p className="text-base font-medium">{userDetails.postalAddress || "Not provided"}</p>
+                <div className="flex flex-wrap gap-2">
+                  {(userDetails.userTypes?.length ? userDetails.userTypes : ["No role assigned"]).map(role => <Badge key={role} variant="secondary">{role}</Badge>)}
+                </div>
               </div>
             </div>
 
@@ -850,15 +850,6 @@ export default function UserDetailsPage() {
                 placeholder="Enter your KRA PIN"
                 value={profileForm.taxPin}
                 onChange={(e) => setProfileForm({ ...profileForm, taxPin: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="taxPin">Postal Address *</Label>
-              <Input
-                  id="postalAddress"
-                  placeholder="Enter your Postal Address"
-                  value={profileForm.postalAddress}
-                  onChange={(e) => setProfileForm({ ...profileForm, postalAddress: e.target.value })}
               />
             </div>
           </div>

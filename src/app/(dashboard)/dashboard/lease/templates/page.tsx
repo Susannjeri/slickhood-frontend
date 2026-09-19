@@ -228,8 +228,8 @@ const LeaseTemplatesPage = () => {
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-[#141130]">Lease Templates</h1>
-              <p className="text-gray-600 mt-1">Manage your rental and sale lease agreements</p>
+              <h1 className="text-3xl font-bold text-[#141130]">My agreement templates</h1>
+              <p className="text-gray-600 mt-1">Rental and sale templates created by your account, plus the approved SlickHood defaults.</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">

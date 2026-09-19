@@ -446,16 +446,19 @@ export const sidebarLinks: SidebarLink[] = [
     subLinks: [
       { label: "Lease operations", href: "/dashboard/lease/operations", permissions: ["view_active_lease"], protected: true },
       { label: "Tenants", href: "/dashboard/rental/tenants", permissions: ["view_active_lease"], excludedRoles: ["Tenant"], protected: true },
-      { label: "Lease templates", href: "/dashboard/lease/templates", permissions: ["view_lease_template"], excludedRoles: ["Tenant"], protected: true },
+      { label: "My agreement templates", href: "/dashboard/lease/templates", permissions: ["view_lease_template"], excludedRoles: ["Tenant"], protected: true },
     ],
   },
   {
     icon: FileSignature,
     label: "Documents & Notices",
-    href: "/dashboard/documents",
     permissions: ["view_lease_document"],
     protected: true,
     description: "Create, issue, acknowledge, sign, and review governed property documents.",
+    subLinks: [
+      { label: "Documents & notices", href: "/dashboard/documents", permissions: ["view_lease_document"], protected: true },
+      { label: "Document templates", href: "/dashboard/documents#document-templates", permissions: ["view_lease_document"], protected: true },
+    ],
   },
   {
     icon: Building,
@@ -740,12 +743,12 @@ export const settingsLinks: SidebarLink[] = [
     icon: Settings,
     label: "Settings",
     protected: true,
-    permissions: ["manage_settings", "view_param", "view_config", "edit_config", "view_all_params"],
+    permissions: [],
     subLinks: [
       {
-        label: "General Settings",
-        href: "/dashboard/user",
-        permissions: ["manage_settings"],
+        label: "My Settings",
+        href: "/dashboard/settings",
+        permissions: [],
         protected: true,
       },
       {

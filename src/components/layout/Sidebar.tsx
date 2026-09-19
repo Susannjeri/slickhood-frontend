@@ -124,7 +124,7 @@ export default function AppSidebar() {
   const [pendingJobsCount, setPendingJobsCount] = useState(0);
   const [isJobsDrawerOpen, setIsJobsDrawerOpen] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
-  const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null);
+  const jobsPollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
   const [currentHash, setCurrentHash] = useState("");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -222,29 +222,39 @@ export default function AppSidebar() {
     } catch { return 0; }
   };
 
-  const setupPolling = (hasPending: boolean) => {
-    if (!canAccessJobs) return;
-    if (pollInterval) clearInterval(pollInterval);
-    const interval = hasPending ? 60000 : 300000;
-    const newInterval = setInterval(async () => {
+  const scheduleJobsPoll = (hasPending: boolean) => {
+    if (jobsPollTimer.current) clearTimeout(jobsPollTimer.current);
+    if (!canAccessJobs || !token || document.visibilityState === "hidden") return;
+    jobsPollTimer.current = setTimeout(async () => {
       const count = await fetchPendingJobs();
-      if (count > 0 && !hasPending) setupPolling(true);
-      else if (count === 0 && hasPending) setupPolling(false);
-    }, interval);
-    setPollInterval(newInterval);
+      scheduleJobsPoll(count > 0);
+    }, hasPending ? 60000 : 300000);
   };
 
   useEffect(() => {
     if (!canAccessJobs || !token) return;
-    const init = async () => { const c = await fetchPendingJobs(); setupPolling(c > 0); };
-    init();
-    return () => { if (pollInterval) clearInterval(pollInterval); };
+    let active = true;
+    const init = async () => {
+      const count = await fetchPendingJobs();
+      if (active) scheduleJobsPoll(count > 0);
+    };
+    void init();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void init();
+      else if (jobsPollTimer.current) clearTimeout(jobsPollTimer.current);
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      active = false;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      if (jobsPollTimer.current) clearTimeout(jobsPollTimer.current);
+    };
   }, [canAccessJobs, token]);
 
   const handleOpenDrawer = async () => {
     setIsJobsDrawerOpen(true);
     const count = await fetchPendingJobs();
-    setupPolling(count > 0);
+    scheduleJobsPoll(count > 0);
   };
 
   const setSubMenuOpen = (label: string, nextOpen: boolean) =>
@@ -651,7 +661,7 @@ export default function AppSidebar() {
         <JobsDrawer
           open={isJobsDrawerOpen}
           onOpenChange={setIsJobsDrawerOpen}
-          onJobsUpdate={async () => { const c = await fetchPendingJobs(); setupPolling(c > 0); }}
+          onJobsUpdate={async () => { const c = await fetchPendingJobs(); scheduleJobsPoll(c > 0); }}
         />
       )}
     </>
