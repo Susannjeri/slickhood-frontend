@@ -5,6 +5,8 @@ import { AlertTriangle, Archive, ArrowUpRight, Building2, CalendarClock, FileLoc
 import { wealthService, AssetPayload, WealthPropertyOption, WealthAssetType } from "@/services/wealth.service";
 import { WealthAsset, WealthDashboard, VaultDocument } from "@/types/wealth";
 import { apiErrorMessage } from "@/lib/api-error";
+import axios from "axios";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +29,7 @@ const list = <T,>(value: unknown): T[] => Array.isArray(value) ? value.filter((i
 const emptyAsset: AssetPayload = { assetType: "", name: "", currency: "KES", acquisitionCost: 0, currentValue: 0, valuationDate: today(), status: "ACTIVE", pricingMode: "MANUAL" };
 type Run = (action: () => Promise<unknown>, message: string) => Promise<boolean>;
 export default function WealthPage() {
+    const {handleTokenRefresh}=useAuth();
     const can=useWealthAccess();
     const [dashboard, setDashboard] = useState<WealthDashboard | null>(null), [assets, setAssets] = useState<WealthAsset[]>([]), [busy, setBusy] = useState(false);
     const [propertyOptions, setPropertyOptions] = useState<WealthPropertyOption[]>([]);
@@ -37,12 +40,13 @@ export default function WealthPage() {
     const canLinkProperties = can("assets");
     const [loading, setLoading] = useState(true), [loadError, setLoadError] = useState("");
     const [vaultError, setVaultError] = useState(""), [revision, setRevision] = useState(0);
-    const requestId = useRef(0), mutationLock = useRef(false);
+    const requestId = useRef(0), mutationLock = useRef(false), accessRefreshAttempted = useRef(false), tokenRefresh = useRef(handleTokenRefresh);
     const [selected, setSelected] = useState<number | undefined>(), [assetForm, setAssetForm] = useState<AssetPayload>(emptyAsset), [editing, setEditing] = useState<number>();
     const [years, setYears] = useState(5), [valueGrowth, setValueGrowth] = useState(5), [incomeGrowth, setIncomeGrowth] = useState(3), [expenseGrowth, setExpenseGrowth] = useState(3);
     const [docs, setDocs] = useState<VaultDocument[]>([]);
     const selectedType = assetTypes.find(type => type.code === assetForm.assetType);
     const selectedAsset = useMemo(() => assets.find(a => a.id === selected), [assets, selected]);
+    useEffect(()=>{tokenRefresh.current=handleTokenRefresh;},[handleTokenRefresh]);
     const load = useCallback(async () => {
         const request = ++requestId.current;
         setLoading(true);
@@ -51,20 +55,31 @@ export default function WealthPage() {
             wealthService.assets(), canLinkProperties ? wealthService.propertyOptions() : Promise.resolve({data:{data:[]}}), wealthService.assetTypes(), wealthService.vault()
         ]);
         if (request !== requestId.current) return;
+        const coreFailures=[d,a,t].filter((result):result is PromiseRejectedResult=>result.status==="rejected");
+        const staleAccess=coreFailures.length===3&&coreFailures.every(result=>axios.isAxiosError(result.reason)&&[401,403].includes(result.reason.response?.status??0));
+        if(staleAccess&&!accessRefreshAttempted.current){
+            accessRefreshAttempted.current=true;
+            try{await tokenRefresh.current();window.location.reload();return;}
+            catch{/* The detailed provider error is shown by the normal warning path below. */}
+        }
         const warnings: string[] = [];
+        if(staleAccess){
+            const reason=coreFailures[0]?.reason;
+            warnings.push(apiErrorMessage(reason,"Your Wealth access could not be refreshed. Sign out and sign in again, then retry."));
+        }
         if (d.status === "fulfilled") {
             const raw = envelopeItem<WealthDashboard | null>(d.value, null);
             setDashboard(raw ? {...raw, assets:list(raw.assets), obligations:list(raw.obligations), goals:list(raw.goals), goalProgress:list(raw.goalProgress), insights:list(raw.insights), projection:list(raw.projection)} : null);
             if (!raw) warnings.push("Wealth totals are unavailable.");
-        } else { setDashboard(null); warnings.push("Wealth totals could not be refreshed."); }
+        } else { setDashboard(null); if(!staleAccess) warnings.push("Wealth totals could not be refreshed."); }
         if (a.status === "fulfilled") {
             const items = envelopeList<WealthAsset>(a.value); setAssets(items);
             setSelected(current => items.some(asset => asset.id === current) ? current : items[0]?.id);
-        } else warnings.push("Asset records could not be refreshed; any records shown may be out of date.");
+        } else if(!staleAccess) warnings.push("Asset records could not be refreshed; any records shown may be out of date.");
         if (p.status === "fulfilled") setPropertyOptions(envelopeList<WealthPropertyOption>(p.value));
-        else { setPropertyOptions([]); warnings.push("Property linking is unavailable. You can still manage your other assets."); }
+        else { setPropertyOptions([]); if(!staleAccess) warnings.push("Property linking is unavailable. You can still manage your other assets."); }
         if (t.status === "fulfilled") setConfiguredAssetTypes(envelopeList<WealthAssetType>(t.value));
-        else { setConfiguredAssetTypes([]); warnings.push("Asset categories are unavailable. Please retry before adding an asset."); }
+        else { setConfiguredAssetTypes([]); if(!staleAccess) warnings.push("Asset categories are unavailable. Please retry before adding an asset."); }
         if (v.status === "fulfilled") { setDocs(envelopeList<VaultDocument>(v.value)); setVaultError(""); }
         else setVaultError("The vault could not be refreshed. Previously shown records may be out of date.");
         setLoadError(warnings.join(" ")); setLoading(false);
