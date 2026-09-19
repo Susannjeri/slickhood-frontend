@@ -89,7 +89,7 @@ function RegistrantConfirmation({
   onConfirmed,
 }: {
   document: KycDocument;
-  onConfirmed: () => Promise<void>;
+  onConfirmed: (document: KycDocument) => void;
 }) {
   const fields = confirmableFieldsFor(document.documentType);
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -106,9 +106,9 @@ function RegistrantConfirmation({
     if (!complete) return;
     setSaving(true);
     try {
-      await confirmKycDocument(document.id, values);
+      const confirmedDocument = await confirmKycDocument(document.id, values);
+      onConfirmed(confirmedDocument);
       toast.success("Your confirmed document details were saved.");
-      await onConfirmed();
     } catch (error) {
       toast.error(errorMessage(error, "The confirmed details could not be saved."));
     } finally {
@@ -600,6 +600,14 @@ export default function KycPage() {
                         kyc={kyc}
                         missing={missing.has(requirement.code)}
                         onUploaded={load}
+                        onConfirmed={(confirmedDocument) => {
+                          setKyc((current) => current ? {
+                            ...current,
+                            documents: current.documents.map((document) =>
+                              document.id === confirmedDocument.id ? confirmedDocument : document),
+                          } : current);
+                          void load();
+                        }}
                       />
                     ))}
                   </div>
@@ -645,11 +653,13 @@ function RequirementCard({
   kyc,
   missing,
   onUploaded,
+  onConfirmed,
 }: {
   requirement: KycRequirement;
   kyc: KycCase;
   missing: boolean;
   onUploaded: () => Promise<void>;
+  onConfirmed: (document: KycDocument) => void;
 }) {
   const matchingAcceptedTypes = useMemo(() => {
     if (requirement.code !== "IDENTITY_BACK") return requirement.acceptedTypes;
@@ -787,7 +797,7 @@ function RequirementCard({
             </div>
           ) : null}
           <OcrKeyDetails document={document} />
-          <RegistrantConfirmation document={document} onConfirmed={onUploaded} />
+          <RegistrantConfirmation document={document} onConfirmed={onConfirmed} />
           <KycDocumentViewer document={document} className="w-full" />
           {!replacing && (
             <Button
