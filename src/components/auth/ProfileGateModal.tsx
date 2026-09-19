@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, XCircle, ArrowRight } from "lucide-react";
 
@@ -29,6 +29,8 @@ export default function ProfileGateModal({ open, fields, onClose }: ProfileGateM
         className="p-0 border-0 overflow-hidden max-w-sm w-full rounded-2xl"
         style={{ boxShadow: "0 24px 60px rgba(20,17,48,0.15)" }}
       >
+        <DialogTitle className="sr-only">Complete your profile</DialogTitle>
+        <DialogDescription className="sr-only">Review the missing profile fields required before you can continue.</DialogDescription>
         {/* ── Top stripe ───────────────────────────── */}
         <div className="h-1 w-full" style={{ background: "#EF4217" }} />
 

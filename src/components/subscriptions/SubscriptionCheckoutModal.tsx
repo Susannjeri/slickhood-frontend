@@ -14,7 +14,7 @@ import {
   subscribeToPlan,
   SubscriptionCheckout,
 } from "@/services/subscription.service";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 interface Props {
   open: boolean;
@@ -168,6 +168,7 @@ export default function SubscriptionCheckoutModal({ open, plan, role, product, t
     <Dialog open={open} onOpenChange={value => { if (!value && !loading) onClose(); }}>
       <DialogContent className="max-h-[92vh] w-[calc(100vw-2rem)] max-w-3xl overflow-y-auto rounded-[28px] border border-[#dce4ef] bg-[#fbfbfc] p-0">
         <DialogTitle className="sr-only">Subscription payment</DialogTitle>
+        <DialogDescription className="sr-only">Choose a payment method and complete or confirm your SlickHood subscription.</DialogDescription>
         <div className="border-l-4 border-[#ff5b15] px-4 py-6 sm:border-l-[8px] sm:px-12 sm:py-7">
           {step === "method" && (
             <>

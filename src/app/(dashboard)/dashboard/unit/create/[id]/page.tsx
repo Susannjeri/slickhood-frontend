@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   CheckCircle2,
@@ -906,6 +908,8 @@ const presetFormLeaseMode: "RENT" | "SALE" | "SERVICE_CHARGE" | null =
           className="sm:max-w-md p-0 overflow-hidden"
           onInteractOutside={(e) => e.preventDefault()}
         >
+          <DialogTitle className="sr-only">Unit created successfully</DialogTitle>
+          <DialogDescription className="sr-only">Choose whether to open the unit, create similar units, or return to the unit list.</DialogDescription>
           <div className="flex flex-col items-center px-8 pt-8 pb-6 gap-5">
 
             {/* Icon */}

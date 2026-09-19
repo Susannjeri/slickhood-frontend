@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -92,6 +93,7 @@ export function ManualPaymentModal({ invoice, open, onClose, onPaymentSuccess }:
         {/* Header */}
         <DialogHeader className="border-b border-gray-100 px-4 pb-4 pt-5 sm:px-6 sm:pt-6">
           <DialogTitle className="text-base text-[#141130]">Record Manual Payment</DialogTitle>
+          <DialogDescription>Record an authorised payment received outside SlickHood for this invoice.</DialogDescription>
           <p className="text-xs text-gray-400 mt-0.5">
             Invoice <span className="font-semibold text-[#EF4217]">{invoice.ref}</span>
             {" · "}

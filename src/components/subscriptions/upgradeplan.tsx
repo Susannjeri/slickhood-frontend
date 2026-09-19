@@ -12,7 +12,7 @@ import {
 } from "@/services/subscription.service";
 import { SubscriptionPlan } from "@/types/subscription";
 import SubscriptionCheckoutModal from "./SubscriptionCheckoutModal";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { businessAreas } from "@/config/businessAreas";
 import { Check, Loader2 } from "lucide-react";
@@ -313,6 +313,7 @@ export default function UpgradePlan() {
             <Dialog open={!!downgradePlan} onOpenChange={open => { if (!open && !mutating) setDowngradePlan(null); }}>
                 <DialogContent className="max-w-lg rounded-3xl">
                     <DialogTitle className="text-2xl font-bold text-[#08184A]">Downgrade to {downgradePlan?.displayName}?</DialogTitle>
+                    <DialogDescription>The change takes effect at the end of the current billing period after payment authorization for the new plan.</DialogDescription>
                     <p className="text-sm text-gray-500">The change will be scheduled for the end of your current billing period. Your existing features remain available until then.</p>
                     <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-800">At period end, SlickHood will ask you to authorize payment for the new plan before activating it.</div>
                     <div className="flex gap-3">
@@ -337,6 +338,7 @@ export default function UpgradePlan() {
                 if (!open && !mutating) setSalesPlan(null);
             }}>
                 <DialogContent className="max-w-lg rounded-3xl">
+                    <DialogDescription className="sr-only">Send the subscription team your requirements for a tailored plan.</DialogDescription>
                     {salesRequestSubmitted ? (
                         <div className="space-y-5 py-4 text-center">
                             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl text-emerald-600">✓</div>

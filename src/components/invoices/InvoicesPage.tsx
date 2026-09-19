@@ -11,6 +11,7 @@ import { useAuthStore } from "@/store/authStore";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -90,6 +91,7 @@ export function InvoicesPage() {
         <SheetContent side="right" className="w-full sm:w-[480px] p-0 flex flex-col">
           <SheetHeader className="px-5 pt-5 pb-0 shrink-0">
             <SheetTitle className="text-base text-[#141130]">Invoice Details</SheetTitle>
+            <SheetDescription>Review charges, payment status and available actions for the selected invoice.</SheetDescription>
           </SheetHeader>
           <div className="flex-1 overflow-hidden p-5 pt-3">
             {selectedInvoice && (

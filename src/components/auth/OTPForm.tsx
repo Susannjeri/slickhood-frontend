@@ -14,7 +14,7 @@ import { useAuthHydrated } from '@/hooks/useAuthHydrated';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { RegistrationStepper } from '@/components/auth/RegistrationStepper';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { invitationUrl, safeInvitationReturnTo } from '@/lib/invitation-navigation';
 
 const EXPIRY_SECONDS = 5 * 60; // 5 minutes
@@ -253,6 +253,8 @@ const OTPForm: React.FC = () => {
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => e.preventDefault()}
         >
+          <DialogTitle className="sr-only">Email verified</DialogTitle>
+          <DialogDescription className="sr-only">Verification succeeded. You are being taken to identity verification and secure account setup.</DialogDescription>
           <div className="flex flex-col items-center px-8 pt-8 pb-6 gap-3 text-center">
             <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
               <CheckCircle2 className="w-9 h-9 text-green-500" />

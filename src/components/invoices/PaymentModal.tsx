@@ -9,6 +9,7 @@ import { API } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -196,6 +197,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
               <DialogTitle className="text-base text-[#141130]">
                 {step === "accounts" ? "Choose Payment Account" : step === "instructions" ? "Payment instructions" : "Confirm Payment"}
               </DialogTitle>
+              <DialogDescription>Choose a verified payment destination and complete payment for this invoice.</DialogDescription>
               <p className="text-xs text-gray-400 mt-0.5">
                 Invoice <span className="font-semibold text-[#EF4217]">{invoice.ref}</span>
                 {" · "}

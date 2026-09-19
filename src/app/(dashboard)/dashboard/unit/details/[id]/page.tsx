@@ -1808,6 +1808,7 @@ export default function ViewUnitPage() {
         <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
           <DialogHeader className="px-6 py-4 border-b">
             <DialogTitle style={{ color: "#141130" }}>Lease Template Preview</DialogTitle>
+            <DialogDescription>Review the lease template document assigned to this unit.</DialogDescription>
           </DialogHeader>
           <div className="flex-1 w-full h-full p-4">
             {pdfUrl ? (
