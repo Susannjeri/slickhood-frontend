@@ -14,6 +14,17 @@ test.beforeEach(async ({ context, page }) => {
       { id: "WAREHOUSE", name: "Warehouse", description: "Industrial storage", category: "INDUSTRIAL", displayOrder: 400, common: false },
     ]),
   }));
+  await page.route("**/account/list**", route => route.fulfill({
+    json: envelope([{
+      id: 91,
+      name: "Landlord collection account",
+      category: "LANDLORD",
+      channel: "MPESA",
+      channelDisplayName: "M-Pesa",
+      active: true,
+      verified: true,
+    }]),
+  }));
 });
 
 test("property creation remains usable when Google Maps is not configured", async ({ page }) => {
@@ -93,6 +104,7 @@ test("property creation preserves the selected management workflow", async ({ pa
   await page.getByLabel("Property name *").fill("Sunset Villa");
   await page.getByLabel("Property type *").selectOption("APARTMENT_BLOCK");
   await page.getByLabel("Address *").fill("123 Main Street, Nairobi");
+  await page.getByLabel("Receiving payment account *").selectOption("91");
   await page.getByLabel("Coordinates (Latitude, Longitude) *").fill("-1.286389, 36.817223");
 
   const requestPromise = page.waitForRequest(request => request.url().includes("/property/create") && request.method() === "POST");
@@ -106,6 +118,8 @@ test("property creation preserves the selected management workflow", async ({ pa
 
   expect(body).toContain('name="managementMode"');
   expect(body).toContain("RENTAL");
+  expect(body).toContain('name="paymentAccountId"');
+  expect(body).toContain("91");
   expect(body).toContain('name="image"; filename="property.png"');
 });
 
