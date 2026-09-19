@@ -2,7 +2,7 @@
 import { FormEvent, ReactElement, cloneElement, useId, useRef, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, Archive, ArrowUpRight, Building2, CalendarClock, FileLock2, Goal, Landmark, Plus, RefreshCw, Scale, ShieldCheck, Sparkles, TrendingUp, WalletCards } from "lucide-react";
-import { wealthService, AssetPayload, WealthPropertyOption, WealthAssetType } from "@/services/wealth.service";
+import { wealthService, AssetPayload, WealthPropertyOption, WealthAssetType, defaultWealthAssetTypes } from "@/services/wealth.service";
 import { WealthAsset, WealthDashboard, VaultDocument } from "@/types/wealth";
 import { apiErrorMessage } from "@/lib/api-error";
 import axios from "axios";
@@ -78,8 +78,14 @@ export default function WealthPage() {
         } else if(!staleAccess) warnings.push("Asset records could not be refreshed; any records shown may be out of date.");
         if (p.status === "fulfilled") setPropertyOptions(envelopeList<WealthPropertyOption>(p.value));
         else { setPropertyOptions([]); if(!staleAccess) warnings.push("Property linking is unavailable. You can still manage your other assets."); }
-        if (t.status === "fulfilled") setConfiguredAssetTypes(envelopeList<WealthAssetType>(t.value));
-        else { setConfiguredAssetTypes([]); if(!staleAccess) warnings.push("Asset categories are unavailable. Please retry before adding an asset."); }
+        if (t.status === "fulfilled") {
+            const types = envelopeList<WealthAssetType>(t.value);
+            setConfiguredAssetTypes(types.length ? types : defaultWealthAssetTypes);
+            if (!types.length) warnings.push("Using the standard asset categories while the catalogue refreshes.");
+        } else {
+            setConfiguredAssetTypes(defaultWealthAssetTypes);
+            if(!staleAccess) warnings.push("Using the standard asset categories while the catalogue refreshes.");
+        }
         if (v.status === "fulfilled") { setDocs(envelopeList<VaultDocument>(v.value)); setVaultError(""); }
         else setVaultError("The vault could not be refreshed. Previously shown records may be out of date.");
         setLoadError(warnings.join(" ")); setLoading(false);

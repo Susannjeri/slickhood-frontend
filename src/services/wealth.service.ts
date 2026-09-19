@@ -3,6 +3,21 @@ import {API} from "@/lib/api";
 export type AssetPayload={propertyId?:number;assetType:string;name:string;reference?:string;location?:string;currency:string;acquisitionCost:number;acquisitionDate?:string;currentValue:number;valuationDate:string;status:string;exchangeCode?:string;instrumentSymbol?:string;quantity?:number;averageUnitCost?:number;pricingMode?:"MANUAL"|"MARKET"};
 export type WealthPropertyOption={id:number;name:string;description?:string};
 export type WealthAssetType={id:number;code:string;label:string;description?:string;displayOrder:number;marketPricingAllowed:boolean;active:boolean};
+export const defaultWealthAssetTypes: WealthAssetType[] = [
+ {id:-1,code:"PROPERTY",label:"Property",description:"Residential or commercial property",displayOrder:10,marketPricingAllowed:false,active:true},
+ {id:-2,code:"LAND",label:"Land",description:"Vacant, agricultural or development land",displayOrder:20,marketPricingAllowed:false,active:true},
+ {id:-3,code:"LISTED_SECURITY",label:"Shares",description:"Exchange-listed shares and securities",displayOrder:30,marketPricingAllowed:true,active:true},
+ {id:-4,code:"FUND",label:"Funds",description:"Unit trusts, mutual funds and exchange-traded funds",displayOrder:40,marketPricingAllowed:true,active:true},
+ {id:-5,code:"GOVERNMENT_SECURITY",label:"Government securities",description:"Treasury bills and bonds",displayOrder:50,marketPricingAllowed:true,active:true},
+ {id:-6,code:"INVESTMENT",label:"Other investments",description:"Private or managed investments",displayOrder:60,marketPricingAllowed:false,active:true},
+ {id:-7,code:"SACCO",label:"SACCO",description:"Deposits and shares held in a SACCO",displayOrder:70,marketPricingAllowed:false,active:true},
+ {id:-8,code:"PENSION",label:"Pension",description:"Retirement and pension accounts",displayOrder:80,marketPricingAllowed:false,active:true},
+ {id:-9,code:"CASH",label:"Cash and bank balances",description:"Cash and bank balances",displayOrder:90,marketPricingAllowed:false,active:true},
+ {id:-10,code:"BUSINESS",label:"Business",description:"Ownership interests in a business",displayOrder:100,marketPricingAllowed:false,active:true},
+ {id:-11,code:"VEHICLE",label:"Vehicle",description:"Cars and other vehicles",displayOrder:110,marketPricingAllowed:false,active:true},
+ {id:-12,code:"DIGITAL_ASSET",label:"Digital assets",description:"Digital assets tracked manually or by market price",displayOrder:120,marketPricingAllowed:true,active:true},
+ {id:-13,code:"OTHER",label:"Other",description:"Other asset types",displayOrder:999,marketPricingAllowed:false,active:true},
+];
 export const wealthService={
  dashboard:(years=5,valueGrowth=5,incomeGrowth=3,expenseGrowth=3)=>API.get("/wealth/dashboard",{params:{years,valueGrowth,incomeGrowth,expenseGrowth}}),
  assets:()=>API.get("/wealth/assets"),
