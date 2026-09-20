@@ -75,8 +75,10 @@ test("marine cargo IDF OCR populates immutable declarations and supports several
  await expect(dialog.getByLabel("IDF number")).toHaveValue("2026IM000123");await expect(dialog.getByLabel("Importer PIN")).toHaveAttribute("readonly","");await expect(dialog.getByLabel("FOB value")).toHaveAttribute("readonly","");
  await dialog.getByLabel("Import Declaration Form (IDF / IM0)").setInputFiles({name:"second-idf.pdf",mimeType:"application/pdf",buffer:Buffer.from("%PDF-1.4 SECOND")});
  await expect(dialog.getByLabel("IDF number")).toHaveCount(2);await expect(dialog.getByTestId("proposal-estimated-total")).toContainText("12,500,000");
+ await dialog.getByLabel("Commercial invoice").setInputFiles({name:"commercial-invoice.pdf",mimeType:"application/pdf",buffer:Buffer.from("%PDF-1.4 COMMERCIAL INVOICE")});
+ await expect(dialog.getByText("commercial-invoice.pdf")).toBeVisible();
  await dialog.locator('input[type="checkbox"]').check();await dialog.getByRole("button",{name:"Submit request"}).click();
- await expect.poll(()=>uploaded).toBe(2);
+ await expect.poll(()=>uploaded).toBe(3);
  expect(submitted).toMatchObject({productCode:"MARINE_CARGO",sumInsured:12500000,proposalData:{consignments:[{idfNumber:"2026IM000123",importerName:"Example Importer Limited",fobValue:"5000000",quantity:"20"},{idfNumber:"2026IM000124",descriptionAndApplication:"Industrial motors",fobValue:"7500000",quantity:"30"}]}});
 });
 
