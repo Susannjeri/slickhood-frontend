@@ -602,6 +602,16 @@ test("browser session cookie writes reject hostile origins and non-JSON requests
     data: {},
   });
   expect(missingCsrf.status()).toBe(403);
+
+  const legacyRefresh = await request.post("/api/auth/refresh", {
+    headers: {
+      Origin: "https://attacker.example",
+      "Content-Type": "application/json",
+      "x-slickhood-csrf": "browser-session-v1",
+    },
+    data: {},
+  });
+  expect(legacyRefresh.status()).toBe(403);
 });
 
 test("password reset verifies ownership and enforces the registration password policy", async ({ page }) => {

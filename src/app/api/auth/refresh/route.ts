@@ -1,12 +1,18 @@
 // app/api/auth/refresh/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
-import { writeAccessTokenCookies } from "@/lib/access-token-cookie";
+import { clearAccessTokenCookies, writeAccessTokenCookies } from "@/lib/access-token-cookie";
 import { accessTokenMaxAge } from "@/lib/session-token";
-
-
+import { rejectUnsafeBrowserSessionMutation } from "@/lib/browser-session-security";
 
 export async function POST(req: NextRequest) {
+  const rejected = rejectUnsafeBrowserSessionMutation(req);
+  if (rejected) {
+    return NextResponse.json(
+      { success: false, description: rejected.description },
+      { status: rejected.status },
+    );
+  }
   const refreshToken = req.cookies.get("refreshToken")?.value;
   if (!refreshToken) {
     return NextResponse.json(
@@ -76,7 +82,7 @@ export async function POST(req: NextRequest) {
       ? error.response?.data?.description
       : undefined;
     const localDescription = error instanceof Error ? error.message : undefined;
-    return NextResponse.json(
+    const response = NextResponse.json(
       { 
         success: false,
         description: providerDescription || localDescription || "Failed to refresh token",
@@ -85,5 +91,14 @@ export async function POST(req: NextRequest) {
       },
       { status: 401 }
     );
+    clearAccessTokenCookies(response.cookies);
+    response.cookies.set("refreshToken", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+    return response;
   }
 }
