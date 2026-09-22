@@ -44,7 +44,7 @@ import { Account, AccountProperty } from "@/types/account";
 interface AccountDetailDrawerProps {
   accountId: number | null;
   onClose: () => void;
-  onChanged: () => void;
+  onChanged: () => void | Promise<void>;
 }
 
 interface PropertyFieldState extends AccountProperty {
@@ -175,6 +175,10 @@ export default function AccountDetailDrawer({
         throw new Error(res?.description || "Failed to check account readiness");
       }
       await loadDetail(account.id);
+      // The detail endpoint and list endpoint are separate reads. Refresh the
+      // parent list after readiness changes so both surfaces show the same
+      // authoritative persisted status immediately.
+      await onChanged();
       toast.success("Account is ready for test payments", {
         description: "No SlickHood administrator approval is required.",
         descriptionClassName: "!text-black",

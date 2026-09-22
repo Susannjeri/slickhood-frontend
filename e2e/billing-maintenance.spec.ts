@@ -86,3 +86,38 @@ test("replacing a receiving credential clears readiness without exposing the sec
   await expect(page.getByText("Setup incomplete", { exact: true }).last()).toBeVisible();
   expect(consoleMessages.join("\n")).not.toContain("synthetic-replacement-only");
 });
+
+test("enabling a receiving account refreshes readiness in both detail and list", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Landlord", permissions: ["view_account", "edit_account", "create_account", "view_invoice_list", "view_payment_list"] });
+  let verified = false;
+  const account = () => ({
+    id: 92,
+    name: "Paystack test route",
+    category: "LANDLORD",
+    channel: "PAYSTACK",
+    channelDisplayName: "Paystack",
+    active: true,
+    verified,
+    properties: [{
+      key: "subaccountCode",
+      label: "Paystack Subaccount Code",
+      description: "Synthetic test destination",
+      value: "ACCT_synthetic",
+      encrypted: true,
+      displayField: true,
+    }],
+  });
+  await page.route("**/account/list**", route => route.fulfill({ json: envelope([account()]) }));
+  await page.route("**/account/92", route => route.fulfill({ json: envelope([account()]) }));
+  await page.route("**/account/92/readiness", route => {
+    verified = true;
+    return route.fulfill({ json: envelope([account()]) });
+  });
+
+  await page.goto("/dashboard/accounts");
+  await expect(page.getByRole("button", { name: /Paystack test route/ }).getByText("Setup incomplete", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Paystack test route/ }).click();
+  await page.getByRole("button", { name: "Check setup and enable" }).click();
+  await expect(page.getByText("Account is ready for test payments", { exact: true })).toBeVisible();
+  await expect(page.getByText("Ready for payments", { exact: true })).toHaveCount(2);
+});
