@@ -38,7 +38,7 @@ test("Paystack return is labelled paid only after authenticated server verificat
   await page.goto("/payment/callback?reference=91");
   await expect(page.getByRole("heading", { name: "Payment confirmed" })).toBeVisible();
   await expect(page.getByText("91", { exact: true })).toBeVisible();
-  await expect(page.getByText(/invoice and subscription have been updated/i)).toBeVisible();
+  await expect(page.getByText(/payment has been verified and applied/i)).toBeVisible();
   expect(confirmationUrl).toContain("reference=91");
 });
 

@@ -97,7 +97,7 @@ function PaystackCallbackContent() {
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-gray-500">
               {status === "paid"
-                ? "Your invoice and subscription have been updated."
+                ? "Your payment has been verified and applied. Updated invoice details are now available."
                 : status === "confirming"
                   ? "SlickHood is verifying the payment directly with Paystack."
                   : status === "error"
