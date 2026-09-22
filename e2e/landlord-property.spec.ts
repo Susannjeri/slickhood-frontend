@@ -56,6 +56,7 @@ test("property editing remains usable when Google Maps is not configured", async
     address: "Nairobi, Kenya",
     mapLocation: "-1.286389,36.817223",
     currency: "KES",
+    managementMode: "RENTAL",
     thumbnail: "",
     imagePathMask: "",
   }]) }));
@@ -63,6 +64,11 @@ test("property editing remains usable when Google Maps is not configured", async
   await page.goto("/dashboard/property/properties/edit/41");
 
   await expect(page.getByText(/Map search is temporarily unavailable/i)).toBeVisible();
+  await expect(page.getByText("Property journey")).toBeVisible();
+  await expect(page.getByText("Rental property")).toBeVisible();
+  await expect(page.getByLabel("Property name *")).toBeVisible();
+  await expect(page.getByText("Receiving payment accounts *")).toBeVisible();
+  await expect(page.getByLabel("Operating currency *")).toBeVisible();
   const coordinates = page.getByLabel("Coordinates (Latitude, Longitude) *");
   await expect(coordinates).toBeEditable();
   await coordinates.fill("-1.292100,36.821900");

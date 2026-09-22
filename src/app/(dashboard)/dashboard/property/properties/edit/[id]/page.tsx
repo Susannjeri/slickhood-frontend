@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -16,6 +15,7 @@ import {
   MapPin,
   Loader2,
   ArrowLeft,
+  Wallet,
 } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { currencyOptions } from "@/lib/actions";
@@ -23,6 +23,16 @@ import { currencyOptions } from "@/lib/actions";
 import dynamic from "next/dynamic";
 import {usePropertyMetadata} from "@/app/(dashboard)/dashboard/property/propertyMetadata";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import PropertyAccountsSheet from "@/components/property/PropertyAccountsSheet";
+import {
+  parseCoordinates,
+  propertyAccountCategories,
+  PropertyCoreFormData,
+  propertyCoreSchema,
+  propertyJourneyLabel,
+  PropertyManagementMode,
+  validatePropertyImage,
+} from "@/app/(dashboard)/dashboard/property/create/propertyCreation";
 
 // const CurrencySelect = dynamic(() => import("@/components/util/CurrencySelect"), { ssr: false });
 const Select = dynamic(() => import("react-select"), { ssr: false });
@@ -36,18 +46,6 @@ type SelectOption = {
   label: string;
   description?: string;
 };
-
-const propertySchema = z.object({
-  name: z.string().min(1, "Property name is required"),
-  type: z.string().min(1, "Property type is required"),
-  address: z.string().min(1, "Address is required"),
-  mapLocation: z
-    .string()
-    .min(1, "Location is required")
-    .regex(/^-?\d+\.?\d*,-?\d+\.?\d*$/, "Invalid coordinates format (lat,lng)"),
-  currency: z.string().optional(),
-});
-type PropertyFormData = z.infer<typeof propertySchema>;
 
 export default function EditPropertyForm() {
   const router = useRouter();
@@ -65,6 +63,9 @@ export default function EditPropertyForm() {
 
   const [isLoadingProperty, setIsLoadingProperty] = useState(true);
   const [originalType,setOriginalType]=useState("");
+  const [managementMode, setManagementMode] = useState<PropertyManagementMode>("RENTAL");
+  const [accountsSheetOpen, setAccountsSheetOpen] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   // Image state
   const [image, setImage] = useState<File | null>(null);
@@ -85,8 +86,9 @@ export default function EditPropertyForm() {
     formState: { errors },
     watch,
     control,
-  } = useForm<PropertyFormData>({
-    resolver: zodResolver(propertySchema),
+  } = useForm<PropertyCoreFormData>({
+    resolver: zodResolver(propertyCoreSchema),
+    defaultValues: { currency: "KES", mapLocation: "" },
   });
 
   const mapLocation = watch("mapLocation");
@@ -116,6 +118,7 @@ export default function EditPropertyForm() {
         setValue("address", property.address);
         setValue("mapLocation", property.mapLocation);
         setValue("currency", property.currency || "KES");
+        setManagementMode(property.managementMode || "RENTAL");
 
         // Parse and set map location
         if (property.mapLocation) {
@@ -159,9 +162,16 @@ export default function EditPropertyForm() {
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const validationError = await validatePropertyImage(file);
+      if (validationError) {
+        setImageError(validationError);
+        e.target.value = "";
+        return;
+      }
+      setImageError(null);
       setImage(file);
       const reader = new FileReader();
       reader.onloadend = () => setImagePreview(reader.result as string);
@@ -173,11 +183,10 @@ export default function EditPropertyForm() {
     const value = e.target.value;
     setValue("mapLocation", value, { shouldValidate: true });
 
-    const coords = value.split(",").map((c) => parseFloat(c.trim()));
-    if (coords.length === 2 && !isNaN(coords[0]) && !isNaN(coords[1])) {
-      const [lat, lng] = coords;
-      setMarker({ lat, lng });
-      setMapCenter({ lat, lng });
+    const coordinates = parseCoordinates(value);
+    if (coordinates) {
+      setMarker(coordinates);
+      setMapCenter(coordinates);
     }
   };
 
@@ -187,7 +196,7 @@ export default function EditPropertyForm() {
     message: string;
   }>({ type: null, message: "" });
 
-  const onSubmit = async (data: PropertyFormData) => {
+  const onSubmit = async (data: PropertyCoreFormData) => {
     // Use new image if uploaded, otherwise keep existing
     if (!image && !existingImagePath) {
       setSubmitStatus({
@@ -208,7 +217,7 @@ export default function EditPropertyForm() {
         type: data.type,
         address: data.address,
         mapLocation: data.mapLocation,
-        currency: data.currency || "KES",
+        currency: data.currency,
       });
 
       setSubmitStatus({
@@ -326,12 +335,22 @@ export default function EditPropertyForm() {
       )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        <div className="flex flex-col gap-3 rounded-lg border bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">Property journey</p>
+            <p className="font-semibold text-[#141130]">{propertyJourneyLabel(managementMode)}</p>
+            <p className="text-xs text-muted-foreground">The journey is fixed after creation to protect existing units, billing and records.</p>
+          </div>
+          <Button type="button" variant="outline" onClick={() => setAccountsSheetOpen(true)}>
+            <Wallet className="mr-2 size-4" />Receiving payment accounts
+          </Button>
+        </div>
         {/* Image + Basic Info Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Image Upload */}
           <div className="space-y-3 p-6 border rounded-lg bg-white">
             <Label className="text-base font-semibold" style={{ color: "#141130" }}>
-              Property Image *
+              Property image *
             </Label>
             <div className="flex flex-col items-center gap-4">
               {imagePreview ? (
@@ -373,17 +392,18 @@ export default function EditPropertyForm() {
                     Click to upload new image
                   </span>
                   <span className="text-xs text-gray-500 mt-1">
-                    PNG, JPG up to 10MB
+                    JPG, PNG or WebP · up to 10 MB · at least 300 × 200 px
                   </span>
                 </label>
               )}
               <Input
                 id="image-upload"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleImageChange}
                 className="hidden"
               />
+              {imageError && <p className="text-sm text-red-600" role="alert">{imageError}</p>}
             </div>
           </div>
 
@@ -394,11 +414,12 @@ export default function EditPropertyForm() {
             </h3>
 
             <div className="space-y-2">
-              <Label htmlFor="name">Property Name *</Label>
+              <Label htmlFor="name">Property name *</Label>
               <Input
                 id="name"
                 placeholder="e.g., Sunset Villa"
                 {...register("name")}
+                maxLength={160}
                 className={errors.name ? "border-red-500" : ""}
               />
               {errors.name && (
@@ -407,15 +428,16 @@ export default function EditPropertyForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="type">Property Type *</Label>
+              <Label htmlFor="type">Property type *</Label>
               <Controller
                 name="type"
                 control={control}
                 render={({ field }) => (
 
                   <Select
+                    inputId="type"
                     options={editPropertyTypeOptions}
-                    isClearable
+                    isClearable={false}
                     isSearchable
                     isLoading={isLoadingTypes}
                     classNamePrefix={"rs"}
@@ -468,6 +490,7 @@ export default function EditPropertyForm() {
                 id="address"
                 placeholder="e.g., 123 Main Street, Nairobi"
                 {...register("address")}
+                maxLength={500}
                 className={errors.address ? "border-red-500" : ""}
               />
               {errors.address && (
@@ -476,15 +499,16 @@ export default function EditPropertyForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="currency">Currency (optional defaults to KES)</Label>
+              <Label htmlFor="currency">Operating currency *</Label>
               <Controller
                 name="currency"
                 control={control}
                 render={({ field }) => (
                   <Select
                     {...field}
+                    inputId="currency"
                     options={currencyOptions}
-                    isClearable
+                    isClearable={false}
                     classNamePrefix="rs"
                     placeholder="Select currency"
                     onChange={(selected: any) =>
@@ -520,6 +544,15 @@ export default function EditPropertyForm() {
                   />
                 )}
               />
+              {errors.currency && <p className="text-sm text-red-600">{errors.currency.message}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Receiving payment accounts *</Label>
+              <Button type="button" variant="outline" className="w-full justify-start" onClick={() => setAccountsSheetOpen(true)}>
+                <Wallet className="mr-2 size-4" />View or change attached accounts
+              </Button>
+              <p className="text-xs text-muted-foreground">At least one payment-ready account must remain attached so invoices have a valid destination.</p>
             </div>
           </div>
         </div>
@@ -600,6 +633,13 @@ export default function EditPropertyForm() {
           </Button>
         </div>
       </form>
+      <PropertyAccountsSheet
+        propertyId={Number(propertyId)}
+        propertyName={watch("name") || "Property"}
+        open={accountsSheetOpen}
+        onOpenChange={setAccountsSheetOpen}
+        allowedCategories={[propertyAccountCategories[managementMode]]}
+      />
     </div>
   );
 }

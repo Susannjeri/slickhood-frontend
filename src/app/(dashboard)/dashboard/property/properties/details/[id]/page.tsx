@@ -76,6 +76,7 @@ import Can from "@/components/auth/Can";
 import CanProperty, {usePropertyPermissions} from "@/components/auth/CanProperty";
 import PropertyAccountsSheet from "@/components/property/PropertyAccountsSheet";
 import EstateSetupChecklist from "@/components/estate/EstateSetupChecklist";
+import { propertyAccountCategories, propertyJourneyLabel } from "@/app/(dashboard)/dashboard/property/create/propertyCreation";
 
 interface PropertyDetails {
     id: number;
@@ -831,6 +832,7 @@ export default function PropertyDetailsPage() {
                         propertyName={property.name}
                         open={accountsSheetOpen}
                         onOpenChange={setAccountsSheetOpen}
+                        allowedCategories={[propertyAccountCategories[property.managementMode || "RENTAL"]]}
                     />
                 )}
 
@@ -911,7 +913,21 @@ export default function PropertyDetailsPage() {
                                         <div className="p-4 border rounded-lg space-y-4">
                                             <div className="space-y-2">
                                                 <div className="flex items-center gap-2 text-gray-600">
-                                                    <span className="text-sm font-medium">Property Type</span>
+                                                    <span className="text-sm font-medium">Property name</span>
+                                                </div>
+                                                <p className="text-md font-semibold" style={{color: "#141130"}}>{property.name}</p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2 text-gray-600">
+                                                    <span className="text-sm font-medium">Property journey</span>
+                                                </div>
+                                                <p className="text-md font-semibold" style={{color: "#141130"}}>{propertyJourneyLabel(property.managementMode)}</p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-2 text-gray-600">
+                                                    <span className="text-sm font-medium">Property type</span>
                                                 </div>
                                                 <p className="text-md font-semibold pl-0" style={{color: "#141130"}}>
                                                     {getPropertyTypeName(property.type)}
@@ -920,7 +936,7 @@ export default function PropertyDetailsPage() {
 
                                             <div className="space-y-2">
                                                 <div className="flex items-center gap-2 text-gray-600">
-                                                    <span className="text-sm font-medium">Currency</span>
+                                                    <span className="text-sm font-medium">Operating currency</span>
                                                 </div>
                                                 <p className="text-md font-semibold pl-0" style={{color: "#141130"}}>
                                                     {property.currency}
@@ -971,7 +987,7 @@ export default function PropertyDetailsPage() {
                                                 style={{ borderColor: "#EF4217", color: "#EF4217" }}
                                             >
                                                 <Wallet className="w-4 h-4 mr-2" />
-                                                Payment Accounts
+                                                Receiving payment accounts
                                             </Button>
                                         </Can>
 

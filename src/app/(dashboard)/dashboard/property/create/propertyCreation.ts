@@ -43,8 +43,7 @@ export function parseCoordinates(value: string) {
   return { lat, lng };
 }
 
-export const propertySchema = z.object({
-  managementMode: z.enum(managementModes),
+export const propertyCoreSchema = z.object({
   name: z.string().trim().min(1, "Property name is required").max(160, "Use 160 characters or fewer"),
   type: z.string().trim().min(1, "Property type is required"),
   address: z.string().trim().min(1, "Address is required").max(500, "Use 500 characters or fewer"),
@@ -52,10 +51,24 @@ export const propertySchema = z.object({
     message: "Enter valid coordinates between -90/90 latitude and -180/180 longitude",
   }),
   currency: z.string().trim().length(3, "Select a valid currency"),
+});
+
+export const propertySchema = propertyCoreSchema.extend({
+  managementMode: z.enum(managementModes),
   paymentAccountId: z.number().int().positive("Select a verified payment account"),
 });
 
+export type PropertyCoreFormData = z.infer<typeof propertyCoreSchema>;
 export type PropertyFormData = z.infer<typeof propertySchema>;
+
+export const propertyJourneyLabel = (mode?: string) =>
+  managementJourneys.find(journey => journey.value === mode)?.title ?? "Property";
+
+export const propertyAccountCategories: Record<PropertyManagementMode, "LANDLORD" | "PROPERTY_SALES" | "ESTATE_MANAGEMENT"> = {
+  RENTAL: "LANDLORD",
+  SALE: "PROPERTY_SALES",
+  SERVICE_CHARGE: "ESTATE_MANAGEMENT",
+};
 
 export async function validatePropertyImage(file: File): Promise<string | null> {
   if (!PROPERTY_IMAGE_TYPES.includes(file.type as (typeof PROPERTY_IMAGE_TYPES)[number])) {

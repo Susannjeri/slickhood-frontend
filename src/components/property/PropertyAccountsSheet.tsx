@@ -47,6 +47,7 @@ interface PropertyAccountsSheetProps {
   allowedCategories?: AccountCategory[];
   createAccountHref?: string;
   onAccountsChanged?: () => void;
+  requireAtLeastOne?: boolean;
 }
 
 // Presigned channel icon URLs expire in ~1h (see account-module.md gotchas) —
@@ -120,6 +121,7 @@ export default function PropertyAccountsSheet({
   allowedCategories = ["LANDLORD", "ESTATE_MANAGEMENT", "PROPERTY_SALES"],
   createAccountHref = "/dashboard/accounts",
   onAccountsChanged,
+  requireAtLeastOne = true,
 }: PropertyAccountsSheetProps) {
   const { handleListPropertyAccounts, handleListAccounts, handleAttachAccount, handleDetachAccount } =
     useApi();
@@ -397,8 +399,11 @@ export default function PropertyAccountsSheet({
                         size="icon"
                         variant="ghost"
                         onClick={() => setDetachTarget(account)}
+                        disabled={requireAtLeastOne && attached.length === 1}
                         className="shrink-0 h-11 w-11 text-red-500 hover:text-red-700 hover:bg-red-50"
-                        title={`Detach ${account.name}`}
+                        title={requireAtLeastOne && attached.length === 1
+                          ? "Attach another payment-ready account before removing this one"
+                          : `Detach ${account.name}`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
