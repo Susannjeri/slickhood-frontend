@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { API } from "@/lib/api";
 import { browserSessionMutationInit } from "@/lib/browser-session-security";
 
-const CONFIRMATION_ATTEMPTS = 4;
-const CONFIRMATION_DELAY_MS = 1_500;
+// Paystack can redirect the browser before its verify endpoint exposes the final
+// transaction state. Keep this bounded so the page reconciles the same payment
+// instead of encouraging the customer to start a second checkout.
+const CONFIRMATION_ATTEMPTS = 15;
+const CONFIRMATION_DELAY_MS = 2_000;
 
 const wait = (milliseconds: number) => new Promise(resolve => window.setTimeout(resolve, milliseconds));
 

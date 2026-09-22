@@ -51,7 +51,7 @@ test("Paystack return remains pending when authenticated server verification fai
   }));
 
   await page.goto("/payment/callback?reference=92");
-  await expect(page.getByRole("heading", { name: "Confirmation pending" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Confirmation pending" })).toBeVisible({ timeout: 40_000 });
   await expect(page.getByText(/Paystack confirmation has not completed yet/i)).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry confirmation" })).toBeVisible();
   await expect(page.getByText(/Payment confirmed/i)).toHaveCount(0);
