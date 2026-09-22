@@ -5,6 +5,33 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { API } from "@/lib/api";
+import { browserSessionMutationInit } from "@/lib/browser-session-security";
+
+const CONFIRMATION_ATTEMPTS = 4;
+const CONFIRMATION_DELAY_MS = 1_500;
+
+const wait = (milliseconds: number) => new Promise(resolve => window.setTimeout(resolve, milliseconds));
+
+async function callbackAccessToken() {
+  let response = await fetch("/browser-session/get-token", {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (response.status === 401) {
+    const refreshed = await fetch("/browser-session/refresh", browserSessionMutationInit());
+    if (refreshed.ok) {
+      response = await fetch("/browser-session/get-token", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+    }
+  }
+  if (!response.ok) throw new Error("Session unavailable");
+  const body = await response.json();
+  const token = body?.data?.jwt;
+  if (typeof token !== "string" || !token) throw new Error("Session unavailable");
+  return token;
+}
 
 function PaystackCallbackContent() {
   const router = useRouter();
@@ -19,19 +46,26 @@ function PaystackCallbackContent() {
     }
     setStatus("confirming");
     try {
-      const sessionResponse = await fetch("/browser-session/get-token", {
-        credentials: "same-origin",
-        cache: "no-store",
-      });
-      if (!sessionResponse.ok) throw new Error("Session unavailable");
-      const sessionBody = await sessionResponse.json();
-      const token = sessionBody?.data?.jwt;
-      if (typeof token !== "string" || !token) throw new Error("Session unavailable");
-      const response = await API.post("/payment/paystack/confirm", null, {
-        params: { reference },
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setStatus(response.data?.data?.paid ? "paid" : "pending");
+      const token = await callbackAccessToken();
+      for (let attempt = 1; attempt <= CONFIRMATION_ATTEMPTS; attempt += 1) {
+        try {
+          const response = await API.post("/payment/paystack/confirm", null, {
+            params: { reference },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (response.data?.data?.paid) {
+            setStatus("paid");
+            return;
+          }
+        } catch (error: unknown) {
+          const statusCode = typeof error === "object" && error !== null && "response" in error
+            ? (error as { response?: { status?: number } }).response?.status
+            : undefined;
+          if (statusCode && statusCode < 500) throw error;
+        }
+        if (attempt < CONFIRMATION_ATTEMPTS) await wait(CONFIRMATION_DELAY_MS);
+      }
+      setStatus("pending");
     } catch {
       setStatus("error");
     }
@@ -63,7 +97,9 @@ function PaystackCallbackContent() {
                 ? "Your invoice and subscription have been updated."
                 : status === "confirming"
                   ? "SlickHood is verifying the payment directly with Paystack."
-                  : "The checkout returned successfully, but confirmation has not completed yet. You can retry safely."}
+                  : status === "error"
+                    ? "We could not complete the secure confirmation. Your payment will not be charged again when you retry."
+                    : "The checkout returned successfully, but Paystack confirmation has not completed yet. SlickHood will continue reconciling it safely."}
             </p>
           </div>
 

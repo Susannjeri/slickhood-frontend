@@ -52,7 +52,27 @@ test("Paystack return remains pending when authenticated server verification fai
 
   await page.goto("/payment/callback?reference=92");
   await expect(page.getByRole("heading", { name: "Confirmation pending" })).toBeVisible();
-  await expect(page.getByText(/confirmation has not completed yet/i)).toBeVisible();
+  await expect(page.getByText(/Paystack confirmation has not completed yet/i)).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry confirmation" })).toBeVisible();
   await expect(page.getByText(/Payment confirmed/i)).toHaveCount(0);
+});
+
+test("Paystack return refreshes an expired access token before confirmation", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: ["view_invoice_list"] });
+  let tokenReads = 0;
+  await page.route("**/browser-session/get-token", route => {
+    tokenReads += 1;
+    return tokenReads === 1
+      ? route.fulfill({ status: 401, json: { success: false } })
+      : route.fulfill({ status: 200, json: { data: { jwt: "refreshed-access-token" } } });
+  });
+  await page.route("**/browser-session/refresh", route => route.fulfill({ status: 200, json: { success: true } }));
+  await page.route("**/payment/paystack/confirm**", route => {
+    expect(route.request().headers().authorization).toBe("Bearer refreshed-access-token");
+    return route.fulfill({ status: 200, json: { success: true, data: { paid: true, invoiceRef: "INV-93" } } });
+  });
+
+  await page.goto("/payment/callback?reference=93");
+  await expect(page.getByRole("heading", { name: "Payment confirmed" })).toBeVisible();
+  expect(tokenReads).toBeGreaterThanOrEqual(2);
 });
