@@ -68,12 +68,18 @@ test("the billed customer can deep-link to and pay an exact participant-scoped i
   await page.getByRole("button", { name: "Pay balance" }).click();
   await expect(page.getByRole("button", { name: /Property Sale Paystack/ })).toHaveCount(0);
   await page.getByRole("button", { name: /M-Pesa Paybill 123456/ }).click();
+  await page.getByLabel("M-Pesa phone number").fill("712345678");
   await page.getByRole("button", { name: "Confirm Payment" }).click();
 
   await expect.poll(() => initialization).toBeTruthy();
   expect(initialization).toEqual({
     method: "POST",
-    body: { invoiceRef: "INV-RENT-501", accountId: 91, paymentChannel: "MPESA" },
+    body: {
+      invoiceRef: "INV-RENT-501",
+      accountId: 91,
+      paymentChannel: "MPESA",
+      phoneNumber: "+254712345678",
+    },
   });
 });
 
