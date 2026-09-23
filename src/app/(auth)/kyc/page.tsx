@@ -272,13 +272,22 @@ export default function KycPage() {
     if (!token || !phone.trim()) return;
     setBusy(true);
     try {
-      await verifyContact({ contact: phone.trim(), channel: "SMS", token });
+      const response = await verifyContact({ contact: phone.trim(), channel: "SMS", token });
+      const deliveryStatus = response.data.data?.[0]?.deliveryStatus as string | undefined;
+      if (deliveryStatus === "FAILED") {
+        setCodeSent(false);
+        setResendCooldown(0);
+        toast.error("The SMS gateway could not accept this code. Check the number or try again shortly.");
+        return;
+      }
       setCodeSent(true);
       setResendCooldown(60);
       toast.success(
-        resending
-          ? "A new verification code was sent."
-          : "A verification code was sent to your phone.",
+        deliveryStatus === "QUEUED"
+          ? "Your verification code is being delivered."
+          : resending
+            ? "A new verification code was accepted for delivery."
+            : "Your verification code was accepted for delivery.",
       );
     } catch (error) {
       toast.error(

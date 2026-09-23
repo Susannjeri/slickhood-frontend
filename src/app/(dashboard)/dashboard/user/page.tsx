@@ -195,8 +195,18 @@ export default function UserDetailsPage() {
       const response = await handleVerifyContact(contact, contactType);
       
       if (response.success) {
+        const deliveryStatus = response.data?.[0]?.deliveryStatus as string | undefined;
+        if (deliveryStatus === "FAILED") {
+          setOtpSent(false);
+          toast.error("The SMS gateway could not accept this code. Check the number or try again shortly.");
+          return;
+        }
         setOtpSent(true);
-        toast.success(response.description || "OTP sent successfully");
+        toast.success(
+          deliveryStatus === "QUEUED"
+            ? "Your verification code is being delivered."
+            : response.description || "Verification code accepted for delivery",
+        );
       } else {
         toast.error(response.description || "Failed to send OTP");
       }
