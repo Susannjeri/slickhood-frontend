@@ -61,7 +61,7 @@ test("reports stay bounded, require deliberate filters, and support forward leas
   }));
 
   await page.goto("/dashboard/reports");
-  await expect(page.getByRole("heading", { name: "Reports" })).toBeVisible();
+  await expect(page.locator("main").getByRole("heading", { name: "Reports", exact: true })).toBeVisible();
   await expect(page.getByText("Showing the first 500 rows.")).toBeVisible();
   await expect(page.getByText("INV-100")).toBeVisible();
 
