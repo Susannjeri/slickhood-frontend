@@ -22,6 +22,18 @@ jobs:
             set -eu
             echo 'Filesystem capacity (KB)'
             df -Pk / /tmp /home
+            echo 'Host uptime and load'
+            uptime
+            echo 'Memory and swap (MiB)'
+            free -m
+            echo 'VM pressure sample'
+            vmstat 1 5
+            echo 'Highest CPU and memory consumers'
+            ps -eo pid,ppid,comm,%cpu,%mem,rss,etimes --sort=-%cpu | head -n 16
+            echo 'Socket summary'
+            sudo ss -s
+            echo 'Listening application sockets'
+            sudo ss -lntp | grep -E ':(80|443|3000|8080|8081|3101)\b' || true
             echo 'SlickHood frontend release directories (KB)'
             sudo du -sk /home/silverocean/deploy /home/silverocean/deploy.candidate-* /home/silverocean/deploy.rollback-* 2>/dev/null || true
             echo 'Frontend transport directory (KB)'
@@ -35,6 +47,34 @@ jobs:
             echo 'Backend service state'
             sudo systemctl show pms.service \
               --property=ActiveState,SubState,Result,NRestarts,ExecMainCode,ExecMainStatus
+            echo 'Nginx service state and configuration'
+            sudo systemctl show nginx.service \
+              --property=ActiveState,SubState,Result,NRestarts,ExecMainCode,ExecMainStatus
+            sudo nginx -t
+            echo 'Frontend PM2 state'
+            sudo -u silverocean pm2 jlist \
+              | node -e 'let input="";process.stdin.on("data",c=>input+=c).on("end",()=>{for(const p of JSON.parse(input)){console.log(JSON.stringify({name:p.name,status:p.pm2_env?.status,restarts:p.pm2_env?.restart_time,unstableRestarts:p.pm2_env?.unstable_restarts,uptime:p.pm2_env?.pm_uptime,memory:p.monit?.memory,cpu:p.monit?.cpu,pid:p.pid}))}})'
+            echo 'Local application latency (seconds)'
+            for url in \
+              http://127.0.0.1:3000/login \
+              http://127.0.0.1:8080/actuator/health \
+              https://app.slickhood.com/login \
+              https://slickhood.com/; do
+              curl --insecure --silent --show-error --output /dev/null \
+                --connect-timeout 5 --max-time 20 \
+                --write-out "$url status=%{http_code} connect=%{time_connect} starttransfer=%{time_starttransfer} total=%{time_total}\n" \
+                "$url" || true
+            done
+            echo 'Recent Nginx upstream and resource errors (counts)'
+            nginx_errors="$(sudo tail -n 4000 /var/log/nginx/error.log 2>/dev/null || true)"
+            for signature in \
+              'upstream timed out' 'connect() failed' 'no live upstreams' \
+              'worker_connections are not enough' 'too many open files' \
+              'upstream prematurely closed connection'; do
+              count="$(printf '%s' "$nginx_errors" | grep -cF "$signature" || true)"
+              printf '%s=%s\n' "$signature" "$count"
+            done
+            unset nginx_errors
             echo 'Recent backend startup error classes (counts only)'
             journal="$(sudo journalctl -u pms.service --since '90 minutes ago' --no-pager)"
             for signature in \
