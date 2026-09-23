@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,21 @@ const CONFIRMATION_ATTEMPTS = 15;
 const CONFIRMATION_DELAY_MS = 2_000;
 
 const wait = (milliseconds: number) => new Promise(resolve => window.setTimeout(resolve, milliseconds));
+
+type PaystackConfirmation = {
+  invoiceRef?: string;
+  paid?: boolean;
+  paymentStatus?: string;
+};
+
+function confirmationFrom(payload: unknown): PaystackConfirmation | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const data = (payload as { data?: unknown }).data;
+  const candidate = Array.isArray(data) ? data[0] : data;
+  return candidate && typeof candidate === "object" ? candidate as PaystackConfirmation : undefined;
+}
+
+const pendingStatuses = new Set(["initialized", "pending", "ongoing", "processing", "queued"]);
 
 async function callbackAccessToken() {
   let response = await fetch("/browser-session/get-token", {
@@ -41,6 +56,8 @@ function PaystackCallbackContent() {
   const searchParams = useSearchParams();
   const reference = searchParams.get("reference") ?? searchParams.get("trxref");
   const [status, setStatus] = useState<"confirming" | "paid" | "pending" | "error">("confirming");
+  const [attempt, setAttempt] = useState(0);
+  const autoConfirmedReference = useRef<string | null>(null);
 
   const confirmPayment = useCallback(async () => {
     if (!reference) {
@@ -48,16 +65,24 @@ function PaystackCallbackContent() {
       return;
     }
     setStatus("confirming");
+    setAttempt(0);
     try {
       const token = await callbackAccessToken();
       for (let attempt = 1; attempt <= CONFIRMATION_ATTEMPTS; attempt += 1) {
+        setAttempt(attempt);
         try {
           const response = await API.post("/payment/paystack/confirm", null, {
             params: { reference },
             headers: { Authorization: `Bearer ${token}` },
           });
-          if (response.data?.data?.paid) {
+          const confirmation = confirmationFrom(response.data);
+          if (confirmation?.paid) {
             setStatus("paid");
+            return;
+          }
+          const providerStatus = confirmation?.paymentStatus?.toLowerCase();
+          if (providerStatus && !pendingStatuses.has(providerStatus)) {
+            setStatus("error");
             return;
           }
         } catch (error: unknown) {
@@ -75,8 +100,13 @@ function PaystackCallbackContent() {
   }, [reference]);
 
   useEffect(() => {
-    void confirmPayment();
-  }, [confirmPayment]);
+    if (!reference || autoConfirmedReference.current === reference) return;
+    const timer = window.setTimeout(() => {
+      autoConfirmedReference.current = reference;
+      void confirmPayment();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [confirmPayment, reference]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -93,7 +123,13 @@ function PaystackCallbackContent() {
 
           <div>
             <h1 className="text-xl font-bold text-[#141130]">
-              {status === "paid" ? "Payment confirmed" : status === "confirming" ? "Confirming payment" : "Confirmation pending"}
+              {status === "paid"
+                ? "Payment confirmed"
+                : status === "confirming"
+                  ? "Confirming payment"
+                  : status === "error"
+                    ? "Unable to confirm payment"
+                    : "Confirmation pending"}
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-gray-500">
               {status === "paid"
@@ -104,6 +140,11 @@ function PaystackCallbackContent() {
                     ? "We could not complete the secure confirmation. Your payment will not be charged again when you retry."
                     : "The checkout returned successfully, but Paystack confirmation has not completed yet. SlickHood will continue reconciling it safely."}
             </p>
+            {status === "confirming" && attempt > 0 && (
+              <p className="mt-2 text-xs text-gray-400" role="status">
+                Verification attempt {attempt} of {CONFIRMATION_ATTEMPTS}
+              </p>
+            )}
           </div>
 
           {reference && (
@@ -130,7 +171,7 @@ function PaystackCallbackContent() {
               Retry confirmation
             </Button>
           )}
-          <Button onClick={() => router.push("/dashboard/invoices")} disabled={status === "confirming"}
+          <Button onClick={() => router.push("/dashboard/invoices")}
                   className="h-11 w-full bg-[#EF4217] text-white hover:bg-[#d63a13]">
             View invoices <ArrowRight className="ml-2 h-4 w-4" />
           </Button>

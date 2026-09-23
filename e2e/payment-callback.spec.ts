@@ -30,7 +30,7 @@ test("Paystack return is labelled paid only after authenticated server verificat
       contentType: "application/json",
       body: JSON.stringify({
         success: true,
-        data: { invoiceRef: "INV-TEST-91", paid: true, paymentStatus: "successful" },
+        data: [{ invoiceRef: "INV-TEST-91", paid: true, paymentStatus: "successful" }],
       }),
     });
   });
@@ -40,6 +40,26 @@ test("Paystack return is labelled paid only after authenticated server verificat
   await expect(page.getByText("91", { exact: true })).toBeVisible();
   await expect(page.getByText(/payment has been verified and applied/i)).toBeVisible();
   expect(confirmationUrl).toContain("reference=91");
+});
+
+test("Paystack return stops polling when provider verification is terminal", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Tenant", permissions: ["view_invoice_list"] });
+  let confirmations = 0;
+  await page.route("**/payment/paystack/confirm**", route => {
+    confirmations += 1;
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: [{ invoiceRef: "INV-TEST-94", paid: false, paymentStatus: "verification_failed" }],
+      }),
+    });
+  });
+
+  await page.goto("/payment/callback?reference=94");
+  await expect(page.getByText(/could not complete the secure confirmation/i)).toBeVisible({ timeout: 5_000 });
+  expect(confirmations).toBe(1);
 });
 
 test("Paystack return remains pending when authenticated server verification fails", async ({ context, page }) => {
