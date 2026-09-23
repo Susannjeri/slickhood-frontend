@@ -1152,11 +1152,11 @@ export function useApi() {
           }
         }
 
-        const handleInitPayment = async(invoiceRef: string, accountId: number, channel: string) => {
+        const handleInitPayment = async(invoiceRef: string, accountId: number, channel: string, phoneNumber?: string) => {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
-            const res = await initPayment(invoiceRef, accountId, channel, token);
+            const res = await initPayment(invoiceRef, accountId, channel, token, phoneNumber);
             return res.data;
           }
           catch (error) {

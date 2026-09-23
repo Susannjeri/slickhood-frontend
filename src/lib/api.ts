@@ -1532,8 +1532,8 @@ export const getSupportedPaymentChannels = (token: string) => {
 // replaced by it as first assumed) — the account's own `channel` field is
 // the only source for this in the modal, so the two params always describe
 // the same account.
-export const initPayment = (invoiceRef: string, accountId: number, channel: string, token: string) => {
-  return API.post(`/payment/init`, { invoiceRef, accountId, paymentChannel: channel }, {
+export const initPayment = (invoiceRef: string, accountId: number, channel: string, token: string, phoneNumber?: string) => {
+  return API.post(`/payment/init`, { invoiceRef, accountId, paymentChannel: channel, phoneNumber }, {
     headers: {
       "Content-Type": 'application/json',
       Authorization: `Bearer ${token}`,
@@ -1653,7 +1653,7 @@ export const activePaymentChannels = (token: string) => {
   })
 } 
 
-export type paymentChannel = "MPESA" | "MPESA_BANK" | "PESA_LINK" | "PAYSTACK";
+export type paymentChannel = "MPESA" | "MPESA_BANK" | "PESA_LINK" | "PAYSTACK" | "PESAWISE";
 
 export type accountCategory = "LANDLORD" | "ESTATE_MANAGEMENT" | "PROPERTY_SALES" | "SLICKHOOD" | "MERCHANT" | "AFFILIATE" | "INSURANCE" | "COMMUNITY_FUND";
 

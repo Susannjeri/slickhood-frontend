@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { ArrowLeft, Loader2, Wallet } from "lucide-react";
 
 interface Props {
@@ -81,6 +82,8 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
   const [selected, setSelected] = useState<Account | null>(null);
   const [paying, setPaying]     = useState(false);
   const [instructions, setInstructions] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneError, setPhoneError] = useState("");
 
   // ── Fetch the property's attached payment accounts when the modal opens ──
   useEffect(() => {
@@ -89,6 +92,8 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
     setSelected(null);
     setAccounts([]);
     setInstructions("");
+    setPhoneNumber("");
+    setPhoneError("");
     let cancelled = false;
 
     const fetch = async () => {
@@ -125,14 +130,27 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
 
   const handleSelectAccount = (account: Account) => {
     setSelected(account);
+    setPhoneError("");
     setStep("confirm");
   };
 
   const handleConfirm = async () => {
     if (!selected) return;
+    const requiresPhone = ["MPESA", "PESAWISE"].includes(selected.channel);
+    const normalizedPhone = phoneNumber.replace(/\s/g, "");
+    if (requiresPhone && !/^\+254[17]\d{8}$/.test(normalizedPhone)) {
+      setPhoneError("Enter a valid Kenyan M-Pesa number, for example +254 712 345 678.");
+      return;
+    }
+    setPhoneError("");
     setPaying(true);
     try {
-      const res = await handleInitPayment(invoice.ref, selected.id, selected.channel);
+      const res = await handleInitPayment(
+        invoice.ref,
+        selected.id,
+        selected.channel,
+        requiresPhone ? normalizedPhone : undefined,
+      );
       const code: string  = res.code ?? "";
       const desc: string  = res.description ?? "Payment initiated.";
 
@@ -274,7 +292,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
               {/* Channel-specific hint */}
               {selected.channel === "MPESA" && (
                 <p className="text-xs text-gray-400 text-center -mt-2">
-                  An STK push will be sent to your registered M-Pesa number. Enter your PIN to complete the payment.
+                  An STK push will be sent to the number below. Enter your PIN only on your phone.
                 </p>
               )}
               {selected.channel === "MPESA_BANK" && (
@@ -284,7 +302,7 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
               )}
               {selected.channel === "PESAWISE" && (
                 <p className="text-xs text-gray-400 text-center -mt-2">
-                  PesaWise will send an M-Pesa prompt to the invoice phone number. SlickHood updates the invoice only after a signed webhook and server-side status check agree.
+                  PesaWise will send an M-Pesa prompt to the number below. SlickHood updates the invoice only after a signed webhook and server-side status check agree.
                 </p>
               )}
               {selected.channel === "PESA_LINK" && (
@@ -296,6 +314,30 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
                 <p className="text-xs text-gray-400 text-center -mt-2">
                   You&apos;ll be redirected to Paystack. Check the recipient and amount before paying. A redirect alone does not mean the invoice is paid.
                 </p>
+              )}
+
+              {["MPESA", "PESAWISE"].includes(selected.channel) && (
+                <div className="w-full space-y-2">
+                  <label htmlFor="invoice-mpesa-phone" className="block text-sm font-semibold text-[#141130]">
+                    M-Pesa phone number
+                  </label>
+                  <PhoneInput
+                    id="invoice-mpesa-phone"
+                    defaultCountry="KE"
+                    international
+                    countryCallingCodeEditable={false}
+                    value={phoneNumber}
+                    onChange={value => {
+                      setPhoneNumber(String(value ?? ""));
+                      setPhoneError("");
+                    }}
+                    aria-invalid={Boolean(phoneError)}
+                    aria-describedby={phoneError ? "invoice-mpesa-phone-error" : undefined}
+                    autoComplete="tel"
+                  />
+                  {phoneError && <p id="invoice-mpesa-phone-error" className="text-xs text-red-600">{phoneError}</p>}
+                  <p className="text-xs text-gray-500">This number is used only for this payment attempt and does not change your profile.</p>
+                </div>
               )}
 
               {/* Actions */}
