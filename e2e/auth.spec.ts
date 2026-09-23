@@ -466,7 +466,30 @@ test("tenant initializes the landlord-defined lease without editing dates", asyn
   await page.getByRole("button",{name:"Initialize Lease"}).first().click();
   await page.getByRole("button",{name:"Initialize Lease"}).last().click();
   await expect.poll(()=>payload).toEqual({token:"multi-unit-tenant-token"});
-  await expect(page).toHaveURL(/\/dashboard\/documents\?leaseId=501/);
+  await expect(page).toHaveURL(/\/dashboard\/documents\?leaseId=501&documentId=601/);
+});
+
+test("repeated tenant lease initialization resumes the existing agreement", async ({ context, page }) => {
+  await authenticated(context, page, {title:"Tenant",permissions:["create_new_lease","view_lease_document"]}, {inviteToken:"resume-token"});
+  await page.route("**/invite/validate**", route => route.fulfill({json:{success:true,code:"S0058",data:[{
+    unit:{propertyId:11,unitId:77,ref:"A-101",propertyType:"APARTMENT",unitType:"APARTMENT",size:85,
+      measurementUnits:{id:1,name:"sqm"},utilities:[],leaseMode:"RENT",price:25000,currency:"KES",occupied:false,
+      advertise:false,thumbnail:"",images:[],templateId:9}, leaseStartDate:"2026-10-01",leaseEndDate:"2027-09-30",
+  }]}}));
+  await page.route("**/property/type", route => route.fulfill({json:envelope([])}));
+  await page.route("**/property/unit/type**", route => route.fulfill({json:envelope([])}));
+  await page.route("**/property/unit/charges?**", route => route.fulfill({json:envelope([])}));
+  await page.route("**/lease/tenant/create", route => route.fulfill({json:{success:true,code:"S0162",data:[{
+    leaseId:501,agreementDocumentId:601,agreementStatus:"ISSUED",
+  }]}}));
+  await page.route("**/lease/documents**", route => route.fulfill({json:{...envelope([]),totalPages:1}}));
+  await page.route("**/lease/list**", route => route.fulfill({json:envelope([])}));
+
+  await page.goto("/lease/initialize?token=resume-token");
+  await page.getByRole("button",{name:"Initialize Lease"}).first().click();
+  await page.getByRole("button",{name:"Initialize Lease"}).last().click();
+
+  await expect(page).toHaveURL(/\/dashboard\/documents\?leaseId=501&documentId=601/);
 });
 
 test("tenant email verification continues to KYC before lease initialization", async ({ page }) => {

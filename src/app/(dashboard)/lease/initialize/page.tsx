@@ -38,6 +38,7 @@ import {
 import ProfileGateModal from "@/components/auth/ProfileGateModal";
 import {usePropertyMetadata} from "@/app/(dashboard)/dashboard/property/propertyMetadata";
 import { invitationUrl } from "@/lib/invitation-navigation";
+import { apiErrorMessage } from "@/lib/api-error";
 
 
 interface UnitDetails {
@@ -235,23 +236,26 @@ function LeaseInitializeContent() {
       }
 
 
-      if (response.success && response.code === "S0162") {
-        toast.success("Lease initialized successfully!");
-        
+      if (response.success) {
         const result = Array.isArray(response.data) ? response.data[0] : response.data;
+        if (!result?.leaseId) {
+          toast.error("The lease was created, but its agreement could not be opened. View Lease operations for its status.");
+          router.replace("/dashboard/lease/operations");
+          return;
+        }
+        toast.success("Lease initialized. Opening your agreement…");
         // Clear invite token
         setInviteToken(null);
-        
-        // Redirect to dashboard
-        setTimeout(() => {
-          router.push(result?.leaseId ? `/dashboard/documents?leaseId=${result.leaseId}` : "/dashboard/lease/operations");
-        }, 1000);
+        setIsSheetOpen(false);
+        const destination = new URLSearchParams({ leaseId: String(result.leaseId) });
+        if (result.agreementDocumentId) destination.set("documentId", String(result.agreementDocumentId));
+        router.replace(`/dashboard/documents?${destination.toString()}`);
       } else {
         toast.error(response.description || "Failed to initialize lease");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error initializing lease:", error);
-      toast.error("Failed to initialize lease. Please try again.");
+      toast.error(apiErrorMessage(error, "Failed to initialize lease. Please try again."));
     } finally {
       setIsSubmitting(false);
     }

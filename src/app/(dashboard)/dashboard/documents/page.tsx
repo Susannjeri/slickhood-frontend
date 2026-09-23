@@ -69,6 +69,7 @@ export default function DocumentsPage() {
 
 function DocumentsWorkspace() {
   const searchParams = useSearchParams();
+  const requestedDocumentId = searchParams.get("documentId");
   const activeRole = useAuthStore((state) => state.activeRole);
   const permissions = useAuthStore((state) => state.permissions);
   const token = useAuthStore((state) => state.token);
@@ -124,6 +125,11 @@ function DocumentsWorkspace() {
   }, [activeRole]);
 
   useEffect(() => { if (!visibleTypes.includes(type)) setType(visibleTypes[0]); }, [type, visibleTypes]);
+
+  useEffect(() => {
+    if (loading || !requestedDocumentId) return;
+    document.getElementById(`lease-document-${requestedDocumentId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [loading, requestedDocumentId, documents]);
 
   const load = useCallback(async () => {
     const sequence = ++loadSequence.current;
@@ -310,7 +316,7 @@ function DocumentsWorkspace() {
       {!loading && !loadError && documents.length === 0 && (isTenant && searchParams.get("leaseId") ?
         <div className="space-y-2 py-8 text-center"><p className="font-medium text-amber-800">Your lease is initialized, but its agreement has not been prepared yet.</p><p className="text-sm text-muted-foreground">The landlord or manager must prepare and issue the agreement before you can sign it. You do not need to initialize the lease again.</p><Button variant="outline" asChild><Link href="/dashboard/lease/operations">Return to lease status</Link></Button></div> :
         <p className="py-8 text-center text-muted-foreground">No documents match this account and selection.</p>)}
-      {!loading && !loadError && documents.map((item) => <div key={item.id} className="flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-center lg:justify-between">
+      {!loading && !loadError && documents.map((item) => <div id={`lease-document-${item.id}`} key={item.id} className={`flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-center lg:justify-between ${requestedDocumentId === String(item.id) ? "border-[#EF4217] bg-orange-50/50 ring-2 ring-orange-100" : ""}`}>
         <div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{item.name}</p><Badge variant="outline">{label(item.status)}</Badge>
           {item.legalReviewRequired && <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Legal review</Badge>}</div>
           <p className="text-sm text-muted-foreground">#{item.id} · Template v{item.templateVersion} · {item.leaseId ? `Lease ${item.leaseId}` : item.saleId ? `Sale ${item.saleId}` : `Property ${item.propertyId}`}</p>
