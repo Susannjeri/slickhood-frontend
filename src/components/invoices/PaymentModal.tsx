@@ -72,7 +72,7 @@ function AccountIcon({ account, size = 40 }: { account: Account; size?: number }
 }
 
 export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props) {
-  const { handleListAccounts, handleInitPayment } = useApi();
+  const { handleInitPayment } = useApi();
 
   const [accounts, setAccounts]         = useState<Account[]>([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
@@ -94,10 +94,11 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
     const fetch = async () => {
       setAccountsLoading(true);
       try {
-        const data = invoice.paymentAccountId
-          ? (await API.get("/payment/invoice/payment-account", { params: { invoiceId: invoice.id } })).data?.data
-          : (await handleListAccounts({ propertyId: invoice.propertyId ?? undefined })).data;
-        // ResponseDTO wraps a single account in an array; tolerate older object envelopes.
+        // The invoice endpoint returns every verified destination valid for this
+        // invoice. The invoice's stored account is only the default, not a lock
+        // that prevents the customer from selecting another payment rail.
+        const data = (await API.get("/payment/invoice/payment-account", { params: { invoiceId: invoice.id } })).data?.data;
+        // Tolerate the former single-object envelope during rolling deployment.
         const candidates: Account[] = Array.isArray(data) ? data : data ? [data] : [];
         const expectedCategory = RECEIVING_CATEGORY_BY_BILLING_TYPE[invoice.billingType || "RENTAL"];
         if (!cancelled) setAccounts(candidates.filter(account =>
@@ -195,9 +196,9 @@ export function PaymentModal({ invoice, open, onClose, onPaymentSuccess }: Props
             )}
             <div>
               <DialogTitle className="text-base text-[#141130]">
-                {step === "accounts" ? "Choose Payment Account" : step === "instructions" ? "Payment instructions" : "Confirm Payment"}
+                {step === "accounts" ? "Choose payment method" : step === "instructions" ? "Payment instructions" : "Confirm payment"}
               </DialogTitle>
-              <DialogDescription>Choose a verified payment destination and complete payment for this invoice.</DialogDescription>
+              <DialogDescription>Select any available payment method for this invoice. You can return here and choose another method if an attempt fails.</DialogDescription>
               <p className="text-xs text-gray-400 mt-0.5">
                 Invoice <span className="font-semibold text-[#EF4217]">{invoice.ref}</span>
                 {" · "}

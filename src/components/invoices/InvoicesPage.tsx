@@ -21,6 +21,7 @@ export function InvoicesPage() {
   const requestedInvoiceId = Number(searchParams.get("invoiceId"));
   const requestedPropertyId = Number(searchParams.get("propertyId"));
   const requestedUnitId = Number(searchParams.get("unitId"));
+  const choosePayment = searchParams.get("choosePayment") === "1";
   const isMobile = useIsInvoiceMobile(); // null | true | false
   const activeRole = useAuthStore(state => state.activeRole?.title);
 
@@ -81,7 +82,7 @@ export function InvoicesPage() {
       {/* Right panel — desktop only */}
       <div className="hidden lg:flex flex-1 flex-col bg-white rounded-xl border border-gray-200 p-5 overflow-hidden min-w-0">
         {selectedInvoice
-          ? <InvoiceDetail invoice={selectedInvoice} refetchKey={paymentRefetchKey} onPaymentSuccess={handlePaymentSuccess} />
+          ? <InvoiceDetail invoice={selectedInvoice} refetchKey={paymentRefetchKey} onPaymentSuccess={handlePaymentSuccess} openPaymentOnLoad={choosePayment && selectedInvoice.id === requestedInvoiceId} />
           : <EmptyDetail />
         }
       </div>
@@ -95,7 +96,7 @@ export function InvoicesPage() {
           </SheetHeader>
           <div className="flex-1 overflow-hidden p-5 pt-3">
             {selectedInvoice && (
-              <InvoiceDetail invoice={selectedInvoice} refetchKey={paymentRefetchKey} onPaymentSuccess={handlePaymentSuccess} />
+              <InvoiceDetail invoice={selectedInvoice} refetchKey={paymentRefetchKey} onPaymentSuccess={handlePaymentSuccess} openPaymentOnLoad={choosePayment && selectedInvoice.id === requestedInvoiceId} />
             )}
           </div>
         </SheetContent>

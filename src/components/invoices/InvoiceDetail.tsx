@@ -18,9 +18,10 @@ interface Props {
   invoice: Invoice;
   refetchKey: number; // increments from InvoicesPage on payment success
   onPaymentSuccess: () => void;
+  openPaymentOnLoad?: boolean;
 }
 
-export function InvoiceDetail({ invoice, refetchKey, onPaymentSuccess }: Props) {
+export function InvoiceDetail({ invoice, refetchKey, onPaymentSuccess, openPaymentOnLoad = false }: Props) {
   const { handleViewLeasePDF } = useApi();
 
   const [pdfUrl, setPdfUrl]         = useState<string | null>(null);
@@ -35,6 +36,10 @@ export function InvoiceDetail({ invoice, refetchKey, onPaymentSuccess }: Props) 
   const blobUrlRef = useRef<string | null>(null);
 
   const paymentsOpen = openItems.includes("payments");
+
+  useEffect(() => {
+    if (openPaymentOnLoad && invoice.payableByCurrentUser && invoice.status !== "PAID") setPayModalOpen(true);
+  }, [invoice.id, invoice.status, invoice.payableByCurrentUser, openPaymentOnLoad]);
 
   // ── Fetch PDF ─────────────────────────────────────────────────────────────
   useEffect(() => {

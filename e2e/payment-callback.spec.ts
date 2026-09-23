@@ -52,7 +52,7 @@ test("Paystack return stops polling when provider verification is terminal", asy
       contentType: "application/json",
       body: JSON.stringify({
         success: true,
-        data: [{ invoiceRef: "INV-TEST-94", paid: false, paymentStatus: "verification_failed" }],
+        data: [{ invoiceId: 44, invoiceRef: "INV-TEST-94", paid: false, paymentStatus: "verification_failed" }],
       }),
     });
   });
@@ -60,6 +60,8 @@ test("Paystack return stops polling when provider verification is terminal", asy
   await page.goto("/payment/callback?reference=94");
   await expect(page.getByText(/could not complete the secure confirmation/i)).toBeVisible({ timeout: 5_000 });
   expect(confirmations).toBe(1);
+  await page.getByRole("button", { name: "Choose another payment method" }).click();
+  await expect(page).toHaveURL(/\/dashboard\/invoices\?invoiceId=44&choosePayment=1/);
 });
 
 test("Paystack return remains pending when authenticated server verification fails", async ({ context, page }) => {

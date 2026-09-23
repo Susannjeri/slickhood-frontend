@@ -16,6 +16,7 @@ const CONFIRMATION_DELAY_MS = 2_000;
 const wait = (milliseconds: number) => new Promise(resolve => window.setTimeout(resolve, milliseconds));
 
 type PaystackConfirmation = {
+  invoiceId?: number;
   invoiceRef?: string;
   paid?: boolean;
   paymentStatus?: string;
@@ -57,6 +58,7 @@ function PaystackCallbackContent() {
   const reference = searchParams.get("reference") ?? searchParams.get("trxref");
   const [status, setStatus] = useState<"confirming" | "paid" | "pending" | "error">("confirming");
   const [attempt, setAttempt] = useState(0);
+  const [invoiceId, setInvoiceId] = useState<number | undefined>();
   const autoConfirmedReference = useRef<string | null>(null);
 
   const confirmPayment = useCallback(async () => {
@@ -76,6 +78,7 @@ function PaystackCallbackContent() {
             headers: { Authorization: `Bearer ${token}` },
           });
           const confirmation = confirmationFrom(response.data);
+          if (confirmation?.invoiceId) setInvoiceId(confirmation.invoiceId);
           if (confirmation?.paid) {
             setStatus("paid");
             return;
@@ -166,12 +169,19 @@ function PaystackCallbackContent() {
             </p>
           </div>
 
-          {status !== "paid" && status !== "confirming" && (
+          {status !== "paid" && status !== "confirming" && <div className="w-full space-y-3">
             <Button onClick={() => void confirmPayment()} variant="outline" className="h-11 w-full">
               Retry confirmation
             </Button>
-          )}
-          <Button onClick={() => router.push("/dashboard/invoices")}
+            {invoiceId && <Button
+              onClick={() => router.push(`/dashboard/invoices?invoiceId=${invoiceId}&choosePayment=1`)}
+              variant="outline"
+              className="h-11 w-full"
+            >
+              Choose another payment method
+            </Button>}
+          </div>}
+          <Button onClick={() => router.push(invoiceId ? `/dashboard/invoices?invoiceId=${invoiceId}` : "/dashboard/invoices")}
                   className="h-11 w-full bg-[#EF4217] text-white hover:bg-[#d63a13]">
             View invoices <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
