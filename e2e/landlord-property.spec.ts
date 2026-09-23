@@ -129,6 +129,36 @@ test("property creation preserves the selected management workflow", async ({ pa
   expect(body).toContain('name="image"; filename="property.png"');
 });
 
+test("property list renders the role-scoped API envelope", async ({ page }) => {
+  await page.route("**/property/list**", route => route.fulfill({ json: {
+    ...envelope([{ id: 41, name: "Green Court", type: "APARTMENT_BLOCK", category: "RESIDENTIAL",
+      address: "Nairobi", mapLocation: "-1.28,36.81", currency: "KES", thumbNail: "" }]),
+    totalPages: 1, totalElements: 1, size: 10,
+  } }));
+
+  await page.goto("/dashboard/property/properties");
+
+  await expect(page.getByText("Green Court", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Cannot read properties of undefined/i)).toHaveCount(0);
+});
+
+test("property list preserves the API failure and offers a working retry", async ({ page }) => {
+  let allowSuccess = false;
+  await page.route("**/property/list**", route => {
+    return allowSuccess
+      ? route.fulfill({ json: { ...envelope([]), totalPages: 0, totalElements: 0, size: 10 } })
+      : route.fulfill({ status: 503, json: { success: false, description: "Property service is temporarily unavailable." } });
+  });
+
+  await page.goto("/dashboard/property/properties");
+  await expect(page.locator('[role="alert"]').filter({ hasText: "Property service is temporarily unavailable." })).toBeVisible();
+  await expect(page.getByText("No properties yet")).toHaveCount(0);
+  allowSuccess = true;
+  await page.getByRole("button", { name: "Retry" }).click();
+  await expect(page.locator('[role="alert"]').filter({ hasText: "Property service is temporarily unavailable." })).toHaveCount(0);
+  await expect(page.getByText("No properties yet")).toBeVisible();
+});
+
 test("property types put common choices first and group specialised choices", async ({ page }) => {
   await page.goto("/dashboard/property/create");
   await page.getByRole("button", { name: /Rental property/i }).click();

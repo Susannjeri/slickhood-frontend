@@ -32,6 +32,7 @@ import PropertyRoleBadges from "@/components/property/PropertyRoleBadges";
 import ProfileGateModal, { ProfileGateFields } from "@/components/auth/ProfileGateModal";
 import { usePropertyMetadata } from "@/app/(dashboard)/dashboard/property/propertyMetadata";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { apiErrorMessage } from "@/lib/api-error";
 
 interface Property {
   id: number;
@@ -106,19 +107,29 @@ export default function PropertiesPage() {
 
       // The API applies ownership, tenancy, ownership-record and selected-workspace
       // authorization. Token claim property lists can be stale after role changes.
-      setProperties(response.data);
-      setTotalPages(response.totalPages);
-      setTotalElements(response.totalElements);
+      const rows = Array.isArray(response?.data) ? response.data as Property[] : [];
+      setProperties(rows);
+      setTotalPages(Number(response?.totalPages) || 0);
+      setTotalElements(Number(response?.totalElements) || rows.length);
 
-      response.data.forEach((property: any) => {
+      rows.forEach((property) => {
         if (property.thumbNail && !imageCache[property.thumbNail]) {
           loadPropertyImage(property.thumbNail);
         }
       });
-    } catch (err: any) {
-      setError(err.message || "Failed to load properties");
+    } catch (err: unknown) {
+      setProperties([]);
+      setTotalPages(0);
+      setTotalElements(0);
+      setError(apiErrorMessage(err, "Properties could not be loaded. Please retry."));
       console.error("Error loading properties:", err);
     }
+  };
+
+  const retryLoad = async () => {
+    setLoading(true);
+    try { await loadProperties(); }
+    finally { setLoading(false); }
   };
 
   const loadPropertyImage = async (imagePath: string) => {
@@ -224,8 +235,9 @@ export default function PropertiesPage() {
 
       {/* Error */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
-          {error}
+        <div role="alert" className="flex flex-col gap-3 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg sm:flex-row sm:items-center sm:justify-between">
+          <span>{error}</span>
+          <Button type="button" variant="outline" onClick={() => void retryLoad()} disabled={loading}>Retry</Button>
         </div>
       )}
 
@@ -236,7 +248,7 @@ export default function PropertiesPage() {
           <p className="text-gray-500">Loading properties...</p>
         </div>
 
-      ) : properties.length === 0 ? (
+      ) : error ? null : properties.length === 0 ? (
         /* ── Empty States ── */
         <div className="flex flex-col items-center justify-center py-20">
           <div
@@ -306,7 +318,11 @@ export default function PropertiesPage() {
                       {/* Thumbnail */}
                       <TableCell className="pl-4 py-3">
                         <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                          {imageCache[property.thumbNail] ? (
+                          {!property.thumbNail ? (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <MapPin className="w-5 h-5 text-gray-400" />
+                            </div>
+                          ) : imageCache[property.thumbNail] ? (
                             <img
                               src={imageCache[property.thumbNail]}
                               alt={property.name}

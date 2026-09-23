@@ -222,10 +222,7 @@ export function useApi() {
                 if (error?.response?.data?.code === "S0174") {
                 return {profileGate: true, fields: error?.response?.data.data[0]} satisfies ProfileGateResult;
               }
-
-              else{
-                // rethrow the error after logging it
-              }
+              throw error;
           }
         };
         
