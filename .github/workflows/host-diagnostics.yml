@@ -46,7 +46,14 @@ jobs:
             sudo du -sk /home/silverocean/backups/pending-release-* 2>/dev/null || true
             echo 'Backend service state'
             sudo systemctl show pms.service \
-              --property=ActiveState,SubState,Result,NRestarts,ExecMainCode,ExecMainStatus
+              --property=ActiveState,SubState,Result,NRestarts,ExecMainCode,ExecMainStatus,MemoryCurrent,MemoryPeak,TasksCurrent,CPUUsageNSec
+            echo 'Backend JVM memory configuration'
+            backend_pid="$(sudo systemctl show pms.service --property=MainPID --value)"
+            if [ "${backend_pid:-0}" -gt 0 ] && command -v jcmd >/dev/null 2>&1; then
+              sudo jcmd "$backend_pid" VM.flags | grep -Eo -- '-XX:[^ ]*(HeapSize|RAMPercentage)[^ ]*' || true
+              sudo jcmd "$backend_pid" GC.heap_info || true
+            fi
+            unset backend_pid
             echo 'Nginx service state and configuration'
             sudo systemctl show nginx.service \
               --property=ActiveState,SubState,Result,NRestarts,ExecMainCode,ExecMainStatus
@@ -66,7 +73,7 @@ jobs:
                 "$url" || true
             done
             echo 'Recent Nginx upstream and resource errors (counts)'
-            nginx_errors="$(sudo tail -n 4000 /var/log/nginx/error.log 2>/dev/null || true)"
+            nginx_errors="$(sudo journalctl -u nginx.service --since '30 minutes ago' --no-pager 2>/dev/null; sudo tail -n 4000 /var/log/nginx/error.log 2>/dev/null | awk -v cutoff="$(date -d '30 minutes ago' '+%Y/%m/%d %H:%M:%S')" '$0 >= cutoff')"
             for signature in \
               'upstream timed out' 'connect() failed' 'no live upstreams' \
               'worker_connections are not enough' 'too many open files' \
