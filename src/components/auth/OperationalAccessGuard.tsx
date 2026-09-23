@@ -15,23 +15,29 @@ export default function OperationalAccessGuard({ children }: { children: ReactNo
   const sessionReady = useAuthStore(state => state.sessionReady);
   const token = useAuthStore(state => state.token);
   const role = useAuthStore(state => state.activeRole);
-  const [ready, setReady] = useState(false);
+  const [verifiedScope, setVerifiedScope] = useState<string | null>(null);
+  const roleTitle = role?.title ?? "";
+  const accessScope = token && roleTitle ? `${token}:${roleTitle}` : null;
+  const bypassKyc = staffRoles.has(normalizedRoleTitle(roleTitle)) || pathname === "/dashboard/helpdesk";
 
   useEffect(() => {
     if (!sessionReady) return;
     if (!token) { router.replace("/login"); return; }
-    if (staffRoles.has(normalizedRoleTitle(role?.title)) || pathname === "/dashboard/helpdesk") { setReady(true); return; }
+    if (bypassKyc) return;
+    if (!accessScope || verifiedScope === accessScope) return;
     let cancelled = false;
     getCurrentKyc().then(kyc => {
       if (cancelled) return;
       // Additional-role KYC is role-scoped. The backend withholds that pending
       // role from the JWT, while an already-approved account remains usable.
       if (kyc.accountStatus !== "ACTIVE") router.replace("/kyc");
-      else setReady(true);
+      else setVerifiedScope(accessScope);
     }).catch(() => { if (!cancelled) router.replace("/kyc"); });
     return () => { cancelled = true; };
-  }, [pathname, role?.title, router, sessionReady, token]);
+  }, [accessScope, bypassKyc, router, sessionReady, token, verifiedScope]);
 
-  if (!ready) return <div className="flex min-h-[60vh] items-center justify-center text-slate-500"><Loader2 className="mr-3 h-6 w-6 animate-spin text-[#EF4217]" />Checking account verification…</div>;
+  if (!sessionReady || !token || (!bypassKyc && verifiedScope !== accessScope)) {
+    return <div className="flex min-h-[60vh] items-center justify-center text-slate-500"><Loader2 className="mr-3 h-6 w-6 animate-spin text-[#EF4217]" />Checking account verification…</div>;
+  }
   return children;
 }

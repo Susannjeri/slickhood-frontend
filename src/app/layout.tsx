@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import "./globals.css";
 import SessionHydrator from "@/components/auth/SessionHydrator";
-import HelpChatBox from "@/components/helpdesk/HelpChatBox";
+import LazyHelpChatBox from "@/components/helpdesk/LazyHelpChatBox";
 import SessionIdleGuard from "@/components/auth/SessionIdleGuard";
 
 const roboto = Roboto({
@@ -43,7 +43,7 @@ export default function RootLayout({
         <div className="h-full w-full">
           {children}
         </div>
-        <HelpChatBox />
+        <LazyHelpChatBox />
 </body>
     </html>
   );
