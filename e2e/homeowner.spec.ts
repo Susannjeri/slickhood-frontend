@@ -106,10 +106,17 @@ test("homeowner can report maintenance but cannot advance operational status", a
   await page.getByRole("button", { name: "New request" }).click();
   await page.getByPlaceholder("Issue title").fill("Kitchen leak");
   await page.getByPlaceholder("Describe the problem and access considerations").fill("Water is collecting below the sink.");
+  await page.getByLabel("Maintenance request evidence").setInputFiles({name:"leak.jpg",mimeType:"image/jpeg",buffer:Buffer.from([0xff,0xd8,0xff,0x01])});
   await page.route("**/maintenance", route => route.request().method() === "POST" ? route.fulfill({ json: envelope({id:1}) }) : route.continue());
+  await page.route("**/maintenance/1/attachments", route => route.fulfill({ json: envelope({id:4,workOrderId:1,category:"REQUEST_EVIDENCE"}) }));
   const requestPromise = page.waitForRequest(request => request.url().endsWith("/maintenance") && request.method() === "POST");
+  const evidencePromise = page.waitForRequest(request => request.url().endsWith("/maintenance/1/attachments") && request.method() === "POST");
   await page.getByRole("button", { name: "Submit request" }).click();
   const request = await requestPromise;
+  const evidence = await evidencePromise;
   expect(request.postDataJSON()).toMatchObject({unitId:77,title:"Kitchen leak",description:"Water is collecting below the sink."});
+  expect(evidence.postData()).toContain("REQUEST_EVIDENCE");
+  expect(evidence.postData()).toContain("leak.jpg");
+  await expect(page.getByText("Maintenance request and evidence submitted.")).toBeVisible();
   await expect(page.getByText("Advance status")).toHaveCount(0);
 });

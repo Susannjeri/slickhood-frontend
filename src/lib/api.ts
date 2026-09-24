@@ -1781,6 +1781,10 @@ export type MaintenanceWorkOrder = {
   status:string; scheduledAt?:string; completedAt?:string; estimatedCost?:number; actualCost?:number;
   currency?:string; resolutionNotes?:string; createdOn:string;
 };
+export type MaintenanceAttachment = {
+  id:number; workOrderId:number; category:string; displayName:string; contentType:string; fileSize:number;
+  checksumSha256:string; uploadedByUserId:number; createdOn:string; downloadUrl:string;
+};
 
 export const viewPaymentReceipt = (paymentId: number, token: string) => {
   return API.get(`/payment/view/receipt?paymentId=${paymentId}`, {
@@ -1791,6 +1795,8 @@ export const viewPaymentReceipt = (paymentId: number, token: string) => {
 export const listUnitMaintenance = (unitId:number, token:string) => API.get(`/maintenance/unit/${unitId}`, {headers:{Authorization:`Bearer ${token}`}});
 export const createMaintenance = (payload:{unitId:number;title:string;description:string;category:string;priority:string}, token:string) => API.post("/maintenance",payload,{headers:{Authorization:`Bearer ${token}`}});
 export const updateMaintenance = (id:number,payload:{status:string;assignedProviderServiceId?:number;scheduledAt?:string;estimatedCost?:number;actualCost?:number;currency?:string;resolutionNotes?:string},token:string) => API.put(`/maintenance/${id}`,payload,{headers:{Authorization:`Bearer ${token}`}});
+export const listMaintenanceAttachments = (id:number,token:string) => API.get(`/maintenance/${id}/attachments`,{headers:{Authorization:`Bearer ${token}`}});
+export const uploadMaintenanceAttachment = (id:number,category:string,file:File,token:string) => {const data=new FormData();data.append("category",category);data.append("file",file);return API.post(`/maintenance/${id}/attachments`,data,{headers:{Authorization:`Bearer ${token}`}});};
 
 export type LeaseDocumentView = {id:number;leaseId?:number;propertyId:number;unitId?:number;documentType:string;status:string;name:string;templateVersion:number;effectiveDate?:string;responseDueDate?:string;issuedAt?:string;acknowledgedAt?:string;createdOn:string};
 export const listLeaseDocuments = (token:string, params: {unitId?: number; page?: number; size?: number} = {}) => API.get("/lease/documents",{params,headers:{Authorization:`Bearer ${token}`}});
