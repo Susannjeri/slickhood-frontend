@@ -168,6 +168,7 @@ export default function KycPage() {
   const sessionReady = useAuthStore((state) => state.sessionReady);
   const [kyc, setKyc] = useState<KycCase>();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
   const [consent, setConsent] = useState(false);
   const [phone, setPhone] = useState("");
@@ -182,6 +183,7 @@ export default function KycPage() {
   const load = useCallback(async () => {
     const request = ++loadRequest.current;
     if (!hasLoadedKyc.current) setLoading(true);
+    setLoadError("");
     try {
       const current = await getCurrentKyc();
       if (request !== loadRequest.current) return;
@@ -190,8 +192,13 @@ export default function KycPage() {
       if (current.verifiedPhoneNumber) setPhone(current.verifiedPhoneNumber);
     } catch (error) {
       if (request !== loadRequest.current) return;
+      const message = errorMessage(
+        error,
+        "Identity verification could not be loaded.",
+      );
+      setLoadError(message);
       toast.error(
-        errorMessage(error, "Identity verification could not be loaded."),
+        message,
       );
     } finally {
       if (request === loadRequest.current) setLoading(false);
@@ -404,7 +411,18 @@ export default function KycPage() {
     }
   };
 
-  if (loading || !kyc) return <Loading />;
+  if (loading) return <Loading />;
+  if (!kyc) {
+    return (
+      <StateCard
+        icon="waiting"
+        title="Verification could not be loaded"
+        text={loadError || "Identity verification is temporarily unavailable."}
+        action="Try again"
+        onAction={load}
+      />
+    );
+  }
   if (
     kyc.status === "APPROVED" &&
     kyc.accountStatus === "ACTIVE" &&
