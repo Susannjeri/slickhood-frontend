@@ -18,6 +18,8 @@ export interface SaleTransaction {
 }
 export type SaleMilestoneType="ESCROW_FUNDED"|"DUE_DILIGENCE_CHECK"|"AGREEMENT_SIGNED"|"TRANSFER_REGISTERED"|"HANDOVER_COMPLETED";
 export type SaleMilestoneStatus="PENDING"|"COMPLETED"|"FAILED";
-export interface SaleMilestone {id:number;saleId:number;milestoneType:SaleMilestoneType;status:SaleMilestoneStatus;amount?:number;currency?:string;externalReference?:string;evidenceDocumentId?:number;notes?:string;occurredAt:string}
-export interface SaleMilestoneCreate {type:SaleMilestoneType;status:SaleMilestoneStatus;amount?:number;externalReference?:string;evidenceDocumentId?:number;notes?:string}
+export interface SaleMilestone {id:number;saleId:number;milestoneType:SaleMilestoneType;status:SaleMilestoneStatus;amount?:number;currency?:string;externalReference?:string;evidenceDocumentId?:number;evidenceAttachmentId?:number;notes?:string;occurredAt:string}
+export interface SaleMilestoneCreate {type:SaleMilestoneType;status:SaleMilestoneStatus;amount?:number;externalReference?:string;evidenceDocumentId?:number;evidenceAttachmentId?:number;notes?:string}
+export type SaleEvidenceCategory="DUE_DILIGENCE"|"TRANSFER_REGISTRATION"|"HANDOVER";
+export interface SaleEvidence {id:number;saleId:number;category:SaleEvidenceCategory;displayName:string;contentType:string;fileSize:number;checksumSha256:string;uploadedByUserId:number;createdOn:string;downloadUrl:string}
 export interface SaleEscrowInvoice {invoiceId:number;invoiceRef:string;amount:number;currency:string;paid:boolean;pendingAmount:number;dueDate:string}

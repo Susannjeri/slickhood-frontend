@@ -195,3 +195,43 @@ test("sales escrow is backed by a buyer invoice and never a typed payment refere
  await expect(page.getByPlaceholder("Payment/external reference")).toHaveCount(0);
  await page.getByRole("button",{name:"Verify paid invoice and record escrow"}).click();
 });
+
+test("sales staff upload categorized evidence instead of entering internal document ids",async({context,page})=>{
+ await authenticated(context,page,{title:"SalesAgent",permissions:["view_sale_pipeline","manage_sale_pipeline"]});
+ const sale={id:5,propertyId:11,propertyName:"Acacia Court",unitId:77,unitRef:"A-07",salesAgentUserId:100,buyerUserId:200,buyerEmail:"buyer@example.com",status:"DUE_DILIGENCE",askingPrice:15000000,offerAmount:14500000,currency:"KES"};
+ let uploaded=false,recorded=false;
+ await page.route("**/sales/5/**",async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith("/evidence")&&route.request().method()==="POST"){
+   const body=route.request().postData()??"";
+   expect(body).toContain("DUE_DILIGENCE");
+   expect(body).toContain("registry.pdf");
+   uploaded=true;
+   await route.fulfill({json:{success:true,code:"S00297",description:"Evidence uploaded.",data:[{id:41,saleId:5,category:"DUE_DILIGENCE",displayName:"registry.pdf",contentType:"application/pdf",fileSize:18,downloadUrl:"https://private.example/evidence"}]}});return;
+  }
+  if(path.endsWith("/milestones")&&route.request().method()==="POST"){
+   expect(route.request().postDataJSON()).toEqual({type:"DUE_DILIGENCE_CHECK",status:"COMPLETED",evidenceAttachmentId:41,externalReference:"REG-2026-41",notes:"Registry search completed."});
+   recorded=true;
+   await route.fulfill({json:{success:true,code:"S00293",description:"Milestone saved.",data:[]}});return;
+  }
+  if(path.endsWith("/milestones")){await route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[]}});return}
+  if(path.endsWith("/evidence")){await route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[]}});return}
+  await route.continue();
+ });
+ await page.route("**/sales**",async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path==="/sales"||path==="/api/sales"){await route.fulfill({json:pageEnvelope([sale])});return}
+  await route.continue();
+ });
+
+ await page.goto("/dashboard/sales");
+ await page.getByText("Due diligence, verified payment and handover evidence").click();
+ await page.getByRole("combobox").filter({hasText:"Select milestone"}).click();
+ await page.getByRole("option",{name:"Due Diligence Check"}).click();
+ await page.getByLabel("Supporting evidence").setInputFiles({name:"registry.pdf",mimeType:"application/pdf",buffer:Buffer.from("%PDF-1.7 evidence")});
+ await page.getByLabel("Supporting record reference").fill("REG-2026-41");
+ await page.getByLabel("Verification notes").fill("Registry search completed.");
+ await page.getByRole("button",{name:"Record completed milestone"}).click();
+ await expect.poll(()=>uploaded&&recorded).toBe(true);
+ await expect(page.getByText("Evidence document ID")).toHaveCount(0);
+});

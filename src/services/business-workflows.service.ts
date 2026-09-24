@@ -18,4 +18,6 @@ export const salesService = {
   createEscrowInvoice: (id:number,amount:number,paymentAccountId:number) => API.post(`/sales/${id}/escrow-invoice`,{amount,paymentAccountId}),
   milestones: (id:number,params:{page?:number;size?:number}={}) => API.get(`/sales/${id}/milestones`,{params:{page:0,size:50,...params}}),
   addMilestone: (id:number,data:SaleMilestoneCreate) => API.post(`/sales/${id}/milestones`,data),
+  evidence: (id:number) => API.get(`/sales/${id}/evidence`),
+  uploadEvidence: (id:number,category:string,file:File) => {const data=new FormData();data.append("category",category);data.append("file",file);return API.post(`/sales/${id}/evidence`,data);},
 };
