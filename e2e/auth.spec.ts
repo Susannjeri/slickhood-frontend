@@ -499,8 +499,8 @@ test("tenant initializes the landlord-defined lease without editing dates", asyn
   await page.goto("/lease/initialize?token=multi-unit-tenant-token");
   await expect(page.getByText("Oct 1, 2026").first()).toBeVisible();
   await expect(page.getByText("Sep 30, 2027").first()).toBeVisible();
-  await page.getByRole("button",{name:"Initialize Lease"}).first().click();
-  await page.getByRole("button",{name:"Initialize Lease"}).last().click();
+  await expect(page.getByText("All unit, charge, payment and lease-period information is shown above.", { exact: false })).toBeVisible();
+  await page.getByRole("button",{name:"Initialize Lease"}).click();
   await expect.poll(()=>payload).toEqual({token:"multi-unit-tenant-token"});
   await expect(page).toHaveURL(/\/dashboard\/documents\?leaseId=501&documentId=601/);
 });
@@ -522,8 +522,7 @@ test("repeated tenant lease initialization resumes the existing agreement", asyn
   await page.route("**/lease/list**", route => route.fulfill({json:envelope([])}));
 
   await page.goto("/lease/initialize?token=resume-token");
-  await page.getByRole("button",{name:"Initialize Lease"}).first().click();
-  await page.getByRole("button",{name:"Initialize Lease"}).last().click();
+  await page.getByRole("button",{name:"Initialize Lease"}).click();
 
   await expect(page).toHaveURL(/\/dashboard\/documents\?leaseId=501&documentId=601/);
 });

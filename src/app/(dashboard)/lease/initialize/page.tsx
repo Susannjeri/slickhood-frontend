@@ -7,13 +7,6 @@ import { useAuthStore } from "@/store/authStore";
 import { useApi } from "@/hooks/useApi";
 import { Button } from "@/components/ui/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -29,7 +22,6 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
-  ArrowRight,
   Receipt,
   LogIn,
   UserPlus,
@@ -111,8 +103,6 @@ function LeaseInitializeContent() {
   const [unitCharges, setUnitCharges] = useState<UnitCharge[]>([]);
   const [loadingCharges, setLoadingCharges] = useState(false);
 
-  // Sheet state
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [leaseStartDate, setLeaseStartDate] = useState("");
   const [leaseEndDate, setLeaseEndDate] = useState("");
   const [firstRentDueDate, setFirstRentDueDate] = useState("");
@@ -246,7 +236,6 @@ function LeaseInitializeContent() {
         toast.success("Lease initialized. Opening your agreement…");
         // Clear invite token
         setInviteToken(null);
-        setIsSheetOpen(false);
         const destination = new URLSearchParams({ leaseId: String(result.leaseId) });
         if (result.agreementDocumentId) destination.set("documentId", String(result.agreementDocumentId));
         router.replace(`/dashboard/documents?${destination.toString()}`);
@@ -404,120 +393,6 @@ function LeaseInitializeContent() {
               </div>
             </div>
           </section>
-        )}
-
-        {/* Initialize Lease Sheet (Only for logged-in users) */}
-        {isLoggedIn && (
-          <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-            <SheetContent className="w-full sm:max-w-xl overflow-y-auto p-6">
-              <SheetHeader className="mb-6">
-                <SheetTitle className="text-[#141130]">Initialize Your Lease</SheetTitle>
-                <SheetDescription>
-                  Confirm the landlord-defined lease period for Unit {unitDetails.ref}. These dates cannot be changed here.
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="space-y-6">
-                {/* Unit Summary */}
-                <div className="p-4 bg-gray-50 rounded-lg border">
-                  <h3 className="font-semibold mb-3" style={{ color: "#141130" }}>
-                    Lease Summary
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Unit:</span>
-                      <span className="font-semibold">{unitDetails.ref}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Type:</span>
-                      <span className="font-semibold">{resolveUnitTypeLabel(unitDetails.unitType)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Price:</span>
-                      <span className="font-semibold" style={{ color: "#EF4217" }}>
-                        {unitDetails.currency} {unitDetails.price.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Lease Mode:</span>
-                      <span className="font-semibold capitalize">{unitDetails.leaseMode}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg border bg-white p-3">
-                    <p className="text-xs text-gray-500">Lease starts</p>
-                    <p className="mt-1 font-semibold text-[#141130]">{leaseStartDate ? formatDate(leaseStartDate) : "Missing from invitation"}</p>
-                  </div>
-                  <div className="rounded-lg border bg-white p-3">
-                    <p className="text-xs text-gray-500">Lease ends</p>
-                    <p className="mt-1 font-semibold text-[#141130]">{leaseEndDate ? formatDate(leaseEndDate) : "Missing from invitation"}</p>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
-                  <h3 className="font-semibold text-[#141130]">Payment timing</h3>
-                  <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-                    <div><p className="text-gray-600">First rent due</p><p className="font-semibold">{firstRentDueDate ? formatDate(firstRentDueDate) : "Missing from invitation"}</p></div>
-                    <div><p className="text-gray-600">Deposit due</p><p className="font-semibold">{depositCharge ? `${unitDetails.currency} ${depositCharge.amount.toLocaleString()} on ${depositDueDate ? formatDate(depositDueDate) : "the lease start date"}` : "No deposit configured"}</p></div>
-                  </div>
-                  <p className="mt-3 text-xs text-orange-900">The initial invoice is issued after both parties sign. Rent and any configured deposit must be paid by the stated due date.</p>
-                </div>
-
-                {/* Duration Display */}
-                {leaseStartDate && leaseEndDate && new Date(leaseEndDate) > new Date(leaseStartDate) && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-sm text-green-800">
-                      <strong>Lease Duration:</strong>{" "}
-                      {Math.ceil(
-                        (new Date(leaseEndDate).getTime() - new Date(leaseStartDate).getTime()) /
-                          (1000 * 60 * 60 * 24)
-                      )}{" "}
-                      days
-                    </p>
-                  </div>
-                )}
-
-                {/* Important Notice */}
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-xs text-yellow-800">
-                    <strong>Important:</strong> Initializing creates the lease and an immutable agreement from these terms. Review the PDF before signing. You may reject it if the terms are not correct.
-                  </p>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsSheetOpen(false)}
-                    disabled={isSubmitting}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleSubmitLease}
-                    disabled={isSubmitting || !leaseStartDate || !leaseEndDate}
-                    className="flex-1 text-white"
-                    style={{ backgroundColor: "#EF4217" }}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Initializing...
-                      </>
-                    ) : (
-                      <>
-                        <ArrowRight className="w-4 h-4 mr-2" />
-                        Initialize Lease
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
         )}
 
         {/* ==================== END OF PART B ==================== */}
@@ -808,52 +683,34 @@ function LeaseInitializeContent() {
           </AccordionItem>
         </Accordion>
 
-        {/* Action Buttons Section */}
-        <div className="bg-white rounded-lg border p-6 space-y-4">
-          <h3 className="text-lg font-semibold" style={{ color: "#141130" }}>
-            Actions
-          </h3>
+        {!isLoggedIn && (
+          <p className="rounded-lg border bg-white p-4 text-center text-sm text-gray-600">
+            Choose the existing-account or new-account path above. Your invitation will remain attached throughout.
+          </p>
+        )}
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* Conditional Initialize/Login Button */}
-            {isLoggedIn ? (
-              <Button
-                onClick={() => setIsSheetOpen(true)}
-                className="flex-1 text-white"
-                style={{ backgroundColor: "#EF4217" }}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Initialize Lease
-              </Button>
-            ) : null}
-          </div>
-
-          {/* Info text for not logged in users */}
-          {!isLoggedIn && (
-            <p className="text-xs text-center text-gray-500 pt-2">
-              Choose the existing-account or new-account path above. Your invitation will remain attached throughout.
-            </p>
-          )}
-        </div>
-
-        {/* CTA Banner - Only for logged-in users */}
+        {/* Final action — the agreement page is the second screen. */}
         {isLoggedIn && (
-          <div className="bg-gradient-to-r from-[#EF4217] to-[#d63a14] rounded-lg p-6 sm:p-8 text-white">
-            <div className="max-w-3xl mx-auto text-center space-y-4">
-              <h2 className="text-2xl sm:text-3xl font-bold">Ready to Initialize Your Lease?</h2>
-              <p className="text-white/90">
-                Review the unit and landlord-defined lease period. Initializing creates the agreement for you to review, accept and sign.
+          <section className="rounded-xl border border-orange-200 bg-white p-6 shadow-sm" aria-labelledby="initialize-lease-action">
+            <h2 id="initialize-lease-action" className="text-2xl font-bold text-[#141130]">Create and review your lease agreement</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              All unit, charge, payment and lease-period information is shown above. Initializing creates an immutable agreement and opens it on the next screen for PDF review, acknowledgement, rejection or signing.
+            </p>
+            {leaseStartDate && leaseEndDate && new Date(leaseEndDate) > new Date(leaseStartDate) && (
+              <p className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                <strong>Lease duration:</strong>{" "}
+                {Math.ceil((new Date(leaseEndDate).getTime() - new Date(leaseStartDate).getTime()) / (1000 * 60 * 60 * 24))} days
               </p>
-              <Button
-                onClick={() => setIsSheetOpen(true)}
-                size="lg"
-                className="bg-white text-[#EF4217] hover:bg-gray-100 font-semibold"
-              >
-                <FileText className="w-5 h-5 mr-2" />
-                Initialize Lease
-              </Button>
-            </div>
-          </div>
+            )}
+            <Button
+              onClick={handleSubmitLease}
+              disabled={isSubmitting || !leaseStartDate || !leaseEndDate}
+              size="lg"
+              className="mt-5 w-full bg-[#EF4217] font-semibold text-white hover:bg-[#d63a14]"
+            >
+              {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Initializing…</> : <><FileText className="mr-2 h-5 w-5" />Initialize Lease</>}
+            </Button>
+          </section>
         )}
       </div>
 
