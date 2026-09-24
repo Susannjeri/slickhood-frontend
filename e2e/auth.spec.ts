@@ -510,6 +510,50 @@ test("tenant initializes the landlord-defined lease without editing dates", asyn
   expect(validationRequests).toBe(1);
 });
 
+test("tenant invitation preserves existing roles and activates tenant only for the lease journey", async ({ context, page }) => {
+  await authenticated(
+    context,
+    page,
+    {title:"Buyer",permissions:["view_sale_pipeline"]},
+    {inviteToken:"buyer-to-tenant-token"},
+  );
+  const refreshedJwt = testToken([
+    {title:"Buyer",permissions:["view_sale_pipeline"]},
+    {title:"Tenant",permissions:["create_new_lease","view_lease_document"]},
+  ]);
+  await page.route("**/browser-session/refresh", route => route.fulfill({
+    headers:{"set-cookie":`token=${refreshedJwt}; Path=/; HttpOnly; SameSite=Lax`},
+    json:{success:true,code:"i0001"},
+  }));
+  await page.route("**/browser-session/get-token", route => route.fulfill({json:{success:true,data:{jwt:refreshedJwt}}}));
+  await page.route("**/invite/validate**", route => route.fulfill({json:{
+    success:true,code:"S0058",description:"Tenant invite",data:[{
+      unit:{propertyId:11,unitId:77,ref:"A-101",propertyType:"APARTMENT",unitType:"APARTMENT",size:85,
+        measurementUnits:{id:1,name:"sqm"},utilities:[],leaseMode:"RENT",price:25000,currency:"KES",
+        occupied:false,advertise:false,thumbnail:"",images:[],templateId:9},
+      leaseStartDate:"2026-10-01",leaseEndDate:"2027-09-30",
+    }],
+  }}));
+  await page.route("**/property/type", route => route.fulfill({json:envelope([])}));
+  await page.route("**/property/unit/type**", route => route.fulfill({json:envelope([])}));
+  await page.route("**/property/unit/charges?**", route => route.fulfill({json:envelope([])}));
+  let activeRoleHeader: string | undefined;
+  await page.route("**/lease/tenant/create", route => {
+    activeRoleHeader = route.request().headers()["x-slickhood-role"];
+    return route.fulfill({json:{success:true,code:"S0162",data:[{leaseId:701,agreementDocumentId:801}]}});
+  });
+  await page.route("**/lease/documents**", route => route.fulfill({json:{...envelope([]),totalPages:1}}));
+  await page.route("**/lease/list**", route => route.fulfill({json:envelope([])}));
+
+  await page.goto("/lease/initialize?token=buyer-to-tenant-token");
+  await page.getByRole("button", {name:"Initialize Lease"}).click();
+  await expect(page).toHaveURL(/\/dashboard\/documents\?leaseId=701&documentId=801/);
+  expect(activeRoleHeader).toBe("Tenant");
+  const auth = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state);
+  expect(auth.roles.map((role:{title:string}) => role.title)).toEqual(["Buyer", "Tenant"]);
+  expect(auth.activeRole.title).toBe("Tenant");
+});
+
 test("repeated tenant lease initialization resumes the existing agreement", async ({ context, page }) => {
   await authenticated(context, page, {title:"Tenant",permissions:["create_new_lease","view_lease_document"]}, {inviteToken:"resume-token"});
   await page.route("**/invite/validate**", route => route.fulfill({json:{success:true,code:"S0058",data:[{
