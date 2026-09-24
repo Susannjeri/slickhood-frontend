@@ -498,7 +498,11 @@ export default function ViewUnitPage() {
   };
 
   const loadImages = async (imagePaths: string[]) => {
-    setImageUrls(imagePaths);
+    const usableImages = Array.from(
+      new Set(imagePaths.filter((path): path is string => typeof path === "string" && path.trim().length > 0)),
+    );
+    setCurrentImageIndex(0);
+    setImageUrls(usableImages);
   };
 
   const handleAdvertiseToggle = async (checked: boolean) => {
