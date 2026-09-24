@@ -166,6 +166,42 @@ test("a bound staff invitation survives validation and offers sign-in before reg
   expect(storedInvite).toBe("insurance-invite-token");
 });
 
+test("ordinary sign in ignores and clears an expired invitation left in browser storage", async ({ page }) => {
+  let invitationInspectionCalls = 0;
+  await page.addInitScript(() => {
+    window.localStorage.setItem("auth-storage", JSON.stringify({
+      state: {
+        email: "invited@example.test",
+        step: "account",
+        inviteToken: "expired-invitation-token",
+        roles: [],
+        roleName: [],
+        permissions: [],
+        propertyIds: [],
+        propertyNames: [],
+        activeRole: null,
+      },
+      version: 0,
+    }));
+  });
+  await page.route("https://accounts.google.com/**", route => route.abort());
+  await page.route("**/invite/inspect**", route => {
+    invitationInspectionCalls += 1;
+    return route.fulfill({ status: 410, json: { success: false, code: "S00128" } });
+  });
+
+  await page.goto("/login");
+
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" })).toBeEnabled();
+  await expect(page.getByText("This invitation has expired or is no longer available.")).toHaveCount(0);
+  await expect.poll(() => invitationInspectionCalls).toBe(0);
+  await expect.poll(async () => page.evaluate(() => {
+    const stored = JSON.parse(window.localStorage.getItem("auth-storage") || "{}");
+    return stored?.state?.inviteToken ?? null;
+  })).toBeNull();
+});
+
 test("a logged-out homeowner invitation preserves the return to its agreement journey", async ({ page }) => {
   await page.route("https://accounts.google.com/**", route => route.abort());
   await page.route("**/invite/inspect**", route => route.fulfill({ json: {

@@ -64,7 +64,10 @@ export default function LoginForm() {
   // or privacy extension must not turn a tenant/staff invitation into an
   // unscoped registration flow.
   const urlInviteToken = searchParams.get("token")?.trim() || null;
-  const candidateInviteToken = urlInviteToken || inviteToken;
+  // A persisted invitation supports deliberate registration/verification
+  // handoffs, but it must never turn a later, ordinary /login visit back into
+  // an invitation journey. Login invitations are therefore URL-bound.
+  const candidateInviteToken = urlInviteToken;
   const invitationStatus: InvitationStatus = !candidateInviteToken
     ? "none"
     : invitationCheck.token === candidateInviteToken
@@ -77,6 +80,10 @@ export default function LoginForm() {
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
+
+  useEffect(() => {
+    if (!urlInviteToken && inviteToken) setInviteToken(null);
+  }, [inviteToken, setInviteToken, urlInviteToken]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
