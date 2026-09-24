@@ -5,6 +5,7 @@ import { Suspense, useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useApi } from "@/hooks/useApi";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -79,7 +80,8 @@ export default function LeaseInitializePage() {
 function LeaseInitializeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { inviteToken, setInviteToken, setStep, token: authToken } = useAuthStore();
+  const { inviteToken, setInviteToken, setStep, token: authToken, sessionReady } = useAuthStore();
+  const { handleTokenRefresh } = useAuth();
   const urlInviteToken = searchParams.get("token")?.trim() || null;
   const effectiveInviteToken = urlInviteToken || inviteToken;
   const {
@@ -108,13 +110,15 @@ function LeaseInitializeContent() {
   const [firstRentDueDate, setFirstRentDueDate] = useState("");
   const [depositDueDate, setDepositDueDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const loadedInvitationToken = useRef<string | null>(null);
+  const [tenantSessionReady, setTenantSessionReady] = useState(false);
+  const loadedInvitationContext = useRef<string | null>(null);
 
   // Profile Gate State
     const [profileGate, setProfileGate] = useState<Record<string, boolean> | null>(null);
 
 
   useEffect(() => {
+    if (!sessionReady) return;
     if (urlInviteToken && inviteToken !== urlInviteToken) {
       setInviteToken(urlInviteToken);
     }
@@ -128,10 +132,14 @@ function LeaseInitializeContent() {
     // React development checks and auth-store hydration can run this effect
     // more than once for the same URL. Invitation validation is stateful, so
     // never issue duplicate validation requests for an unchanged token.
-    if (loadedInvitationToken.current === effectiveInviteToken) return;
-    loadedInvitationToken.current = effectiveInviteToken;
+    // Revalidate once after session hydration changes from anonymous to
+    // authenticated. That authenticated validation is what attaches Tenant to
+    // an existing multi-role account.
+    const invitationContext = `${effectiveInviteToken}:${authToken ? "authenticated" : "anonymous"}`;
+    if (loadedInvitationContext.current === invitationContext) return;
+    loadedInvitationContext.current = invitationContext;
     loadData(effectiveInviteToken);
-  }, [effectiveInviteToken, inviteToken, urlInviteToken]);
+  }, [authToken, effectiveInviteToken, inviteToken, sessionReady, urlInviteToken]);
 
   const loadData = async (token: string) => {
     try {
@@ -157,6 +165,27 @@ function LeaseInitializeContent() {
         setLeaseEndDate(invitation?.leaseEndDate ?? "");
         setFirstRentDueDate(invitation?.firstRentDueDate ?? invitation?.leaseStartDate ?? "");
         setDepositDueDate(invitation?.depositDueDate ?? invitation?.leaseStartDate ?? "");
+
+        // Validating a tenant invitation assigns the Tenant role server-side.
+        // Refresh the access token so that new role is present in its claims,
+        // then select it before the protected lease-creation request. Without
+        // this, multi-role users remain on their previous role (for example
+        // Buyer) and the Initialize button is rejected with a silent 403.
+        if (authToken) {
+          const currentSession = useAuthStore.getState();
+          const currentRoleIsTenant = currentSession.activeRole?.title
+            .replace(/[_\s]/g, "").toLowerCase() === "tenant";
+          if (!currentRoleIsTenant) await handleTokenRefresh();
+          const refreshed = useAuthStore.getState();
+          const tenantRole = refreshed.roles.find(
+            role => role.title.replace(/[_\s]/g, "").toLowerCase() === "tenant"
+          );
+          if (!tenantRole) {
+            throw new Error("The tenant role could not be activated for this invitation.");
+          }
+          refreshed.setActiveRole(tenantRole);
+          setTenantSessionReady(true);
+        }
         await getUnitTypes(unit.propertyType);
         // Load unit images using inviteToken
         // Legacy invitations can contain an empty thumbnail. Skipping blank
@@ -210,6 +239,10 @@ function LeaseInitializeContent() {
   };
 
   const handleSubmitLease = async () => {
+    if (isLoggedIn && !tenantSessionReady) {
+      toast.error("Your tenant access is still being prepared. Please wait a moment and try again.");
+      return;
+    }
     if (!leaseStartDate || !leaseEndDate) {
       toast.error("This invitation does not contain a lease period. Ask the landlord to send a new assignment.");
       return;
@@ -715,11 +748,11 @@ function LeaseInitializeContent() {
             <Button
               type="button"
               onClick={handleSubmitLease}
-              disabled={isSubmitting || !leaseStartDate || !leaseEndDate}
+              disabled={isSubmitting || !tenantSessionReady || !leaseStartDate || !leaseEndDate}
               size="lg"
               className="mt-5 w-full bg-[#EF4217] font-semibold text-white hover:bg-[#d63a14]"
             >
-              {isSubmitting ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Initializing…</> : <><FileText className="mr-2 h-5 w-5" />Initialize Lease</>}
+              {isSubmitting || !tenantSessionReady ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" />Preparing tenant access…</> : <><FileText className="mr-2 h-5 w-5" />Initialize Lease</>}
             </Button>
           </section>
         )}
