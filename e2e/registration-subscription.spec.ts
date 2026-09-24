@@ -339,6 +339,33 @@ test("an interrupted Add Business Area journey resumes KYC instead of bypassing 
   await expect(page.getByRole("button", { name: "Save & return to current workspace" })).toBeVisible();
 });
 
+test("a continuation lookup failure cannot trap an authenticated existing role", async ({ context, page }) => {
+  const landlord = { title: "Landlord", permissions: ["view_property"] };
+  await authenticated(context, page, landlord);
+  await page.addInitScript(() => {
+    const persisted = JSON.parse(localStorage.getItem("auth-storage") || "{}");
+    persisted.state = { ...persisted.state, selectedBusinessAreaId: "property-sales" };
+    localStorage.setItem("auth-storage", JSON.stringify(persisted));
+  });
+
+  let kycRequests = 0;
+  await page.route("**/kyc/current", route => {
+    kycRequests += 1;
+    if (kycRequests === 1) return route.fulfill({ status: 503, json: { success: false, description: "Temporarily unavailable" } });
+    return route.fulfill({ json: envelope([{ status: "APPROVED", accountStatus: "ACTIVE", phoneVerified: true, requirements: [], missingRequirements: [], documents: [] }]) });
+  });
+  await page.route("**/dash/totals**", route => route.fulfill({ json: envelope([{ role: "LANDLORD", primaryCount: 0, secondaryCount: 0, pendingActions: 0, completedCount: 0 }]) }));
+  await page.route("**/reports/catalog**", route => route.fulfill({ json: envelope([]) }));
+
+  await page.goto("/continue-setup");
+  await expect(page.getByText(/could not determine your next setup step/i)).toBeVisible();
+  await page.getByRole("button", { name: "Open Landlord workspace" }).click();
+
+  await expect(page).toHaveURL(/\/dashboard$/);
+  const recovered = await page.evaluate(() => JSON.parse(localStorage.getItem("auth-storage") || "{}").state);
+  expect(recovered.selectedBusinessAreaId).toBeNull();
+});
+
 test("Superadmin cannot add, open or switch into a customer business area", async ({ context, page }) => {
   const superadmin = { title: "Superadmin", permissions: ["manage_users"] };
   const landlord = { title: "Landlord", permissions: ["create_property"] };

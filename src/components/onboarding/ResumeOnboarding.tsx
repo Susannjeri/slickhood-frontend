@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, Loader2, RotateCcw, ShieldCheck } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
+import { PROFILE_DASHBOARD_HREF } from "@/config/businessAreas";
 import {
   OnboardingContinuation,
   resolveOnboardingContinuation,
@@ -15,6 +16,7 @@ export default function ResumeOnboarding() {
   const token = useAuthStore(state => state.token);
   const activeRole = useAuthStore(state => state.activeRole);
   const selectedBusinessAreaId = useAuthStore(state => state.selectedBusinessAreaId);
+  const setSelectedBusinessAreaId = useAuthStore(state => state.setSelectedBusinessAreaId);
   const [continuation, setContinuation] = useState<OnboardingContinuation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,6 +37,14 @@ export default function ResumeOnboarding() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const openExistingWorkspace = () => {
+    // Recover only the already-issued role. OperationalAccessGuard performs a
+    // fresh KYC check on the destination, and backend authorization remains the
+    // source of truth for every workspace request.
+    setSelectedBusinessAreaId(null);
+    router.replace(PROFILE_DASHBOARD_HREF);
   };
 
   useEffect(() => {
@@ -90,9 +100,16 @@ export default function ResumeOnboarding() {
           {!loading && error && (
             <div className="space-y-5 text-center">
               <p className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">{error}</p>
-              <button onClick={() => void load()} className="inline-flex items-center gap-2 rounded-xl bg-[#071744] px-6 py-3 font-bold text-white">
-                <RotateCcw className="h-4 w-4" /> Try again
-              </button>
+              <div className="flex flex-col justify-center gap-3 sm:flex-row">
+                <button onClick={() => void load()} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-6 py-3 font-bold text-[#071744]">
+                  <RotateCcw className="h-4 w-4" /> Try again
+                </button>
+                {activeRole && (
+                  <button onClick={openExistingWorkspace} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#071744] px-6 py-3 font-bold text-white">
+                    Open {activeRole.title} workspace <ArrowRight className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
