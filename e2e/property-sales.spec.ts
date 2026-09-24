@@ -116,6 +116,7 @@ test("sales owner sees how to resolve an existing active sale before inviting ag
  });
 
  await page.goto("/dashboard/sales");
+ await page.locator("#invite-buyer").scrollIntoViewIfNeeded();
  await page.getByRole("combobox").nth(1).click();
  await page.getByRole("option",{name:/A-07/}).click();
  const conflict=page.getByRole("alert").filter({hasText:"This unit already has an active sale"});
