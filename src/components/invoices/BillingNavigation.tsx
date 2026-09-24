@@ -15,7 +15,7 @@ const receivingSettings: Record<string, string> = {
 
 const subscriptionRoles = new Set([
   "Landlord", "EstateManager", "SalesAgent", "ServiceProvider",
-  "Affiliate", "AssetPortfolioManager", "Superadmin",
+  "AssetPortfolioManager", "Superadmin",
 ]);
 
 const latePaymentRoles = new Set(["Landlord", "EstateManager", "SalesAgent"]);

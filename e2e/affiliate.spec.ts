@@ -43,6 +43,19 @@ test("new affiliate sees approval status without subscription or financial contr
  expect(accountListRequests).toBe(0);
 });
 
+test("affiliate navigation never exposes subscription or change-plan controls",async({context,page})=>{
+ await authenticated(context,page,{title:"Affiliate",permissions:["view_account","view_invite_list"]});
+ await page.route("**/affiliate/dashboard",route=>route.fulfill({json:envelope({profile:{referralCode:"SH-1234567890ABCDEF",status:"ACTIVE",commissionRate:10,minimumPayout:1000,currency:"KES"},totalReferrals:0,conversions:0,conversionRatePercent:0,availableBalance:0,pendingEarnings:0,lifetimeEarnings:0,pendingPayouts:0,historyLimited:false,referrals:[],commissions:[],payouts:[]})}));
+ await page.route("**/affiliate/history/**",route=>route.fulfill({json:{...envelope([]),totalPages:0,totalElements:0,size:20}}));
+ await page.route("**/affiliate/balances",route=>route.fulfill({json:envelope([])}));
+ await page.route("**/account/list**",route=>route.fulfill({json:envelope([])}));
+ await page.goto("/dashboard/affiliate");
+ await expect(page.getByRole("link",{name:"Subscription & billing"})).toHaveCount(0);
+ await expect(page.getByRole("link",{name:"Change plan"})).toHaveCount(0);
+ await expect(page.getByRole("link",{name:"Subscriptions",exact:true})).toHaveCount(0);
+ await expect(page.getByRole("link",{name:"Upgrade Plan",exact:true})).toHaveCount(0);
+});
+
 test("system owner records payout decisions through an auditable dialog",async({context,page})=>{
  await authenticated(context,page,{title:"Super Admin",permissions:[]});
  let decision:unknown;
