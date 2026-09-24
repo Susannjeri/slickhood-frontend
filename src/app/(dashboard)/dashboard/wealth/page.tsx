@@ -107,19 +107,8 @@ type KnownInstrument = {
 };
 const knownInstruments: Record<string, KnownInstrument[]> = {
   LISTED_SECURITY: [
-    { key: "NSE:SCOM", label: "Safaricom (SCOM · NSE)", exchangeCode: "NSE", instrumentSymbol: "SCOM" },
-    { key: "NSE:EQTY", label: "Equity Group (EQTY · NSE)", exchangeCode: "NSE", instrumentSymbol: "EQTY" },
-    { key: "NSE:KCB", label: "KCB Group (KCB · NSE)", exchangeCode: "NSE", instrumentSymbol: "KCB" },
-    { key: "NSE:COOP", label: "Co-operative Bank (COOP · NSE)", exchangeCode: "NSE", instrumentSymbol: "COOP" },
     { key: "NASDAQ:AAPL", label: "Apple (AAPL · NASDAQ)", exchangeCode: "NASDAQ", instrumentSymbol: "AAPL" },
     { key: "NASDAQ:MSFT", label: "Microsoft (MSFT · NASDAQ)", exchangeCode: "NASDAQ", instrumentSymbol: "MSFT" },
-  ],
-  DIGITAL_ASSET: [
-    { key: "DIGITAL:BTC", label: "Bitcoin (BTC)", exchangeCode: "DIGITAL", instrumentSymbol: "BTC" },
-    { key: "DIGITAL:ETH", label: "Ethereum (ETH)", exchangeCode: "DIGITAL", instrumentSymbol: "ETH" },
-    { key: "DIGITAL:USDT", label: "Tether (USDT)", exchangeCode: "DIGITAL", instrumentSymbol: "USDT" },
-    { key: "DIGITAL:SOL", label: "Solana (SOL)", exchangeCode: "DIGITAL", instrumentSymbol: "SOL" },
-    { key: "DIGITAL:XRP", label: "XRP (XRP)", exchangeCode: "DIGITAL", instrumentSymbol: "XRP" },
   ],
 };
 type Run = (
@@ -317,7 +306,7 @@ export default function WealthPage() {
       const instrumentSymbol = assetForm.instrumentSymbol?.trim() ?? "";
       if (!/^[A-Za-z0-9._-]{1,20}$/.test(exchangeCode)) {
         toast.error(
-          "Exchange code must be 1–20 letters or numbers with no spaces, for example NSE.",
+          "Exchange code must be 1–20 letters or numbers with no spaces, for example NASDAQ.",
         );
         document.querySelector<HTMLInputElement>('input[name="exchangeCode"]')?.focus();
         return;
@@ -895,8 +884,8 @@ export default function WealthPage() {
                         name="exchangeCode"
                         required
                         maxLength={20}
-                        title="Enter a short exchange code with no spaces, for example NSE."
-                        placeholder="e.g. NSE"
+                        title="Enter a supported exchange code with no spaces, for example NASDAQ."
+                        placeholder="e.g. NASDAQ"
                         value={assetForm.exchangeCode ?? ""}
                         onChange={(e) =>
                           setAssetForm({
@@ -912,7 +901,7 @@ export default function WealthPage() {
                         required
                         maxLength={40}
                         title="Enter the fund or security ticker with no spaces."
-                        placeholder="e.g. KCB or AAPL"
+                        placeholder="e.g. AAPL"
                         value={assetForm.instrumentSymbol ?? ""}
                         onChange={(e) =>
                           setAssetForm({
