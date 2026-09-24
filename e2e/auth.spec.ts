@@ -475,14 +475,18 @@ test("tenant initializes the landlord-defined lease without editing dates", asyn
     {title:"Tenant",permissions:["create_new_lease","view_lease_document"]},
     {inviteToken:"multi-unit-tenant-token"},
   );
-  await page.route("**/invite/validate**",route=>route.fulfill({json:{
+  let validationRequests = 0;
+  await page.route("**/invite/validate**",route=>{
+    validationRequests += 1;
+    return route.fulfill({json: validationRequests === 1 ? {
     success:true,code:"S0058",description:"Tenant invite",data:[{
       unit:{propertyId:11,unitId:77,ref:"A-101",propertyType:"APARTMENT",unitType:"APARTMENT",size:85,
         measurementUnits:{id:1,name:"sqm"},utilities:[],leaseMode:"RENT",price:25000,currency:"KES",
         occupied:false,advertise:false,thumbnail:"",images:[],templateId:9},
       leaseStartDate:"2026-10-01",leaseEndDate:"2027-09-30",
     }],
-  }}));
+  } : {success:false,code:"E0058",description:"Invitation already used",data:[]}});
+  });
   await page.route("**/property/type",route=>route.fulfill({json:envelope([])}));
   await page.route("**/property/unit/type**",route=>route.fulfill({json:envelope([])}));
   await page.route("**/property/unit/charges?**",route=>route.fulfill({json:envelope([])}));
@@ -503,6 +507,7 @@ test("tenant initializes the landlord-defined lease without editing dates", asyn
   await page.getByRole("button",{name:"Initialize Lease"}).click();
   await expect.poll(()=>payload).toEqual({token:"multi-unit-tenant-token"});
   await expect(page).toHaveURL(/\/dashboard\/documents\?leaseId=501&documentId=601/);
+  expect(validationRequests).toBe(1);
 });
 
 test("repeated tenant lease initialization resumes the existing agreement", async ({ context, page }) => {

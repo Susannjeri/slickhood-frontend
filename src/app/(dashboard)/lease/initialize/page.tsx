@@ -1,7 +1,7 @@
 // app/lease/initialize/page.tsx - PART A
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 import { useApi } from "@/hooks/useApi";
@@ -108,6 +108,7 @@ function LeaseInitializeContent() {
   const [firstRentDueDate, setFirstRentDueDate] = useState("");
   const [depositDueDate, setDepositDueDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const loadedInvitationToken = useRef<string | null>(null);
 
   // Profile Gate State
     const [profileGate, setProfileGate] = useState<Record<string, boolean> | null>(null);
@@ -124,6 +125,11 @@ function LeaseInitializeContent() {
       return;
     }
 
+    // React development checks and auth-store hydration can run this effect
+    // more than once for the same URL. Invitation validation is stateful, so
+    // never issue duplicate validation requests for an unchanged token.
+    if (loadedInvitationToken.current === effectiveInviteToken) return;
+    loadedInvitationToken.current = effectiveInviteToken;
     loadData(effectiveInviteToken);
   }, [effectiveInviteToken, inviteToken, urlInviteToken]);
 
@@ -234,8 +240,12 @@ function LeaseInitializeContent() {
           return;
         }
         toast.success("Lease initialized. Opening your agreement…");
-        // Clear invite token
-        setInviteToken(null);
+        // Do not clear the persisted invitation while this URL still contains
+        // the token. Doing so changes effectiveInviteToken, re-runs the
+        // validation effect, and can let the now-consumed invitation redirect
+        // to login before Next.js completes this navigation. The documents
+        // route no longer uses the invitation token, and a later auth flow can
+        // replace or clear the persisted value safely.
         const destination = new URLSearchParams({ leaseId: String(result.leaseId) });
         if (result.agreementDocumentId) destination.set("documentId", String(result.agreementDocumentId));
         router.replace(`/dashboard/documents?${destination.toString()}`);
@@ -703,6 +713,7 @@ function LeaseInitializeContent() {
               </p>
             )}
             <Button
+              type="button"
               onClick={handleSubmitLease}
               disabled={isSubmitting || !leaseStartDate || !leaseEndDate}
               size="lg"
