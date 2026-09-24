@@ -254,6 +254,27 @@ test("vault submits encoded document category and shows server failures without 
   });
   await page.goto("/dashboard/wealth");
   await page.getByRole("tab", { name: "Document vault" }).click();
+  await expect(page.getByLabel("Document category").locator("option")).toHaveText([
+    "WILL",
+    "TRUST",
+    "TRUST DEED",
+    "POWER OF ATTORNEY",
+    "BENEFICIARY NOMINATION",
+    "TITLE DOCUMENT",
+    "TITLE DEED",
+    "SALE AGREEMENT",
+    "LEASE",
+    "SHARE CERTIFICATE",
+    "INSURANCE POLICY",
+    "PENSION STATEMENT",
+    "TAX RECORD",
+    "VALUATION",
+    "APPROVAL",
+    "WARRANTY",
+    "LOAN",
+    "RECEIPT",
+    "OTHER",
+  ]);
   await page.getByLabel("Document category").selectOption("TRUST_DEED");
   await page
     .getByLabel("File", { exact: true })
