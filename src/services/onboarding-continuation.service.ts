@@ -99,12 +99,17 @@ export async function resolveOnboardingContinuation(
 
   const response = await getCurrentSubscription(token, area.subscriptionRole);
   const current = response.data.data?.[0] ?? null;
-  if (!current) {
+  const endAt = current?.endAt ? new Date(current.endAt) : null;
+  const hasLiveSubscription = current?.status === "ACTIVE"
+    && (!endAt || endAt.getTime() > Date.now());
+  if (!hasLiveSubscription) {
     return {
       complete: false,
       destination: `/business-areas/plans?area=${area.id}`,
       areaTitle: area.title,
-      message: `Your email is verified. Complete your ${area.title} plan and free-trial setup to enter your workspace.`,
+      message: current
+        ? `Your ${area.title} subscription needs attention before you can enter the workspace.`
+        : `Your email is verified. Complete your ${area.title} plan and free-trial setup to enter your workspace.`,
     };
   }
 

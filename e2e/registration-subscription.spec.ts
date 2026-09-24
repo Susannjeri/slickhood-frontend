@@ -230,6 +230,58 @@ test("trial duration comes from policy and activation remains attached to the se
   expect(trialRequest).toEqual({ role: "LANDLORD", planCode: "LANDLORD_BRONZE_MONTHLY" });
 });
 
+test("an expired subscription routes to renewal instead of the workspace or a second trial", async ({ context, page }) => {
+  await authenticated(context, page, { title: "Landlord", permissions: [] });
+  await page.addInitScript(() => {
+    const persisted = JSON.parse(localStorage.getItem("auth-storage") || "{}");
+    persisted.state = { ...persisted.state, selectedBusinessAreaId: "property-management" };
+    localStorage.setItem("auth-storage", JSON.stringify(persisted));
+  });
+  const plan = {
+    uuid: "plan-bronze-monthly",
+    code: "LANDLORD_BRONZE_MONTHLY",
+    displayName: "Bronze",
+    planCategory: "RENTAL",
+    roleFamily: "LANDLORD",
+    productKey: "LANDLORD",
+    billingCycle: "MONTHLY",
+    price: 1000,
+    currency: "KES",
+    active: true,
+    features: [],
+    quotas: [{ metricKey: "UNITS", limitValue: 10 }],
+  };
+  await page.unroute("**/kyc/current");
+  await page.route("**/kyc/current", route => route.fulfill({ json: envelope([{
+    id: 91, status: "APPROVED", accountStatus: "ACTIVE", phoneVerified: true,
+    requirements: [], missingRequirements: [], documents: [],
+  }]) }));
+  await page.route("**/subscription/plans**", route => route.fulfill({ json: envelope([plan]) }));
+  await page.route("**/subscription/trial-policy**", route => route.fulfill({ json: envelope([{ durationDays: 14 }]) }));
+  await page.route("**/subscription/current**", route => route.fulfill({ json: envelope([{
+    uuid: "expired-subscription",
+    role: "LANDLORD",
+    planCode: plan.code,
+    productKey: "LANDLORD",
+    status: "EXPIRED",
+    startAt: "2026-07-01T00:00:00Z",
+    endAt: "2026-08-01T00:00:00Z",
+    autoRenew: false,
+    termVersion: 1,
+    planDetails: plan,
+  }]) }));
+
+  await page.goto("/continue-setup");
+  await expect(page.getByText("Your Rental Management subscription needs attention before you can enter the workspace.")).toBeVisible();
+  await page.getByRole("button", { name: "Continue setup" }).click();
+
+  await expect(page).toHaveURL(/\/business-areas\/plans\?area=property-management/);
+  await expect(page.getByText("Subscription expired", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Restore Bronze" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review renewal options" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start Free Trial" })).toHaveCount(0);
+});
+
 test("Soko free merchant access uses free activation instead of the trial endpoint", async ({ context, page }) => {
   await authenticated(context, page, { title: "ServiceProvider", permissions: [] });
   const plan = {
