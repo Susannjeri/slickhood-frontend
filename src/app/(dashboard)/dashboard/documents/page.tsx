@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -69,6 +69,7 @@ export default function DocumentsPage() {
 
 function DocumentsWorkspace() {
   const searchParams = useSearchParams();
+  const templatesMode = searchParams.get("view") === "templates";
   const requestedDocumentId = searchParams.get("documentId");
   const activeRole = useAuthStore((state) => state.activeRole);
   const permissions = useAuthStore((state) => state.permissions);
@@ -81,7 +82,6 @@ function DocumentsWorkspace() {
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [logoConfigured, setLogoConfigured] = useState(false);
   const [ownershipId, setOwnershipId] = useState(searchParams.get("ownershipId") ?? "");
   const [optionsPage, setOptionsPage] = useState(0);
   const [optionsHasMore, setOptionsHasMore] = useState(false);
@@ -123,6 +123,31 @@ function DocumentsWorkspace() {
     if (["Landlord", "PropertyManager", "LeasingOfficer"].includes(role ?? "")) return rentalTypes.filter(t => t !== "TENANT_TERMINATION_NOTICE");
     return allTypes.filter(t => t !== "TENANT_TERMINATION_NOTICE");
   }, [activeRole]);
+  const orderedDocuments = useMemo(() => {
+    const actionPriority = (item: LeaseDocument) => {
+      if (requestedDocumentId === String(item.id)) return -1;
+      const recipientAction = item.viewerParty === "RECIPIENT" && (
+        item.status === "ISSUED" || item.status === "ACKNOWLEDGED" ||
+        (item.status === "PARTIALLY_SIGNED" && !item.recipientSignedAt)
+      );
+      const issuerAction = item.viewerParty === "ISSUER" && (
+        item.status === "DRAFT" ||
+        (item.status === "PARTIALLY_SIGNED" && !item.issuerSignedAt)
+      );
+      if (recipientAction || issuerAction) return 0;
+      if (["ISSUED", "ACKNOWLEDGED", "PARTIALLY_SIGNED"].includes(item.status)) return 1;
+      if (item.status === "SIGNED") return 2;
+      if (item.status === "REJECTED") return 3;
+      return 4;
+    };
+    const typePriority = (item: LeaseDocument) => {
+      if (item.documentType === "PROPERTY_SALE_LETTER_OF_OFFER") return 0;
+      if (["PROPERTY_SALE_AGREEMENT", "RESIDENTIAL_LEASE_AGREEMENT", "COMMERCIAL_LEASE_AGREEMENT", "ESTATE_RESIDENTIAL_AGREEMENT"].includes(item.documentType)) return 1;
+      return 2;
+    };
+    return [...documents].sort((left, right) =>
+      actionPriority(left) - actionPriority(right) || typePriority(left) - typePriority(right) || right.id - left.id);
+  }, [documents, requestedDocumentId]);
 
   useEffect(() => { if (!visibleTypes.includes(type)) setType(visibleTypes[0]); }, [type, visibleTypes]);
 
@@ -145,7 +170,7 @@ function DocumentsWorkspace() {
       } else {
         setDocuments([]); setTotalPages(0);
       }
-      if (canViewTemplates) {
+      if (templatesMode && canViewTemplates) {
         const templateResponse = await leaseDocumentService.templates().catch(error => {
           if (sequence === loadSequence.current) setTemplateError(apiErrorMessage(error, "Could not load templates. Existing documents remain available."));
           return null;
@@ -158,13 +183,9 @@ function DocumentsWorkspace() {
     } catch (error: unknown) {
       if (sequence === loadSequence.current) setLoadError(apiErrorMessage(error, "Could not load documents."));
     } finally { if (sequence === loadSequence.current) setLoading(false); }
-  }, [canViewDocuments, canViewTemplates, page, searchParams]);
+  }, [canViewDocuments, canViewTemplates, page, searchParams, templatesMode]);
 
   useEffect(() => { void load(); return () => { loadSequence.current++; }; }, [load]);
-  useEffect(() => {
-    if (!canCreate) return;
-    void leaseDocumentService.branding().then(response => setLogoConfigured(Boolean(response.data?.data?.configured))).catch(() => undefined);
-  }, [canCreate]);
   useEffect(() => {
     const linkedType = searchParams.get("type") as LeaseDocumentType | null;
     if (linkedType && allTypes.includes(linkedType)) setType(linkedType);
@@ -180,7 +201,7 @@ function DocumentsWorkspace() {
     if (linkedOwnership) setOwnershipId(linkedOwnership);
   }, [searchParams]);
   useEffect(() => {
-    if (!canCreate || !token) return;
+    if (!templatesMode || !canCreate || !token) return;
     let cancelled = false;
     const request = isSaleDocument ? salesService.list({ page: optionsPage, size: 100 })
       : isEstateDocument ? estateService.listOwnership({ page: optionsPage, size: 100, active: true, propertyId: Number(searchParams.get("propertyId")) || undefined })
@@ -194,7 +215,7 @@ function DocumentsWorkspace() {
       else setLeases(current => optionsPage ? [...current, ...data] : data);
     }).catch(error => { if (!cancelled) setOptionsError(apiErrorMessage(error, "Could not load document choices.")); });
     return () => { cancelled = true; };
-  }, [canCreate, token, isSaleDocument, isEstateDocument, optionsPage, searchParams]);
+  }, [canCreate, token, isSaleDocument, isEstateDocument, optionsPage, searchParams, templatesMode]);
 
   useEffect(() => {
     const lease = leases.find(item => String(item.id) === leaseId);
@@ -206,16 +227,6 @@ function DocumentsWorkspace() {
     const ownership = ownerships.find(item => String(item.id) === ownershipId);
     if (isEstateDocument && ownership) setEffectiveDate(ownership.ownershipStart);
   }, [leaseId, saleId, leases, sales, isSaleDocument, isEstateDocument, ownerships, ownershipId]);
-
-  async function uploadLogo(event: ChangeEvent<HTMLInputElement>) {
-    const logo = event.target.files?.[0];
-    if (!logo) return;
-    if (logo.size > 512 * 1024 || !["image/png", "image/jpeg"].includes(logo.type)) { toast.error("Use a PNG or JPEG logo no larger than 512 KB."); event.target.value = ""; return; }
-    setBusy(true);
-    try { await leaseDocumentService.uploadLogo(logo); setLogoConfigured(true); toast.success("Document logo updated."); }
-    catch (error: unknown) { toast.error(apiErrorMessage(error, "Could not update the document logo.")); }
-    finally { setBusy(false); event.target.value = ""; }
-  }
 
   async function generate(event: FormEvent) {
     event.preventDefault();
@@ -286,12 +297,10 @@ function DocumentsWorkspace() {
   }
 
   return <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">
-    <div><h1 className="text-3xl font-bold text-[#141130] dark:text-white">{isTenant ? "My lease documents" : "Documents & notices"}</h1>
-      <p className="text-muted-foreground">{isTenant ? "Review the current draft and follow its issue, acknowledgement, and two-party signing status." : "Versioned agreements and notices with delivery, acknowledgement, signatures, and audit-safe snapshots."}</p></div>
+    <div><h1 className="text-3xl font-bold text-[#141130] dark:text-white">{templatesMode ? "Document templates" : isTenant ? "My lease documents" : "Documents & notices"}</h1>
+      <p className="text-muted-foreground">{templatesMode ? "Prepare transaction drafts and maintain the approved wording used by your workspace." : isTenant ? "Review the current document and follow its issue, acknowledgement, and two-party signing status." : "Documents requiring approval or signature appear first, followed by active and completed records."}</p></div>
 
-    {canCreate && <Card><CardHeader><CardTitle>Document owner branding</CardTitle><CardDescription>The logo belongs to this account and is used for properties owned by this account. Employees use their employer/property owner’s saved logo.</CardDescription></CardHeader><CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{logoConfigured ? "Logo configured" : "No logo configured"}</p><p className="text-sm text-muted-foreground">PNG or JPEG, maximum 512 KB. Every generated draft snapshots the current logo.</p></div><div><Label htmlFor="document-logo" className="sr-only">Document owner logo</Label><Input id="document-logo" type="file" accept="image/png,image/jpeg" disabled={busy} onChange={uploadLogo} /></div></CardContent></Card>}
-
-    {canCreate && <Card><CardHeader><CardTitle className="flex items-center gap-2"><FilePlus2 className="h-5 w-5 text-[#EF4217]" />Create draft</CardTitle>
+    {templatesMode && canCreate && <Card><CardHeader><CardTitle className="flex items-center gap-2"><FilePlus2 className="h-5 w-5 text-[#EF4217]" />Create draft</CardTitle>
       <CardDescription>Rentals use a Residential or Commercial Lease Agreement. Property sales use a Letter of Offer. Estate managers use an Estate Residential Agreement.</CardDescription></CardHeader>
       <CardContent><form onSubmit={generate} className="grid gap-4 md:grid-cols-3">
         <div className="space-y-2 md:col-span-2"><Label htmlFor="document-type">Document type</Label><select id="document-type" value={type} onChange={(e) => { setType(e.target.value as LeaseDocumentType); setOptionsPage(0); setOptionsHasMore(false); }} className="h-10 w-full rounded-md border bg-background px-3 text-sm">
@@ -310,13 +319,13 @@ function DocumentsWorkspace() {
         <div className="md:col-span-3"><Button disabled={busy} className="bg-[#EF4217] hover:bg-[#d83a13]">Create draft</Button></div>
       </form></CardContent></Card>}
 
-    {canViewDocuments && <Card><CardHeader><CardTitle>Your documents</CardTitle></CardHeader><CardContent className="space-y-3">
+    {!templatesMode && canViewDocuments && <Card><CardHeader><CardTitle>Documents and notices</CardTitle><CardDescription>Items waiting for your approval, acknowledgement or signature are shown first.</CardDescription></CardHeader><CardContent className="space-y-3">
       {loading && <p role="status">Loading documents…</p>}
       {loadError && <div role="alert">{loadError}<Button variant="outline" onClick={() => void load()}>Retry</Button></div>}
       {!loading && !loadError && documents.length === 0 && (isTenant && searchParams.get("leaseId") ?
         <div className="space-y-2 py-8 text-center"><p className="font-medium text-amber-800">Your lease is initialized, but its agreement has not been prepared yet.</p><p className="text-sm text-muted-foreground">The landlord or manager must prepare and issue the agreement before you can sign it. You do not need to initialize the lease again.</p><Button variant="outline" asChild><Link href="/dashboard/lease/operations">Return to lease status</Link></Button></div> :
         <p className="py-8 text-center text-muted-foreground">No documents match this account and selection.</p>)}
-      {!loading && !loadError && documents.map((item) => <div id={`lease-document-${item.id}`} key={item.id} className={`flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-center lg:justify-between ${requestedDocumentId === String(item.id) ? "border-[#EF4217] bg-orange-50/50 ring-2 ring-orange-100" : ""}`}>
+      {!loading && !loadError && orderedDocuments.map((item) => <div id={`lease-document-${item.id}`} key={item.id} className={`flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-center lg:justify-between ${requestedDocumentId === String(item.id) ? "border-[#EF4217] bg-orange-50/50 ring-2 ring-orange-100" : ""}`}>
         <div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{item.name}</p><Badge variant="outline">{label(item.status)}</Badge>
           {item.legalReviewRequired && <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Legal review</Badge>}</div>
           <p className="text-sm text-muted-foreground">#{item.id} · Template v{item.templateVersion} · {item.leaseId ? `Lease ${item.leaseId}` : item.saleId ? `Sale ${item.saleId}` : `Property ${item.propertyId}`}</p>
@@ -337,7 +346,7 @@ function DocumentsWorkspace() {
       {totalPages > 1 && <div className="flex items-center justify-between border-t pt-4"><Button type="button" variant="outline" disabled={page === 0 || busy} onClick={() => setPage(value => value - 1)}>Previous</Button><span className="text-sm text-muted-foreground">Page {page + 1} of {totalPages}</span><Button type="button" variant="outline" disabled={page >= totalPages - 1 || busy} onClick={() => setPage(value => value + 1)}>Next</Button></div>}
     </CardContent></Card>}
 
-    {canViewTemplates && <Card id="document-templates"><CardHeader><CardTitle>Document templates</CardTitle><CardDescription>{canViewTemplateHistory ? "Current and historical template versions for SlickHood governance and support review." : "Only the current template for each document type is shown. Existing issued documents retain the version originally used."}</CardDescription></CardHeader>
+    {templatesMode && canViewTemplates && <Card id="document-templates"><CardHeader><CardTitle>Controlled document wording</CardTitle><CardDescription>{canViewTemplateHistory ? "Current and historical template versions for SlickHood governance and support review." : "Only the current template for each document type is shown. Existing issued documents retain the version originally used."}</CardDescription></CardHeader>
       <CardContent>{!editing ? <div className="space-y-2">{templates.filter(template => visibleTypes.includes(template.documentType)).length === 0 && <div className="rounded-lg border border-dashed p-6 text-center"><p className="font-medium">No templates are available for this workspace</p><p className="mt-1 text-sm text-muted-foreground">Templates appear here according to your active role and business area.</p></div>}{templates.filter(template => visibleTypes.includes(template.documentType)).map((template) => <div key={template.id} className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-semibold">{template.displayName}</p><p className="text-sm text-muted-foreground">{label(template.documentType)} · Version {template.version}</p><Badge variant={template.legalReviewRequired ? "outline" : "secondary"} className="mt-2">{template.legalReviewRequired ? "Legal review required" : `Approved${template.legalReviewedAt ? ` ${new Date(template.legalReviewedAt).toLocaleDateString()}` : ""}`}</Badge></div><div className="flex gap-2">
         <Button size="sm" variant="outline" onClick={() => setPreviewing(template)}><Eye className="mr-1 h-4 w-4" />View template</Button>
         {canEditTemplates && <Button size="sm" variant="outline" onClick={() => setEditing({...template, legalReviewRequired: true})}><Pencil className="mr-1 h-4 w-4" />Edit</Button>}</div></div>)}</div> :

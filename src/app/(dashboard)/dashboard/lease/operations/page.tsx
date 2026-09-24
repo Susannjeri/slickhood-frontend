@@ -127,7 +127,7 @@ function LeaseOperationsWorkspace() {
         <div className="mt-4 flex flex-wrap gap-2">
           {!lease.signed && activeRole?.title?.toLowerCase() === "tenant" && lease.agreementDocumentId && <Button size="sm" asChild><Link href={`/dashboard/documents?leaseId=${lease.id}`}>{lease.agreementStatus === "DRAFT" ? "Review draft agreement" : "View and sign agreement"}</Link></Button>}
           {lease.signed && <Can permissions={["view_lease_document"]}><Button size="sm" variant="outline" asChild><Link href={`/dashboard/documents?leaseId=${lease.id}`}>View signed agreement</Link></Button></Can>}
-          {!lease.signed && activeRole?.title?.toLowerCase() !== "tenant" && <Can permissions={["create_lease_document"]}><Button size="sm" asChild><Link href={`/dashboard/documents?leaseId=${lease.id}&type=RESIDENTIAL_LEASE_AGREEMENT`}>{lease.agreementDocumentId ? "Continue agreement" : "Prepare agreement"}</Link></Button></Can>}
+          {!lease.signed && activeRole?.title?.toLowerCase() !== "tenant" && <Can permissions={["create_lease_document"]}><Button size="sm" asChild><Link href={`/dashboard/documents?${lease.agreementDocumentId ? "" : "view=templates&"}leaseId=${lease.id}&type=RESIDENTIAL_LEASE_AGREEMENT`}>{lease.agreementDocumentId ? "Continue agreement" : "Prepare agreement"}</Link></Button></Can>}
           {lease.signed && (!lease.lifecycleStatus || lease.lifecycleStatus === "ACTIVE") && <Can permissions={["delete_lease"]}><Button size="sm" variant="outline" onClick={() => setTerminating(terminating === lease.id ? null : lease.id)}>Give termination notice</Button></Can>}
         </div>
         {terminating === lease.id && <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-[220px_1fr_auto]">

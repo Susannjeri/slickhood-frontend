@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Bell, CheckCircle2, Loader2, LockKeyhole, Mail, MessageSquareText, Phone, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -12,6 +12,10 @@ import { Switch } from "@/components/ui/switch";
 import { apiErrorMessage } from "@/lib/api-error";
 import { NotificationCategory, NotificationCategoryPreference, NotificationPreferences, notificationService } from "@/services/notification.service";
 import CurrencyPreferencesCard from "@/components/settings/CurrencyPreferencesCard";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { leaseDocumentService } from "@/services/lease-document.service";
+import { useAuthStore } from "@/store/authStore";
 
 const descriptions: Record<NotificationCategory, { label: string; detail: string }> = {
   BILLING: { label: "Billing", detail: "Invoices, payment confirmations, late fees and overdue balances." },
@@ -26,6 +30,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
+  const [logoConfigured, setLogoConfigured] = useState(false);
+  const [brandingBusy, setBrandingBusy] = useState(false);
+  const canCreateDocuments = useAuthStore(state => state.permissions.includes("create_lease_document"));
 
   const load = useCallback(async () => {
     setLoading(true); setError(undefined);
@@ -44,6 +51,23 @@ export default function SettingsPage() {
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (!canCreateDocuments) return;
+    void leaseDocumentService.branding().then(response => setLogoConfigured(Boolean(response.data?.data?.configured))).catch(() => undefined);
+  }, [canCreateDocuments]);
+
+  const uploadDocumentLogo = async (event: ChangeEvent<HTMLInputElement>) => {
+    const logo = event.target.files?.[0];
+    if (!logo) return;
+    if (logo.size > 512 * 1024 || !["image/png", "image/jpeg"].includes(logo.type)) {
+      toast.error("Use a PNG or JPEG logo no larger than 512 KB."); event.target.value = ""; return;
+    }
+    setBrandingBusy(true);
+    try { await leaseDocumentService.uploadLogo(logo); setLogoConfigured(true); toast.success("Workspace document logo updated."); }
+    catch (error: unknown) { toast.error(apiErrorMessage(error, "Could not update the workspace document logo.")); }
+    finally { setBrandingBusy(false); event.target.value = ""; }
+  };
 
   const change = (category: NotificationCategory, field: "emailEnabled" | "smsEnabled" | "whatsappEnabled", checked: boolean) => {
     setValue(current => current ? { ...current, categories: current.categories.map(item =>
@@ -79,6 +103,11 @@ export default function SettingsPage() {
     </header>
 
     <CurrencyPreferencesCard />
+
+    {canCreateDocuments && <Card>
+      <CardHeader><CardTitle><h2>Workspace document branding</h2></CardTitle><CardDescription>Set the property owner or organisation logo once for agreements and notices generated from this workspace.</CardDescription></CardHeader>
+      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="font-medium">{logoConfigured ? "Logo configured" : "No logo configured"}</p><p className="text-sm text-muted-foreground">PNG or JPEG, maximum 512 KB. New document drafts snapshot the current logo.</p></div><div><Label htmlFor="workspace-document-logo" className="sr-only">Workspace document logo</Label><Input id="workspace-document-logo" type="file" accept="image/png,image/jpeg" disabled={brandingBusy} onChange={uploadDocumentLogo} /></div></CardContent>
+    </Card>}
 
     {error ? <Alert variant="destructive"><Bell/><AlertTitle>Preferences could not be loaded</AlertTitle><AlertDescription><p>{error}</p><Button className="mt-2" variant="outline" onClick={() => void load()}>Try again</Button></AlertDescription></Alert> :
       loading || !value ? <div className="flex justify-center rounded-xl border bg-white py-20"><Loader2 className="size-8 animate-spin text-[#EF4217]" /></div> : <>

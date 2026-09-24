@@ -210,7 +210,7 @@ test("landlord creates a residential lease agreement without a sales offer lette
     await route.continue();
   });
 
-  await page.goto("/dashboard/documents?leaseId=41&type=RESIDENTIAL_LEASE_AGREEMENT");
+  await page.goto("/dashboard/documents?view=templates&leaseId=41&type=RESIDENTIAL_LEASE_AGREEMENT");
   await expect(page.getByLabel("Document type")).toHaveValue("RESIDENTIAL_LEASE_AGREEMENT");
   await expect(page.getByLabel("Lease", { exact: true })).toHaveValue("41");
   await page.getByLabel("Effective date").fill("2026-10-01");

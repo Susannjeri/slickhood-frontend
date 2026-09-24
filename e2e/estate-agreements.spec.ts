@@ -39,7 +39,7 @@ test("linked homeowner beyond the first choices page stays selected and submits 
     return route.fulfill({json:{...envelope([{id:1,propertyId:11,homeownerUserId:2,unitId:76,homeownerName:"Same owner, different home",ownershipStart:"2026-08-01"}]),totalPages:2}});
   });
   await page.route("**/lease/documents**",route=>route.fulfill({json:envelope([])}));
-  await page.goto("/dashboard/documents?propertyId=11&unitId=77&recipientUserId=2&ownershipId=900&effectiveDate=2026-09-01&type=ESTATE_RESIDENTIAL_AGREEMENT");
+  await page.goto("/dashboard/documents?view=templates&propertyId=11&unitId=77&recipientUserId=2&ownershipId=900&effectiveDate=2026-09-01&type=ESTATE_RESIDENTIAL_AGREEMENT");
   await expect(page.getByLabel("Homeowner and property")).toHaveValue("900");
   await expect(page.getByLabel("Homeowner and property")).toBeDisabled();
   await expect(page.getByLabel("Effective date")).toHaveValue("2026-09-01");
@@ -48,20 +48,15 @@ test("linked homeowner beyond the first choices page stays selected and submits 
   expect((await request).postDataJSON()).toMatchObject({ownershipId:900,propertyId:11,recipientUserId:2,effectiveDate:"2026-09-01"});
 });
 
-test("template failure does not hide issued estate documents and retry recovers",async({context,page})=>{
+test("template service is not requested by the operational documents page",async({context,page})=>{
   await authenticated(context,page,{title:"EstateManager",permissions:["view_lease_document","create_lease_document"]});
   await page.route("**/estate/ownership**",route=>route.fulfill({json:envelope([])}));
-  let failure=true;
+  let templateRequests=0;
   await page.route("**/lease/documents**",route=>{
-    if(new URL(route.request().url()).pathname.endsWith("/templates")) return failure
-      ? route.fulfill({status:503,json:{description:"Template service unavailable"}})
-      : route.fulfill({json:envelope([])});
+    if(new URL(route.request().url()).pathname.endsWith("/templates")) { templateRequests++; return route.fulfill({status:503,json:{description:"Template service unavailable"}}); }
     return route.fulfill({json:{...envelope([document]),totalPages:1}});
   });
   await page.goto("/dashboard/documents?propertyId=11&type=ESTATE_RESIDENTIAL_AGREEMENT");
-  await expect(page.getByRole("button",{name:"Retry templates"})).toBeVisible();
   await expect(page.getByRole("button",{name:"PDF",exact:true})).toBeVisible();
-  failure=false; await page.getByRole("button",{name:"Retry templates"}).click();
-  await expect(page.getByRole("button",{name:"Retry templates"})).toHaveCount(0);
-  await expect(page.getByRole("button",{name:"PDF",exact:true})).toBeVisible();
+  expect(templateRequests).toBe(0);
 });

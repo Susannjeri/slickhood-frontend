@@ -77,11 +77,35 @@ test("unapproved draft cannot issue and its issuer can cancel for replacement",a
   await expect(page.getByRole("button",{name:"Cancel draft"})).toBeVisible();
 });
 
+test("landlord document work is approval-first and authoring is separated into templates",async({context,page})=>{
+  await authenticated(context,page,{title:"Landlord",permissions:["view_lease_document","create_lease_document","issue_lease_document","view_document_template_history"]});
+  await documents(page,[
+    {...base,id:70,viewerParty:"ISSUER",status:"SIGNED",name:"Completed lease"},
+    {...base,id:71,viewerParty:"ISSUER",status:"DRAFT",name:"Draft awaiting issue"},
+    {...base,id:72,viewerParty:"ISSUER",status:"PARTIALLY_SIGNED",recipientSignedAt:"2026-09-24T08:00:00",name:"Awaiting landlord signature"},
+  ]);
+  await page.route("**/lease/list**",r=>r.fulfill({json:envelope([])}));
+
+  await page.goto("/dashboard/documents");
+  await expect(page.locator('[id^="lease-document-"]')).toHaveCount(3);
+  const ordered = await page.locator('[id^="lease-document-"]').allTextContents();
+  expect(ordered[0]).toContain("Awaiting landlord signature");
+  expect(ordered[1]).toContain("Draft awaiting issue");
+  expect(ordered[2]).toContain("Completed lease");
+  await expect(page.getByRole("button",{name:"Create draft",exact:true})).toHaveCount(0);
+  await expect(page.getByText("Document owner branding")).toHaveCount(0);
+
+  await page.goto("/dashboard/documents?view=templates");
+  await expect(page.getByRole("heading",{name:"Document templates"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Create draft",exact:true})).toBeVisible();
+  await expect(page.getByText("Documents and notices")).toHaveCount(0);
+});
+
 test("estate agreement identifies one of a homeowner's multiple units",async({context,page})=>{
   await authenticated(context,page,{title:"EstateManager",permissions:["view_lease_document","create_lease_document"]});
   await documents(page,[]);
   await page.route("**/estate/ownership**",r=>r.fulfill({json:{...envelope([1,2].map(id=>({id,propertyId:21,unitId:30+id,homeownerUserId:2,propertyName:"Acacia",unitRef:`A-${id}`,homeownerName:"Homeowner",homeownerEmail:"homeowner@example.test",ownershipStart:"2026-09-01",active:true}))),totalPages:1}}));
-  await page.goto("/dashboard/documents?type=ESTATE_RESIDENTIAL_AGREEMENT");
+  await page.goto("/dashboard/documents?view=templates&type=ESTATE_RESIDENTIAL_AGREEMENT");
   await page.getByLabel("Homeowner and property").selectOption("2");
   await expect(page.getByLabel("Effective date")).toHaveValue("2026-09-01");
   const request=page.waitForRequest(r=>r.method()==="POST"&&new URL(r.url()).pathname.endsWith("/lease/documents"));

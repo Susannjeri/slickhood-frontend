@@ -459,7 +459,7 @@ export const sidebarLinks: SidebarLink[] = [
     description: "Create, issue, acknowledge, sign, and review governed property documents.",
     subLinks: [
       { label: "Documents & notices", href: "/dashboard/documents", permissions: ["view_lease_document"], protected: true },
-      { label: "Document templates", href: "/dashboard/documents#document-templates", permissions: ["view_lease_document", "view_document_template_history"], protected: true },
+      { label: "Document templates", href: "/dashboard/documents?view=templates", permissions: ["view_lease_document", "view_document_template_history"], protected: true },
     ],
   },
   {
