@@ -59,6 +59,34 @@ const documents = [
   },
 ];
 
+test("KYC load failure offers recovery instead of an endless loading screen", async ({
+  context,
+  page,
+}) => {
+  await authenticated(context, page, {
+    title: "Landlord",
+    permissions: [],
+  });
+  await page.route("**/kyc/current", (route) =>
+    route.fulfill({
+      status: 400,
+      json: {
+        success: false,
+        description: "The verification request could not be processed.",
+        data: [],
+      },
+    }),
+  );
+
+  await page.goto("/kyc");
+
+  await expect(
+    page.getByRole("heading", { name: "Verification could not be loaded" }),
+  ).toBeVisible();
+  await expect(page.getByText("Loading secure verification…")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
+});
+
 test("admin corrects an OCR transcription without replacing the original evidence", async ({
   context,
   page,
