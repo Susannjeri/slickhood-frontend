@@ -91,7 +91,7 @@ export const insuranceService={
  publishRenewalOffer:(policyId:number,payload:Record<string,unknown>)=>API.post(`/insurance/admin/policies/${policyId}/renewal-offer`,payload),
  decideRenewalPayment:(id:number,status:"VERIFIED"|"REJECTED",reason?:string)=>API.post(`/insurance/admin/renewal-payments/${id}/decision`,{status,reason}),
  remitRenewalPayment:(id:number,reference:string)=>API.post(`/insurance/admin/renewal-payments/${id}/remit`,{reference}),
- completeRenewal:(policyId:number,policyNumber:string)=>API.post(`/insurance/admin/policies/${policyId}/renewal-complete`,{policyNumber}),
+ completeRenewal:(policyId:number,policyNumber:string,file:File)=>{const form=new FormData();form.append("data",new Blob([JSON.stringify({policyNumber})],{type:"application/json"}));form.append("file",file);return API.post(`/insurance/admin/policies/${policyId}/renewal-complete`,form)},
  assignCase:(id:number,adviserUserId:number)=>API.post(`/insurance/admin/cases/${id}/assign`,{adviserUserId}),
  assignmentDecision:(id:number,decision:"ACCEPTED"|"DECLINED",reason?:string)=>API.post(`/insurance/admin/cases/${id}/assignment-decision`,{decision,reason}),
  updateCaseStatus:(id:number,status:string,note?:string)=>API.post(`/insurance/admin/cases/${id}/status`,{status,note}),
@@ -102,7 +102,7 @@ export const insuranceService={
  publishQuote:(caseId:number,quoteId:number)=>API.post(`/insurance/admin/cases/${caseId}/quotes/${quoteId}/publish`),
  decidePayment:(id:number,status:"VERIFIED"|"REJECTED",reason?:string)=>API.post(`/insurance/admin/payments/${id}/decision`,{status,reason}),
  remitPayment:(id:number,reference:string)=>API.post(`/insurance/admin/payments/${id}/remit`,{reference}),
- issuePolicy:(caseId:number,payload:Record<string,unknown>)=>API.post(`/insurance/admin/cases/${caseId}/policy`,payload),
+ issuePolicy:(caseId:number,payload:Record<string,unknown>,file:File)=>{const form=new FormData();form.append("data",new Blob([JSON.stringify(payload)],{type:"application/json"}));form.append("file",file);return API.post(`/insurance/admin/cases/${caseId}/policy`,form)},
  updateClaim:(id:number,payload:Record<string,unknown>)=>API.post(`/insurance/admin/claims/${id}/status`,payload),
  updateRenewal:(id:number,status:string)=>API.post(`/insurance/admin/policies/${id}/renewal`,{status}),
 };

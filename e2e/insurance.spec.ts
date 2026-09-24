@@ -246,6 +246,7 @@ test("insurance journey runs from customer quote selection through policy issue 
  await page.getByLabel("Policy number").fill("APA-POL-31");
  await page.getByLabel("Cover starts").fill("2026-09-01");
  await page.getByLabel("Cover ends").fill("2027-08-31");
+ await page.getByLabel("Insurer policy schedule").setInputFiles({name:"policy-schedule.pdf",mimeType:"application/pdf",buffer:Buffer.from("%PDF-1.4 policy schedule")});
  await page.getByRole("button",{name:"Confirm"}).click();
  await expect.poll(()=>policyIssued).toBe(true);
 
