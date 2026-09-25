@@ -571,9 +571,9 @@ function EstateWorkspace() {
                     : outstandingLabel}
               </CardTitle>
             </CardHeader>
-            {billing.error && (
+            {Boolean(billing.error) && (
               <CardContent className="pt-0">
-                <Button size="sm" variant="outline" onClick={billing.retry}>
+                <Button size="sm" variant="outline" onClick={billing.reload}>
                   Retry service charges
                 </Button>
               </CardContent>
