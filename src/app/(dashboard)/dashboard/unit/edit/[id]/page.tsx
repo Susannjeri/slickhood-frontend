@@ -142,7 +142,7 @@ export default function EditUnitPage() {
       setLoading(true);
 
       const [unitRes, utilitiesRes, measurementsRes] = await Promise.all([
-        viewUnit(Number(propertyId), Number(unitId)),
+        viewUnit(Number(unitId)),
         fetchSupportedUtilities(),
         fetchMeasurementUnits(),
       ]);

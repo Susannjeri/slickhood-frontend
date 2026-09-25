@@ -623,11 +623,19 @@ export const uploadUnitImages = (data: {unitId: number, images: File[]}, token:s
   });
 };
 
-export const getUnit = (propertyId:number, unitId:number, token:string) => {
-
-  return API.get(`/property/unit/list?propertyId=${propertyId}&unitId=${unitId}`, {
+export const getUnit = (unitId:number, token:string) => {
+  return API.get(`/property/unit/${unitId}`, {
     headers: {
       "Content-Type": 'application/json',
+      Authorization: `Bearer ${token}`
+    }
+  })
+}
+
+export const getUnitImages = (unitId:number, token:string) => {
+  return API.get(`/property/unit/${unitId}/images`, {
+    headers: {
+      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`
     }
   })
@@ -1780,7 +1788,7 @@ export type MaintenanceWorkOrder = {
   id:number; workOrderNumber:string; propertyId:number; unitId:number; requestedByUserId:number;
   assignedProviderServiceId?:number; title:string; description:string; category:string; priority:string;
   status:string; scheduledAt?:string; completedAt?:string; estimatedCost?:number; actualCost?:number;
-  currency?:string; resolutionNotes?:string; createdOn:string;
+  currency?:string; resolutionNotes?:string; createdOn:string; attachments?:MaintenanceAttachment[];
 };
 export type MaintenanceAttachment = {
   id:number; workOrderId:number; category:string; displayName:string; contentType:string; fileSize:number;

@@ -170,18 +170,19 @@ export default function AppSidebar() {
   }, [activeBusinessArea, activeRole?.title, token]);
 
   useEffect(() => {
-    if (!token || !activeRole) { workspaceRequestId.current += 1; setWorkspaces([]); return; }
+    if (!token || !activeRole?.title) { workspaceRequestId.current += 1; setWorkspaces([]); return; }
     const currentRequestId = ++workspaceRequestId.current;
     void getTeamWorkspaces().then(response => {
       if (workspaceRequestId.current !== currentRequestId) return;
       const options = response.data.data ?? [];
+      const selectedWorkspaceId = useAuthStore.getState().activeWorkspaceId;
       setWorkspaces(options);
-      if (options.length === 1 && activeWorkspaceId !== options[0].id) setActiveWorkspaceId(options[0].id);
-      if (activeWorkspaceId && !options.some(option => option.id === activeWorkspaceId)) {
+      if (options.length === 1 && selectedWorkspaceId !== options[0].id) setActiveWorkspaceId(options[0].id);
+      if (selectedWorkspaceId && !options.some(option => option.id === selectedWorkspaceId)) {
         setActiveWorkspaceId(options.length === 1 ? options[0].id : null);
       }
     }).catch(() => { if (workspaceRequestId.current === currentRequestId) setWorkspaces([]); });
-  }, [activeRole?.title, activeWorkspaceId, setActiveWorkspaceId, token]);
+  }, [activeRole?.title, setActiveWorkspaceId, token]);
 
   const subscriptionAllows = (link: SidebarLink) => !link.subscriptionFeatures?.length
     || entitlementScope === null

@@ -78,7 +78,7 @@ import { useAuthStore } from "@/store/authStore";
 import ManageChargesDrawer from "@/components/unit/ManageChargesDrawer";
 import { usePropertyMetadata } from "@/app/(dashboard)/dashboard/property/propertyMetadata";
 import { parseUnitOrigin, unitListHref, unitOriginLabel } from "@/lib/unitNavigation";
-import { createMaintenance, downloadLeaseDocumentPdf, LeaseDocumentView, listLeaseDocuments, listUnitMaintenance, MaintenanceAttachment, listMaintenanceAttachments, MaintenanceWorkOrder, updateMaintenance, uploadMaintenanceAttachment } from "@/lib/api";
+import { createMaintenance, downloadLeaseDocumentPdf, getUnitImages, LeaseDocumentView, listLeaseDocuments, listUnitMaintenance, MaintenanceAttachment, MaintenanceWorkOrder, updateMaintenance, uploadMaintenanceAttachment } from "@/lib/api";
 import { ProtectedPdfButton } from "@/components/documents/ProtectedPdfButton";
 import { LateFeePolicySetup } from "@/components/billing/LateFeePolicySetup";
 
@@ -349,12 +349,13 @@ export default function ViewUnitPage() {
   const [documentsError, setDocumentsError] = useState("");
   const [documentPage, setDocumentPage] = useState(0);
   const [documentPages, setDocumentPages] = useState(0);
+  const [activeTab, setActiveTab] = useState("overview");
   const documentRequest = useRef(0);
 
   const loadMaintenance = async () => {
     if (!token || !unitId) return;
     setMaintenanceLoading(true);
-    try { const response=await listUnitMaintenance(Number(unitId),token); const orders:MaintenanceWorkOrder[]=response.data?.data ?? [];setMaintenance(orders);const evidence=await Promise.all(orders.map(async order=>{try{const value=await listMaintenanceAttachments(order.id,token);return [order.id,value.data?.data??[]] as const;}catch{return [order.id,[]] as const;}}));setMaintenanceAttachments(Object.fromEntries(evidence)); }
+    try { const response=await listUnitMaintenance(Number(unitId),token); const orders:MaintenanceWorkOrder[]=response.data?.data ?? [];setMaintenance(orders);setMaintenanceAttachments(Object.fromEntries(orders.map(order=>[order.id,order.attachments??[]]))); }
     catch { toast.error("Maintenance requests could not be loaded."); }
     finally { setMaintenanceLoading(false); }
   };
@@ -372,8 +373,8 @@ export default function ViewUnitPage() {
     finally { if(request === documentRequest.current) setDocumentsLoading(false); }
   };
 
-  useEffect(()=>{loadMaintenance();},[token,unitId]);
-  useEffect(()=>{loadDocuments(); return () => { documentRequest.current++; };},[token,unitId,documentPage,activeRole]);
+  useEffect(()=>{if(activeTab==="maintenance")void loadMaintenance();},[token,unitId,activeTab]);
+  useEffect(()=>{if(activeTab==="documents")void loadDocuments(); return () => { documentRequest.current++; };},[token,unitId,documentPage,activeRole,activeTab]);
 
   const submitMaintenance = async () => {
     if(!token||!maintenanceForm.title.trim()||!maintenanceForm.description.trim())return;
@@ -392,27 +393,17 @@ export default function ViewUnitPage() {
   };
 
   useEffect(() => {
-    if (unitId && propertyId) {
+    if (unitId) {
       if (isLoadingTypes) return;
       loadUnitDetails();
-      loadUnitCharges();
-
-      const hasViewTenants = checkPermissions(["view_tenants"]);
-      const hasViewManagers = checkPermissions(["view_landlord_and_managers"]);
-
-      if (hasViewTenants) loadTenants();
-      if (checkPermissions(["view_invite_list"])) loadUnitInvites();
-      if (hasViewManagers) {
-        loadManagers();
-      }
     }
-  }, [unitId, propertyId, isLoadingTypes, activeRole]);
+  }, [unitId, isLoadingTypes, activeRole]);
 
   const loadUnitDetails = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await viewUnit(Number(propertyId), Number(unitId));
+      const response = await viewUnit(Number(unitId));
       if (response.success && response.data) {
         // Unit detail responses are object-shaped while collection responses
         // are arrays.  Supporting both keeps the unit detail journey working
@@ -428,9 +419,11 @@ export default function ViewUnitPage() {
           utilities: Array.isArray(unitData.utilities) ? unitData.utilities : [],
           images: Array.isArray(unitData.images) ? unitData.images : [],
         });
+        if (!propertyId && unitData.propertyId) {
+          router.replace(`/dashboard/unit/details/${unitId}?p=${unitData.propertyId}&from=${origin}`, { scroll: false });
+        }
         setCurrentPropertyType(unitData.propertyType);
-        const allImages = [unitData.thumbnail, ...(unitData.images || [])];
-        loadImages(allImages);
+        loadImages([unitData.thumbnail]);
       } else {
         setError("Failed to load unit details");
       }
@@ -515,6 +508,23 @@ export default function ViewUnitPage() {
     setCurrentImageIndex(0);
     setImageUrls(usableImages);
   };
+
+  useEffect(() => {
+    if (!token || !unit?.unitId) return;
+    let current = true;
+    void getUnitImages(unit.unitId, token)
+      .then((response) => {
+        if (!current) return;
+        const gallery = Array.isArray(response.data?.data) ? response.data.data : [];
+        loadImages([unit.thumbnail, ...gallery]);
+      })
+      .catch(() => {
+        // The cover image remains usable if the optional gallery request fails.
+      });
+    return () => {
+      current = false;
+    };
+  }, [token, unit?.unitId, unit?.thumbnail]);
 
   const handleAdvertiseToggle = async (checked: boolean) => {
     if (!unit) return;
@@ -1141,7 +1151,7 @@ export default function ViewUnitPage() {
         </Card>
 
         {/* ── Tab Bar ── */}
-        <Tabs defaultValue="overview" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={(value)=>{setActiveTab(value);if(value==="financials"&&!unitCharges.length)void loadUnitCharges();if(value==="tenant"){if(checkPermissions(["view_tenants"]))void loadTenants();if(checkPermissions(["view_invite_list"]))void loadUnitInvites();}if(value==="lease"&&checkPermissions(["view_landlord_and_managers"]))void loadManagers();}} className="space-y-6">
           <div className="overflow-x-auto">
             <TabsList className="inline-flex w-auto h-auto p-1 gap-1">
               <TabsTrigger value="overview" className="text-sm px-4">Overview</TabsTrigger>

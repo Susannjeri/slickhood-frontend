@@ -360,12 +360,12 @@ export function useApi() {
             }
         };
 
-        const viewUnit = async (propertyId: number, unitId: number) => {
+        const viewUnit = async (unitId: number) => {
           try {
             const { token } = useAuthStore.getState();
             if (!token) throw new Error("No token available");
             
-            const res = await getUnit(propertyId, unitId, token);
+            const res = await getUnit(unitId, token);
             return res.data
           }
           catch (error) {
