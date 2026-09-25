@@ -5,129 +5,1709 @@ import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { salesService } from "@/services/business-workflows.service";
-import { SaleEvidence, SaleMilestone, SaleMilestoneType, SaleStatus, SaleTransaction } from "@/types/business-workflows";
+import {
+  SaleEvidence,
+  SaleMilestone,
+  SaleMilestoneType,
+  SaleStatus,
+  SaleTransaction,
+} from "@/types/business-workflows";
 import { useAuthStore } from "@/store/authStore";
 import { listAccounts } from "@/lib/api";
-import { usePagedBusinessProperties, usePagedBusinessUnits } from "@/hooks/usePagedBusinessOptions";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  usePagedBusinessProperties,
+  usePagedBusinessUnits,
+} from "@/hooks/usePagedBusinessOptions";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { apiErrorMessage } from "@/lib/api-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import RequireRole from "@/components/auth/RequireRole";
 import { Account } from "@/types/account";
 import { leaseDocumentService } from "@/services/lease-document.service";
 import { CheckCircle2, Circle, ShieldCheck } from "lucide-react";
 import { LateFeePolicySetup } from "@/components/billing/LateFeePolicySetup";
 
-const managerNext:Partial<Record<SaleStatus,SaleStatus[]>>={LEAD:["VIEWING","OFFERED","CANCELLED"],VIEWING:["OFFERED","CANCELLED"],OFFERED:["CANCELLED"],RESERVED:["DUE_DILIGENCE","CANCELLED"],DUE_DILIGENCE:["AGREEMENT","CANCELLED"],AGREEMENT:["COMPLETION","CANCELLED"],COMPLETION:["COMPLETED","CANCELLED"]};
-const milestoneTypes:SaleMilestoneType[]=["ESCROW_FUNDED","DUE_DILIGENCE_CHECK","AGREEMENT_SIGNED","TRANSFER_REGISTERED","HANDOVER_COMPLETED"];
-const label=(value:string)=>value.toLowerCase().replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
-const defaultResponseDueDate=()=>{const value=new Date();value.setDate(value.getDate()+14);return value.toISOString().slice(0,10)};
-const buyerNextStep=(item:SaleTransaction)=>{
- if(item.status==="LEAD")return "Your sales contact is arranging the next step.";
- if(item.status==="VIEWING")return "Attend the viewing, then wait for the recorded offer.";
- if(item.status==="OFFERED")return "Review and sign the letter of offer.";
- if(item.status==="RESERVED")return item.escrowInvoiceId?"Pay the sale invoice and follow due diligence.":"The seller is preparing your payment invoice and due-diligence steps.";
- if(item.status==="DUE_DILIGENCE")return "Review the due-diligence updates. The sale agreement follows when checks pass.";
- if(item.status==="AGREEMENT")return "Review and sign the property sale agreement.";
- if(item.status==="COMPLETION")return "Payment is verified. Transfer and handover evidence are being completed.";
- if(item.status==="COMPLETED")return "Purchase completed. Your ownership record and handover history are available.";
- return "This transaction was cancelled. Its documents remain available for your records.";
+type SalesTask = "invite" | "pipeline";
+
+const managerNext: Partial<Record<SaleStatus, SaleStatus[]>> = {
+  LEAD: ["VIEWING", "OFFERED", "CANCELLED"],
+  VIEWING: ["OFFERED", "CANCELLED"],
+  OFFERED: ["CANCELLED"],
+  RESERVED: ["DUE_DILIGENCE", "CANCELLED"],
+  DUE_DILIGENCE: ["AGREEMENT", "CANCELLED"],
+  AGREEMENT: ["COMPLETION", "CANCELLED"],
+  COMPLETION: ["COMPLETED", "CANCELLED"],
+};
+const milestoneTypes: SaleMilestoneType[] = [
+  "ESCROW_FUNDED",
+  "DUE_DILIGENCE_CHECK",
+  "AGREEMENT_SIGNED",
+  "TRANSFER_REGISTERED",
+  "HANDOVER_COMPLETED",
+];
+const label = (value: string) =>
+  value
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+const defaultResponseDueDate = () => {
+  const value = new Date();
+  value.setDate(value.getDate() + 14);
+  return value.toISOString().slice(0, 10);
+};
+const buyerNextStep = (item: SaleTransaction) => {
+  if (item.status === "LEAD")
+    return "Your sales contact is arranging the next step.";
+  if (item.status === "VIEWING")
+    return "Attend the viewing, then wait for the recorded offer.";
+  if (item.status === "OFFERED") return "Review and sign the letter of offer.";
+  if (item.status === "RESERVED")
+    return item.escrowInvoiceId
+      ? "Pay the sale invoice and follow due diligence."
+      : "The seller is preparing your payment invoice and due-diligence steps.";
+  if (item.status === "DUE_DILIGENCE")
+    return "Review the due-diligence updates. The sale agreement follows when checks pass.";
+  if (item.status === "AGREEMENT")
+    return "Review and sign the property sale agreement.";
+  if (item.status === "COMPLETION")
+    return "Payment is verified. Transfer and handover evidence are being completed.";
+  if (item.status === "COMPLETED")
+    return "Purchase completed. Your ownership record and handover history are available.";
+  return "This transaction was cancelled. Its documents remain available for your records.";
 };
 
-export default function SalesPage(){
- const token=useAuthStore(s=>s.token),role=useAuthStore(s=>s.activeRole?.title),workspace=useAuthStore(s=>s.activeWorkspaceId);
- return <SalesWorkspace key={`${token}:${role}:${workspace}`} />;
+export default function SalesPage() {
+  const token = useAuthStore((s) => s.token),
+    role = useAuthStore((s) => s.activeRole?.title),
+    workspace = useAuthStore((s) => s.activeWorkspaceId);
+  return <SalesWorkspace key={`${token}:${role}:${workspace}`} />;
 }
-function SalesWorkspace(){
- const searchParams=useSearchParams();
- const permissions=useAuthStore(s=>s.permissions),token=useAuthStore(s=>s.token),activeRole=useAuthStore(s=>s.activeRole?.title),canManage=permissions.includes("manage_sale_pipeline"),canAccept=permissions.includes("accept_sale_offer"),isBuyer=activeRole==="Buyer";
- const isSalesBiller=activeRole==="SalesAgent";
- const requestedPropertyId=Number(searchParams.get("propertyId")),requestedUnitId=Number(searchParams.get("unitId")),requestedSaleId=Number(searchParams.get("saleId")),requestedInquiryId=Number(searchParams.get("inquiryId"));
- const hasSelectedUnitLink=Number.isSafeInteger(requestedPropertyId)&&requestedPropertyId>0&&Number.isSafeInteger(requestedUnitId)&&requestedUnitId>0;
- const [items,setItems]=useState<SaleTransaction[]>([]);
- const [loadError,setLoadError]=useState(""); const loadSequence=useRef(0);
- const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[page,setPage]=useState(0),[totalPages,setTotalPages]=useState(0),[totalElements,setTotalElements]=useState(0);
- const [searchInput,setSearchInput]=useState(""),[search,setSearch]=useState("");
- const [propertyId,setPropertyId]=useState(hasSelectedUnitLink?String(requestedPropertyId):"all"),[unitId,setUnitId]=useState(hasSelectedUnitLink?String(requestedUnitId):""),[buyerEmail,setBuyerEmail]=useState(""),[askingPrice,setAskingPrice]=useState(""),[offerAmount,setOfferAmount]=useState(""),[responseDueDate,setResponseDueDate]=useState(defaultResponseDueDate),[currency,setCurrency]=useState("KES"),[notes,setNotes]=useState("");
- const [offerAmounts,setOfferAmounts]=useState<Record<number,string>>({}),[reasons,setReasons]=useState<Record<number,string>>({});
- const [milestones,setMilestones]=useState<Record<number,SaleMilestone[]>>({}),[milestoneType,setMilestoneType]=useState<Record<number,SaleMilestoneType>>({});
- const [milestoneAmount,setMilestoneAmount]=useState<Record<number,string>>({}),[evidenceFiles,setEvidenceFiles]=useState<Record<number,File|undefined>>({}),[saleEvidence,setSaleEvidence]=useState<Record<number,SaleEvidence[]>>({});
- const [paymentAccounts,setPaymentAccounts]=useState<Account[]>([]),[escrowAccountId,setEscrowAccountId]=useState<Record<number,string>>({});
- const [offerTemplateReady,setOfferTemplateReady]=useState(false),[setupLoading,setSetupLoading]=useState(canManage),[setupError,setSetupError]=useState("");
- const [lateFeeConfigured,setLateFeeConfigured]=useState(false);
- const [inquiry,setInquiry]=useState<{id:number;propertyId:number;unitId:number;name:string;email:string;phone?:string;message:string}|null>(null);
- const [evidenceReferences,setEvidenceReferences]=useState<Record<number,string>>({}),[evidenceNotes,setEvidenceNotes]=useState<Record<number,string>>({});
- const propertyOptions=usePagedBusinessProperties(canManage,undefined,[],"SALE",hasSelectedUnitLink?requestedPropertyId:undefined),properties=propertyOptions.items,propertiesLoading=propertyOptions.loading;
- const unitOptions=usePagedBusinessUnits(canManage,propertyId==="all"?null:Number(propertyId),"SALE",true,hasSelectedUnitLink?requestedUnitId:undefined),units=unitOptions.items,unitsLoading=unitOptions.loading;
- const selectedUnit=units.find(candidate=>candidate.unitId===Number(unitId));
- const selectedProperty=properties.find(candidate=>candidate.id===selectedUnit?.propertyId);
- const existingUnitSale=selectedUnit?items.find(item=>item.unitId===selectedUnit.unitId&&item.status!=="CANCELLED"):undefined;
+function SalesWorkspace() {
+  const searchParams = useSearchParams();
+  const permissions = useAuthStore((s) => s.permissions),
+    token = useAuthStore((s) => s.token),
+    activeRole = useAuthStore((s) => s.activeRole?.title),
+    canManage = permissions.includes("manage_sale_pipeline"),
+    canAccept = permissions.includes("accept_sale_offer"),
+    isBuyer = activeRole === "Buyer";
+  const isSalesBiller = activeRole === "SalesAgent";
+  const requestedPropertyId = Number(searchParams.get("propertyId")),
+    requestedUnitId = Number(searchParams.get("unitId")),
+    requestedSaleId = Number(searchParams.get("saleId")),
+    requestedInquiryId = Number(searchParams.get("inquiryId"));
+  const hasSelectedUnitLink =
+    Number.isSafeInteger(requestedPropertyId) &&
+    requestedPropertyId > 0 &&
+    Number.isSafeInteger(requestedUnitId) &&
+    requestedUnitId > 0;
+  const [items, setItems] = useState<SaleTransaction[]>([]);
+  const [loadError, setLoadError] = useState("");
+  const loadSequence = useRef(0);
+  const [busy, setBusy] = useState(false),
+    [loading, setLoading] = useState(true),
+    [page, setPage] = useState(0),
+    [totalPages, setTotalPages] = useState(0),
+    [totalElements, setTotalElements] = useState(0);
+  const [searchInput, setSearchInput] = useState(""),
+    [search, setSearch] = useState("");
+  const [propertyId, setPropertyId] = useState(
+      hasSelectedUnitLink ? String(requestedPropertyId) : "all",
+    ),
+    [unitId, setUnitId] = useState(
+      hasSelectedUnitLink ? String(requestedUnitId) : "",
+    ),
+    [buyerEmail, setBuyerEmail] = useState(""),
+    [askingPrice, setAskingPrice] = useState(""),
+    [offerAmount, setOfferAmount] = useState(""),
+    [responseDueDate, setResponseDueDate] = useState(defaultResponseDueDate),
+    [currency, setCurrency] = useState("KES"),
+    [notes, setNotes] = useState("");
+  const [offerAmounts, setOfferAmounts] = useState<Record<number, string>>({}),
+    [reasons, setReasons] = useState<Record<number, string>>({});
+  const [milestones, setMilestones] = useState<Record<number, SaleMilestone[]>>(
+      {},
+    ),
+    [milestoneType, setMilestoneType] = useState<
+      Record<number, SaleMilestoneType>
+    >({});
+  const [milestoneAmount, setMilestoneAmount] = useState<
+      Record<number, string>
+    >({}),
+    [evidenceFiles, setEvidenceFiles] = useState<
+      Record<number, File | undefined>
+    >({}),
+    [saleEvidence, setSaleEvidence] = useState<Record<number, SaleEvidence[]>>(
+      {},
+    );
+  const [paymentAccounts, setPaymentAccounts] = useState<Account[]>([]),
+    [escrowAccountId, setEscrowAccountId] = useState<Record<number, string>>(
+      {},
+    );
+  const [offerTemplateReady, setOfferTemplateReady] = useState(false),
+    [setupLoading, setSetupLoading] = useState(canManage),
+    [setupError, setSetupError] = useState("");
+  const [lateFeeConfigured, setLateFeeConfigured] = useState(false);
+  const [inquiry, setInquiry] = useState<{
+    id: number;
+    propertyId: number;
+    unitId: number;
+    name: string;
+    email: string;
+    phone?: string;
+    message: string;
+  } | null>(null);
+  const [activeTask, setActiveTask] = useState<SalesTask>(() =>
+    isBuyer ||
+    (Number.isSafeInteger(requestedSaleId) && requestedSaleId > 0) ||
+    (canManage && !permissions.includes("view_unit"))
+      ? "pipeline"
+      : "invite",
+  );
+  const [evidenceReferences, setEvidenceReferences] = useState<
+      Record<number, string>
+    >({}),
+    [evidenceNotes, setEvidenceNotes] = useState<Record<number, string>>({});
+  const propertyOptions = usePagedBusinessProperties(
+      canManage && activeTask === "invite",
+      undefined,
+      [],
+      "SALE",
+      hasSelectedUnitLink ? requestedPropertyId : undefined,
+    ),
+    properties = propertyOptions.items,
+    propertiesLoading = propertyOptions.loading;
+  const unitOptions = usePagedBusinessUnits(
+      canManage && activeTask === "invite",
+      propertyId === "all" ? null : Number(propertyId),
+      "SALE",
+      true,
+      hasSelectedUnitLink ? requestedUnitId : undefined,
+    ),
+    units = unitOptions.items,
+    unitsLoading = unitOptions.loading;
+  const selectedUnit = units.find(
+    (candidate) => candidate.unitId === Number(unitId),
+  );
+  const selectedProperty = properties.find(
+    (candidate) => candidate.id === selectedUnit?.propertyId,
+  );
+  const existingUnitSale = selectedUnit
+    ? items.find(
+        (item) =>
+          item.unitId === selectedUnit.unitId && item.status !== "CANCELLED",
+      )
+    : undefined;
 
- const load=useCallback(async()=>{
-  const sequence=++loadSequence.current; setLoading(true); setLoadError(""); setItems([]);
-  try{const response=await salesService.list({page,size:25,search:search||undefined});if(sequence!==loadSequence.current)return;
-   setItems(response.data?.data??[]);setTotalPages(response.data?.totalPages??0);setTotalElements(response.data?.totalElements??0);
-  }catch(error:unknown){if(sequence===loadSequence.current)setLoadError(apiErrorMessage(error,"Could not load sales. Please retry."))}
-  finally{if(sequence===loadSequence.current)setLoading(false)}
- },[page,search]);
- useEffect(()=>{void load();return()=>{loadSequence.current++}},[load]);
- useEffect(()=>{if(loading||!Number.isSafeInteger(requestedSaleId)||requestedSaleId<=0)return;requestAnimationFrame(()=>document.getElementById(`sale-${requestedSaleId}`)?.scrollIntoView({behavior:"smooth",block:"center"}))},[items,loading,requestedSaleId]);
- useEffect(()=>{if(!canManage||!token){setSetupLoading(false);return}let cancelled=false;void (async()=>{setSetupLoading(true);setSetupError("");try{const [accountResponse,templateResponse]=await Promise.all([listAccounts(token,{byLandlord:true,size:100}),leaseDocumentService.templates()]);if(cancelled)return;const accounts=(accountResponse.data?.data??[]).filter((account:Account)=>account.category==="PROPERTY_SALES"&&account.active&&account.verified);setPaymentAccounts(accounts);setOfferTemplateReady((templateResponse.data?.data??[]).some((template:{documentType:string;legalReviewRequired:boolean;legalReviewedAt?:string})=>template.documentType==="PROPERTY_SALE_LETTER_OF_OFFER"&&!template.legalReviewRequired&&Boolean(template.legalReviewedAt)))}catch(error:unknown){if(!cancelled)setSetupError(apiErrorMessage(error,"Property Sales setup could not be checked."))}finally{if(!cancelled)setSetupLoading(false)}})();return()=>{cancelled=true}},[canManage,token]);
- useEffect(()=>{if(propertyOptions.error)toast.error(apiErrorMessage(propertyOptions.error,"Could not load sale properties."))},[propertyOptions.error]);
- useEffect(()=>{if(unitOptions.error)toast.error(apiErrorMessage(unitOptions.error,"Could not load sale units."))},[unitOptions.error]);
- useEffect(()=>{if(!selectedUnit)return;setCurrency(selectedUnit.currency??"KES");setAskingPrice(String(selectedUnit.price??""));setOfferAmount(String(selectedUnit.price??""))},[selectedUnit]);
- useEffect(()=>{if(!Number.isSafeInteger(requestedInquiryId)||requestedInquiryId<=0)return;try{const value=JSON.parse(sessionStorage.getItem(`listing-inquiry:${requestedInquiryId}`)??"null");if(value?.id===requestedInquiryId&&value.propertyId===requestedPropertyId&&value.unitId===requestedUnitId){setInquiry(value);setBuyerEmail(value.email??"");setNotes(value.message??"")}}catch{/* A missing local handoff never bypasses normal form validation. */}},[requestedInquiryId,requestedPropertyId,requestedUnitId]);
+  const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
+    setLoading(true);
+    setLoadError("");
+    setItems([]);
+    try {
+      const response = await salesService.list({
+        page,
+        size: 25,
+        search: search || undefined,
+      });
+      if (sequence !== loadSequence.current) return;
+      setItems(response.data?.data ?? []);
+      setTotalPages(response.data?.totalPages ?? 0);
+      setTotalElements(response.data?.totalElements ?? 0);
+    } catch (error: unknown) {
+      if (sequence === loadSequence.current)
+        setLoadError(
+          apiErrorMessage(error, "Could not load sales. Please retry."),
+        );
+    } finally {
+      if (sequence === loadSequence.current) setLoading(false);
+    }
+  }, [page, search]);
+  useEffect(() => {
+    void load();
+    return () => {
+      loadSequence.current++;
+    };
+  }, [load]);
+  useEffect(() => {
+    const syncHash = () => {
+      if (window.location.hash === "#invite-buyer") setActiveTask("invite");
+      if (
+        window.location.hash === "#buyers" ||
+        window.location.hash.startsWith("#sale-")
+      )
+        setActiveTask("pipeline");
+    };
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
+  useEffect(() => {
+    if (
+      loading ||
+      !Number.isSafeInteger(requestedSaleId) ||
+      requestedSaleId <= 0
+    )
+      return;
+    requestAnimationFrame(() =>
+      document
+        .getElementById(`sale-${requestedSaleId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" }),
+    );
+  }, [items, loading, requestedSaleId]);
+  useEffect(() => {
+    if (!canManage || !token) {
+      setSetupLoading(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      setSetupLoading(true);
+      setSetupError("");
+      try {
+        const [accountResponse, templateResponse] = await Promise.all([
+          listAccounts(token, { byLandlord: true, size: 100 }),
+          leaseDocumentService.templates(),
+        ]);
+        if (cancelled) return;
+        const accounts = (accountResponse.data?.data ?? []).filter(
+          (account: Account) =>
+            account.category === "PROPERTY_SALES" &&
+            account.active &&
+            account.verified,
+        );
+        setPaymentAccounts(accounts);
+        setOfferTemplateReady(
+          (templateResponse.data?.data ?? []).some(
+            (template: {
+              documentType: string;
+              legalReviewRequired: boolean;
+              legalReviewedAt?: string;
+            }) =>
+              template.documentType === "PROPERTY_SALE_LETTER_OF_OFFER" &&
+              !template.legalReviewRequired &&
+              Boolean(template.legalReviewedAt),
+          ),
+        );
+      } catch (error: unknown) {
+        if (!cancelled)
+          setSetupError(
+            apiErrorMessage(
+              error,
+              "Property Sales setup could not be checked.",
+            ),
+          );
+      } finally {
+        if (!cancelled) setSetupLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [canManage, token]);
+  useEffect(() => {
+    if (propertyOptions.error)
+      toast.error(
+        apiErrorMessage(
+          propertyOptions.error,
+          "Could not load sale properties.",
+        ),
+      );
+  }, [propertyOptions.error]);
+  useEffect(() => {
+    if (unitOptions.error)
+      toast.error(
+        apiErrorMessage(unitOptions.error, "Could not load sale units."),
+      );
+  }, [unitOptions.error]);
+  useEffect(() => {
+    if (!selectedUnit) return;
+    setCurrency(selectedUnit.currency ?? "KES");
+    setAskingPrice(String(selectedUnit.price ?? ""));
+    setOfferAmount(String(selectedUnit.price ?? ""));
+  }, [selectedUnit]);
+  useEffect(() => {
+    if (!Number.isSafeInteger(requestedInquiryId) || requestedInquiryId <= 0)
+      return;
+    try {
+      const value = JSON.parse(
+        sessionStorage.getItem(`listing-inquiry:${requestedInquiryId}`) ??
+          "null",
+      );
+      if (
+        value?.id === requestedInquiryId &&
+        value.propertyId === requestedPropertyId &&
+        value.unitId === requestedUnitId
+      ) {
+        setInquiry(value);
+        setBuyerEmail(value.email ?? "");
+        setNotes(value.message ?? "");
+      }
+    } catch {
+      /* A missing local handoff never bypasses normal form validation. */
+    }
+  }, [requestedInquiryId, requestedPropertyId, requestedUnitId]);
 
- function chooseProperty(value:string){setPropertyId(value);setUnitId("");setAskingPrice("");setOfferAmount("")}
- function chooseUnit(value:string){setUnitId(value);const unit=units.find(candidate=>candidate.unitId===Number(value));if(unit){setCurrency(unit.currency??"KES");setAskingPrice(String(unit.price??""));setOfferAmount(String(unit.price??""))}}
- async function create(event:FormEvent){event.preventDefault();if(!selectedUnit||!offerAmount||!responseDueDate)return;if(existingUnitSale){toast.error("This unit already has an active buyer or sale transaction. Open it below to continue, or cancel it before inviting another buyer.");document.getElementById(`sale-${existingUnitSale.id}`)?.scrollIntoView({behavior:"smooth",block:"center"});return}if(paymentAccounts.length===0||!offerTemplateReady){toast.error("Complete the two Property Sales setup steps before inviting a buyer.");return}setBusy(true);try{await salesService.create({propertyId:selectedUnit.propertyId,unitId:selectedUnit.unitId,buyerEmail:buyerEmail.trim(),askingPrice:Number(askingPrice),offerAmount:Number(offerAmount),responseDueDate,currency,notes:notes.trim()||undefined});toast.success("Buyer invited. The Letter of Offer is ready in the buyer's secure workspace.");setBuyerEmail("");setNotes("");setResponseDueDate(defaultResponseDueDate());await load()}catch(error:unknown){toast.error(apiErrorMessage(error,"Could not create the buyer invitation and Letter of Offer."))}finally{setBusy(false)}}
- async function advance(item:SaleTransaction,status:SaleStatus){const reason=reasons[item.id]?.trim();const offer=offerAmounts[item.id];if(status==="CANCELLED"&&!reason){toast.error("Enter a cancellation reason first.");return}if(status==="OFFERED"&&(!offer||Number(offer)<=0)){toast.error("Enter the buyer offer amount first.");return}setBusy(true);try{await salesService.update(item.id,{status,offerAmount:status==="OFFERED"?Number(offer):undefined,notes:status==="CANCELLED"?reason:undefined});toast.success(`Sale moved to ${label(status)}.`);await load()}catch(error:unknown){toast.error(apiErrorMessage(error,"Could not update sale."))}finally{setBusy(false)}}
- async function loadMilestones(id:number){try{const [m,e]=await Promise.all([salesService.milestones(id),salesService.evidence(id)]);setMilestones(current=>({...current,[id]:m.data?.data??[]}));setSaleEvidence(current=>({...current,[id]:e.data?.data??[]}))}catch(error:unknown){toast.error(apiErrorMessage(error,"Could not load sale evidence."))}}
- async function createEscrowInvoice(item:SaleTransaction){const raw=milestoneAmount[item.id],amount=Number(raw),paymentAccountId=Number(escrowAccountId[item.id]);if(!raw||!Number.isFinite(amount)||amount<=0){toast.error("Enter the contractual escrow amount.");return}if(!paymentAccountId){toast.error("Select a verified Property Sales payment account.");return}if(!item.offerAmount){toast.error("The buyer's offer must be accepted before creating an escrow invoice.");return}if(amount>item.offerAmount){toast.error("Escrow cannot exceed the accepted offer amount.");return}setBusy(true);try{const response=await salesService.createEscrowInvoice(item.id,amount,paymentAccountId),payload=response.data.data,invoice=Array.isArray(payload)?payload[0]:payload;if(!invoice?.invoiceId||!invoice.invoiceRef)throw new Error("Invoice response is incomplete. Refresh sales before retrying.");setItems(current=>current.map(sale=>sale.id===item.id?{...sale,escrowInvoiceId:invoice.invoiceId,escrowRequiredAmount:invoice.amount}:sale));toast.success(`Escrow invoice ${invoice.invoiceRef} created for the buyer.`)}catch(error:unknown){toast.error(apiErrorMessage(error,"Could not create the escrow invoice."))}finally{setBusy(false)}}
- async function addMilestone(item:SaleTransaction){const id=item.id,type=milestoneType[id];if(!type){toast.error("Select a milestone.");return}if(type==="ESCROW_FUNDED"&&!item.escrowInvoiceId){toast.error("Create the buyer's escrow invoice first.");return}const file=evidenceFiles[id];if(!["ESCROW_FUNDED","AGREEMENT_SIGNED"].includes(type)&&!file){toast.error("Choose the supporting evidence file.");return}if(file&&file.size>10*1024*1024){toast.error("Choose a PDF, JPG or PNG no larger than 10 MB.");return}setBusy(true);try{let evidenceAttachmentId:number|undefined,evidenceDocumentId:number|undefined;if(type==="AGREEMENT_SIGNED"){const response=await leaseDocumentService.list({saleId:id,size:100});const document=(response.data?.data??[]).find((value:{id:number;documentType:string;status:string})=>value.documentType==="PROPERTY_SALE_AGREEMENT"&&value.status==="SIGNED");if(!document)throw new Error("Both parties must sign the Property Sale Agreement first.");evidenceDocumentId=document.id}else if(file){const category=type==="DUE_DILIGENCE_CHECK"?"DUE_DILIGENCE":type==="TRANSFER_REGISTERED"?"TRANSFER_REGISTRATION":"HANDOVER";const response=await salesService.uploadEvidence(id,category,file),payload=response.data?.data;evidenceAttachmentId=(Array.isArray(payload)?payload[0]:payload)?.id;if(!evidenceAttachmentId)throw new Error("Evidence upload did not complete.")}await salesService.addMilestone(id,{type,status:"COMPLETED",evidenceDocumentId,evidenceAttachmentId,externalReference:!["ESCROW_FUNDED","AGREEMENT_SIGNED"].includes(type)?evidenceReferences[id]?.trim():undefined,notes:!["ESCROW_FUNDED","AGREEMENT_SIGNED"].includes(type)?evidenceNotes[id]?.trim():undefined});setEvidenceFiles(current=>({...current,[id]:undefined}));toast.success(type==="ESCROW_FUNDED"?"Paid escrow invoice verified and milestone recorded.":"Milestone evidence recorded.");await Promise.all([loadMilestones(id),load()])}catch(error:unknown){toast.error(apiErrorMessage(error,type==="ESCROW_FUNDED"?"The linked escrow invoice is not fully paid yet.":"Could not record milestone."))}finally{setBusy(false)}}
+  function chooseProperty(value: string) {
+    setPropertyId(value);
+    setUnitId("");
+    setAskingPrice("");
+    setOfferAmount("");
+  }
+  function chooseUnit(value: string) {
+    setUnitId(value);
+    const unit = units.find((candidate) => candidate.unitId === Number(value));
+    if (unit) {
+      setCurrency(unit.currency ?? "KES");
+      setAskingPrice(String(unit.price ?? ""));
+      setOfferAmount(String(unit.price ?? ""));
+    }
+  }
+  async function create(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedUnit || !offerAmount || !responseDueDate) return;
+    if (existingUnitSale) {
+      toast.error(
+        "This unit already has an active buyer or sale transaction. Open it below to continue, or cancel it before inviting another buyer.",
+      );
+      document
+        .getElementById(`sale-${existingUnitSale.id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    if (paymentAccounts.length === 0 || !offerTemplateReady) {
+      toast.error(
+        "Complete the two Property Sales setup steps before inviting a buyer.",
+      );
+      return;
+    }
+    setBusy(true);
+    try {
+      await salesService.create({
+        propertyId: selectedUnit.propertyId,
+        unitId: selectedUnit.unitId,
+        buyerEmail: buyerEmail.trim(),
+        askingPrice: Number(askingPrice),
+        offerAmount: Number(offerAmount),
+        responseDueDate,
+        currency,
+        notes: notes.trim() || undefined,
+      });
+      toast.success(
+        "Buyer invited. The Letter of Offer is ready in the buyer's secure workspace.",
+      );
+      setBuyerEmail("");
+      setNotes("");
+      setResponseDueDate(defaultResponseDueDate());
+      await load();
+    } catch (error: unknown) {
+      toast.error(
+        apiErrorMessage(
+          error,
+          "Could not create the buyer invitation and Letter of Offer.",
+        ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function advance(item: SaleTransaction, status: SaleStatus) {
+    const reason = reasons[item.id]?.trim();
+    const offer = offerAmounts[item.id];
+    if (status === "CANCELLED" && !reason) {
+      toast.error("Enter a cancellation reason first.");
+      return;
+    }
+    if (status === "OFFERED" && (!offer || Number(offer) <= 0)) {
+      toast.error("Enter the buyer offer amount first.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await salesService.update(item.id, {
+        status,
+        offerAmount: status === "OFFERED" ? Number(offer) : undefined,
+        notes: status === "CANCELLED" ? reason : undefined,
+      });
+      toast.success(`Sale moved to ${label(status)}.`);
+      await load();
+    } catch (error: unknown) {
+      toast.error(apiErrorMessage(error, "Could not update sale."));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function loadMilestones(id: number) {
+    try {
+      const [m, e] = await Promise.all([
+        salesService.milestones(id),
+        salesService.evidence(id),
+      ]);
+      setMilestones((current) => ({ ...current, [id]: m.data?.data ?? [] }));
+      setSaleEvidence((current) => ({ ...current, [id]: e.data?.data ?? [] }));
+    } catch (error: unknown) {
+      toast.error(apiErrorMessage(error, "Could not load sale evidence."));
+    }
+  }
+  async function createEscrowInvoice(item: SaleTransaction) {
+    const raw = milestoneAmount[item.id],
+      amount = Number(raw),
+      paymentAccountId = Number(escrowAccountId[item.id]);
+    if (!raw || !Number.isFinite(amount) || amount <= 0) {
+      toast.error("Enter the contractual escrow amount.");
+      return;
+    }
+    if (!paymentAccountId) {
+      toast.error("Select a verified Property Sales payment account.");
+      return;
+    }
+    if (!item.offerAmount) {
+      toast.error(
+        "The buyer's offer must be accepted before creating an escrow invoice.",
+      );
+      return;
+    }
+    if (amount > item.offerAmount) {
+      toast.error("Escrow cannot exceed the accepted offer amount.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const response = await salesService.createEscrowInvoice(
+          item.id,
+          amount,
+          paymentAccountId,
+        ),
+        payload = response.data.data,
+        invoice = Array.isArray(payload) ? payload[0] : payload;
+      if (!invoice?.invoiceId || !invoice.invoiceRef)
+        throw new Error(
+          "Invoice response is incomplete. Refresh sales before retrying.",
+        );
+      setItems((current) =>
+        current.map((sale) =>
+          sale.id === item.id
+            ? {
+                ...sale,
+                escrowInvoiceId: invoice.invoiceId,
+                escrowRequiredAmount: invoice.amount,
+              }
+            : sale,
+        ),
+      );
+      toast.success(
+        `Escrow invoice ${invoice.invoiceRef} created for the buyer.`,
+      );
+    } catch (error: unknown) {
+      toast.error(
+        apiErrorMessage(error, "Could not create the escrow invoice."),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function addMilestone(item: SaleTransaction) {
+    const id = item.id,
+      type = milestoneType[id];
+    if (!type) {
+      toast.error("Select a milestone.");
+      return;
+    }
+    if (type === "ESCROW_FUNDED" && !item.escrowInvoiceId) {
+      toast.error("Create the buyer's escrow invoice first.");
+      return;
+    }
+    const file = evidenceFiles[id];
+    if (!["ESCROW_FUNDED", "AGREEMENT_SIGNED"].includes(type) && !file) {
+      toast.error("Choose the supporting evidence file.");
+      return;
+    }
+    if (file && file.size > 10 * 1024 * 1024) {
+      toast.error("Choose a PDF, JPG or PNG no larger than 10 MB.");
+      return;
+    }
+    setBusy(true);
+    try {
+      let evidenceAttachmentId: number | undefined,
+        evidenceDocumentId: number | undefined;
+      if (type === "AGREEMENT_SIGNED") {
+        const response = await leaseDocumentService.list({
+          saleId: id,
+          size: 100,
+        });
+        const document = (response.data?.data ?? []).find(
+          (value: { id: number; documentType: string; status: string }) =>
+            value.documentType === "PROPERTY_SALE_AGREEMENT" &&
+            value.status === "SIGNED",
+        );
+        if (!document)
+          throw new Error(
+            "Both parties must sign the Property Sale Agreement first.",
+          );
+        evidenceDocumentId = document.id;
+      } else if (file) {
+        const category =
+          type === "DUE_DILIGENCE_CHECK"
+            ? "DUE_DILIGENCE"
+            : type === "TRANSFER_REGISTERED"
+              ? "TRANSFER_REGISTRATION"
+              : "HANDOVER";
+        const response = await salesService.uploadEvidence(id, category, file),
+          payload = response.data?.data;
+        evidenceAttachmentId = (Array.isArray(payload) ? payload[0] : payload)
+          ?.id;
+        if (!evidenceAttachmentId)
+          throw new Error("Evidence upload did not complete.");
+      }
+      await salesService.addMilestone(id, {
+        type,
+        status: "COMPLETED",
+        evidenceDocumentId,
+        evidenceAttachmentId,
+        externalReference: !["ESCROW_FUNDED", "AGREEMENT_SIGNED"].includes(type)
+          ? evidenceReferences[id]?.trim()
+          : undefined,
+        notes: !["ESCROW_FUNDED", "AGREEMENT_SIGNED"].includes(type)
+          ? evidenceNotes[id]?.trim()
+          : undefined,
+      });
+      setEvidenceFiles((current) => ({ ...current, [id]: undefined }));
+      toast.success(
+        type === "ESCROW_FUNDED"
+          ? "Paid escrow invoice verified and milestone recorded."
+          : "Milestone evidence recorded.",
+      );
+      await Promise.all([loadMilestones(id), load()]);
+    } catch (error: unknown) {
+      toast.error(
+        apiErrorMessage(
+          error,
+          type === "ESCROW_FUNDED"
+            ? "The linked escrow invoice is not fully paid yet."
+            : "Could not record milestone.",
+        ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
 
- return <RequireRole roles={["SalesAgent", "SalesCoordinator", "ListingAgent", "Buyer"]} permissions={["view_sale_pipeline"]}>
- <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
-  <div><p className="text-sm font-semibold uppercase tracking-[.18em] text-[#EF4217]">SlickHood Property Sales</p><h1 className="mt-1 text-3xl font-bold">{isBuyer?"My Property Purchases":"Property Sale Management"}</h1><p className="text-muted-foreground">{isBuyer?"Track each purchase, review and sign documents, pay verified invoices and follow transfer through handover.":"Manage buyers from invitation and offer through due diligence, verified payment, transfer and handover."}</p></div>
-  {canManage&&<Card className={paymentAccounts.length>0&&offerTemplateReady&&(!isSalesBiller||lateFeeConfigured)?"border-emerald-200":"border-orange-200"}><CardHeader><div className="flex items-start justify-between gap-4"><div><CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-[#EF4217]"/>Property Sales setup</CardTitle><CardDescription>Complete these once. Every buyer then receives a secure, ready-to-sign Letter of Offer, payments use your receiving account, and any late-fee rule is disclosed.</CardDescription></div>{!setupLoading&&<span className="text-sm font-semibold">{Number(offerTemplateReady)+Number(paymentAccounts.length>0)+(isSalesBiller?Number(lateFeeConfigured):0)}/{isSalesBiller?3:2} ready</span>}</div></CardHeader><CardContent className="space-y-4">{setupLoading?<p role="status" className="text-sm text-muted-foreground">Checking offer and payment readiness…</p>:<><div className="grid gap-3 md:grid-cols-2"><div className="flex gap-3 rounded-lg border p-4">{offerTemplateReady?<CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600"/>:<Circle className="h-5 w-5 shrink-0 text-slate-300"/>}<div><p className="font-semibold">Letter of Offer standard</p><p className="text-sm text-muted-foreground">{offerTemplateReady?"Approved, integrity-checked standard is ready.":"An administrator must approve the controlled Letter of Offer standard."}</p><Button asChild variant="link" className="h-auto p-0"><Link href="/dashboard/documents?view=templates&type=PROPERTY_SALE_LETTER_OF_OFFER">Open documents</Link></Button></div></div><div className="flex gap-3 rounded-lg border p-4">{paymentAccounts.length>0?<CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600"/>:<Circle className="h-5 w-5 shrink-0 text-slate-300"/>}<div><p className="font-semibold">Receiving account</p><p className="text-sm text-muted-foreground">{paymentAccounts.length>0?`${paymentAccounts.length} verified Property Sales account${paymentAccounts.length===1?"":"s"} ready.`:"Add and complete provider verification for a Property Sales account."}</p><Button asChild variant="link" className="h-auto p-0"><Link href="/dashboard/sales/accounts">Configure receiving account</Link></Button></div></div></div>{isSalesBiller&&<LateFeePolicySetup billingType="SALE" onReadyChange={setLateFeeConfigured}/>} {setupError&&<div role="alert" className="text-sm text-red-700">{setupError}</div>}</>}</CardContent></Card>}
-  {isBuyer&&<div className="grid gap-4 sm:grid-cols-3"><Card><CardHeader className="pb-2"><CardDescription>Active on this page</CardDescription><CardTitle>{loading?"Loading…":items.filter(item=>!["COMPLETED","CANCELLED"].includes(item.status)).length}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Awaiting signature on this page</CardDescription><CardTitle>{loading?"Loading…":items.filter(item=>item.status==="OFFERED"||item.status==="AGREEMENT").length}</CardTitle></CardHeader></Card><Card><CardHeader className="pb-2"><CardDescription>Payment ready on this page</CardDescription><CardTitle>{loading?"Loading…":items.filter(item=>Boolean(item.escrowInvoiceId)&&item.status!=="COMPLETED").length}</CardTitle></CardHeader></Card></div>}
-  {canManage&&<Card id="invite-buyer" className="scroll-mt-24"><CardHeader><CardTitle>Invite a buyer</CardTitle><CardDescription>{hasSelectedUnitLink?"The selected unit and its stored sale terms are fixed. Enter the buyer email and the date by which the buyer must respond.":"Select a unit, enter the buyer email and response date, then send. Existing buyers sign in; new buyers register and complete KYC before opening the same secure offer."}</CardDescription></CardHeader><CardContent><form onSubmit={create} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-   {!hasSelectedUnitLink&&<div className="space-y-2"><Label>Property filter (optional)</Label><Input value={propertyOptions.search} onChange={event=>propertyOptions.setSearch(event.target.value)} placeholder="Search properties…"/><Select value={propertyId} onValueChange={chooseProperty} disabled={propertiesLoading&&properties.length===0}><SelectTrigger><SelectValue placeholder={propertiesLoading?"Loading properties…":"All properties"}/></SelectTrigger><SelectContent><SelectItem value="all">All sale inventory</SelectItem>{properties.map(property=><SelectItem key={property.id} value={String(property.id)}>{property.name}</SelectItem>)}</SelectContent></Select>{propertyOptions.hasMore&&<Button type="button" size="sm" variant="outline" onClick={propertyOptions.loadMore} disabled={propertiesLoading}>Load more properties</Button>}</div>}
-   {!hasSelectedUnitLink&&<div className="space-y-2"><Label>Sale unit</Label><Input value={unitOptions.search} onChange={event=>unitOptions.setSearch(event.target.value)} placeholder="Search unit reference…"/><Select value={unitId} onValueChange={chooseUnit} disabled={unitsLoading&&units.length===0}><SelectTrigger><SelectValue placeholder={unitsLoading?"Loading sale units…":"Select available sale unit"}/></SelectTrigger><SelectContent>{units.map(unit=><SelectItem key={unit.unitId} value={String(unit.unitId)}>{properties.find(property=>property.id===unit.propertyId)?.name??`Property #${unit.propertyId}`} / {unit.ref} · {unit.currency} {unit.price?.toLocaleString()}</SelectItem>)}</SelectContent></Select>{unitOptions.hasMore&&<Button type="button" size="sm" variant="outline" onClick={unitOptions.loadMore} disabled={unitsLoading}>Load more units</Button>}{!unitsLoading&&units.length===0&&<p className="text-sm text-amber-700">No available sale units match this filter. Set a unit&apos;s commercial use to Sale, then return here.</p>}</div>}
-   {inquiry&&<div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm md:col-span-2 lg:col-span-3"><p className="font-semibold">Website enquiry from {inquiry.name}</p><p className="mt-1">{inquiry.email}{inquiry.phone?` · ${inquiry.phone}`:""}</p><p className="mt-2 text-slate-600">{inquiry.message}</p></div>}
-   <div className="space-y-2"><Label htmlFor="buyer-email">Buyer email</Label><Input id="buyer-email" required type="email" autoComplete="email" maxLength={254} value={buyerEmail} onChange={event=>setBuyerEmail(event.target.value)} placeholder="buyer@example.com"/></div>
-   {selectedUnit&&<div className="rounded-lg border border-blue-200 bg-blue-50 p-4 md:col-span-2 lg:col-span-3"><p className="font-semibold">Selected sale unit</p><div className="mt-2 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4"><p><span className="text-muted-foreground">Property</span><br/><strong>{selectedProperty?.name??`Property #${selectedUnit.propertyId}`}</strong></p><p><span className="text-muted-foreground">Unit</span><br/><strong>{selectedUnit.ref}</strong></p><p><span className="text-muted-foreground">Type and size</span><br/><strong>{selectedUnit.unitType?label(selectedUnit.unitType):"Not recorded"}{selectedUnit.size?` · ${selectedUnit.size.toLocaleString()} ${selectedUnit.measurementUnits?.name??""}`:""}</strong></p><p><span className="text-muted-foreground">Listing price</span><br/><strong>{currency} {selectedUnit.price?.toLocaleString()}</strong></p></div></div>}
-   {existingUnitSale&&<div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 md:col-span-2 lg:col-span-3"><p className="font-semibold">This unit already has an active sale</p><p className="mt-1">Continue sale #{existingUnitSale.id} for {existingUnitSale.buyerName??existingUnitSale.buyerEmail??existingUnitSale.invitedBuyerEmail??"the existing buyer"}, currently at {label(existingUnitSale.status)}. Cancel that transaction first if you need to invite a different buyer.</p><Button type="button" size="sm" variant="outline" className="mt-3" onClick={()=>document.getElementById(`sale-${existingUnitSale.id}`)?.scrollIntoView({behavior:"smooth",block:"center"})}>Open existing sale</Button></div>}
-   {!hasSelectedUnitLink&&<div className="space-y-2"><Label htmlFor="asking-price">Asking price from unit</Label><Input id="asking-price" required readOnly aria-readonly="true" type="number" min="0.01" step="0.01" value={askingPrice} className="bg-muted"/><p className="text-xs text-muted-foreground">Change the unit listing to change its asking price.</p></div>}
-   {!hasSelectedUnitLink&&<div className="space-y-2"><Label htmlFor="offer-amount">Agreed offer amount</Label><Input id="offer-amount" required type="number" min="0.01" step="0.01" value={offerAmount} onChange={event=>setOfferAmount(event.target.value)}/><p className="text-xs text-muted-foreground">This amount is frozen into the buyer&apos;s Letter of Offer.</p></div>}
-   <div className="space-y-2"><Label htmlFor="offer-response-due">Buyer response due</Label><Input id="offer-response-due" required type="date" min={new Date(Date.now()+86400000).toISOString().slice(0,10)} value={responseDueDate} onChange={event=>setResponseDueDate(event.target.value)}/></div>
-   {!hasSelectedUnitLink&&<div className="space-y-2"><Label htmlFor="currency">Currency from unit</Label><Input id="currency" required readOnly aria-readonly="true" maxLength={12} value={currency} className="bg-muted"/></div>}
-   {!hasSelectedUnitLink&&<div className="space-y-2"><Label htmlFor="sale-notes">Internal notes</Label><Textarea id="sale-notes" maxLength={1000} value={notes} onChange={event=>setNotes(event.target.value)} placeholder="Optional context for the sales team"/></div>}
-   {hasSelectedUnitLink&&!unitsLoading&&!selectedUnit&&<div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 md:col-span-2 lg:col-span-3">This sale unit could not be loaded. Return to the unit and open Property Sales again.</div>}
-   <div className="md:col-span-2 lg:col-span-3"><Button disabled={busy||setupLoading||paymentAccounts.length===0||!offerTemplateReady||!selectedUnit||!offerAmount||!responseDueDate||Boolean(existingUnitSale)} className="bg-[#EF4217]">{busy?"Sending…":existingUnitSale?"Existing sale must be continued or cancelled":"Send invitation and Letter of Offer"}</Button></div>
-  </form></CardContent></Card>}
-  <Card id="buyers" className="scroll-mt-24"><CardHeader><CardTitle>{isBuyer?"My purchases":"Buyers & sale transactions"}</CardTitle><CardDescription>{totalElements} transaction{totalElements===1?"":"s"}. {isBuyer?"Each card shows your next action and current purchase status.":"Search by buyer, email, property or unit. Stage changes are locked, validated and notified."}</CardDescription></CardHeader><CardContent className="space-y-4">
-   <form className="flex max-w-2xl gap-2" onSubmit={event=>{event.preventDefault();setPage(0);setSearch(searchInput.trim())}}><Input aria-label="Search buyers and sales" value={searchInput} onChange={event=>setSearchInput(event.target.value)} placeholder={isBuyer?"Search my property or unit…":"Search buyer, email, property or unit…"}/><Button type="submit" variant="outline">Search</Button>{search&&<Button type="button" variant="ghost" onClick={()=>{setSearchInput("");setPage(0);setSearch("")}}>Clear</Button>}</form>
-   {loading&&<p className="py-8 text-center text-muted-foreground">Loading sale transactions…</p>}
-   {loadError&&<div role="alert">{loadError}<Button variant="outline" onClick={()=>void load()}>Retry sales</Button></div>}
-   {!loading&&!loadError&&items.length===0&&<p className="py-8 text-center text-muted-foreground">{search?"No purchases match your search.":isBuyer?"You do not have a property purchase yet. Open the secure invitation sent by the seller to link it to this account.":"No buyer or property sale transactions in this workspace."}</p>}
-   {!loading&&!loadError&&items.map(item=><div id={`sale-${item.id}`} key={item.id} className="scroll-mt-24 space-y-4 rounded-lg border p-4"><div className="flex flex-col justify-between gap-3 md:flex-row md:items-start"><div><div className="flex flex-wrap items-center gap-2"><strong>{isBuyer?(item.propertyName??`Property ${item.propertyId}`):`Sale #${item.id}`}</strong><Badge>{label(item.status)}</Badge>{!item.buyerUserId&&<Badge variant="outline">Buyer invite pending</Badge>}</div><p className="mt-1 text-sm text-muted-foreground">{item.propertyName??`Property ${item.propertyId}`} · {item.unitRef??`Unit ${item.unitId}`}{!isBuyer&&` · ${item.buyerName??item.buyerEmail??item.invitedBuyerEmail??`Buyer #${item.buyerUserId}`}`} · {item.currency} {item.askingPrice.toLocaleString()}</p>{item.offerAmount&&<p className="text-sm font-medium">Offer: {item.currency} {item.offerAmount.toLocaleString()}</p>}{isBuyer&&<p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900"><strong>Next:</strong> {buyerNextStep(item)}</p>}</div>{item.status==="OFFERED"&&item.offerAmount&&<div className="flex flex-wrap gap-2"><Button size="sm" asChild><Link href={`/dashboard/documents?${canAccept ? "" : "view=templates&"}saleId=${item.id}&type=PROPERTY_SALE_LETTER_OF_OFFER&amount=${item.offerAmount}&currency=${item.currency}`}>{canAccept?"Review and sign letter of offer":"Prepare letter of offer"}</Link></Button></div>}</div>
-    <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" asChild><Link href={`/dashboard/unit/details/${item.unitId}?p=${item.propertyId}&from=sale-units`}>View unit</Link></Button>{(canManage||canAccept||permissions.includes("view_lease_document"))&&<Button size="sm" variant="outline" asChild><Link href={`/dashboard/documents?saleId=${item.id}`}>View letters, agreements and signing status</Link></Button>}{canManage&&permissions.includes("edit_unit")&&<Button size="sm" asChild><Link href={`/dashboard/unit/details/${item.unitId}?p=${item.propertyId}&from=sale-units`}>Manage unit</Link></Button>}</div>
-    {canAccept&&item.escrowInvoiceId&&<Button size="sm" asChild><Link href={`/dashboard/invoices?invoiceId=${item.escrowInvoiceId}`}>Pay sale invoice #{item.escrowInvoiceId}</Link></Button>}
-    {!item.buyerUserId&&item.status==="OFFERED"&&<p className="text-sm text-amber-700">The buyer must complete the email invitation before a letter can be generated.</p>}
-    {item.status === "AGREEMENT" && <Button size="sm" variant="outline" asChild><Link href={`/dashboard/documents?${canManage ? "view=templates&" : ""}saleId=${item.id}&type=PROPERTY_SALE_AGREEMENT&amount=${item.offerAmount}&currency=${item.currency}`}>{canManage ? "Prepare sale agreement" : "Review sale agreement"}</Link></Button>}{canManage&&<div className="space-y-3 border-t pt-3"><div className="grid gap-3 md:grid-cols-2"><div className="space-y-1"><Label htmlFor={`offer-${item.id}`}>Offer amount</Label><Input id={`offer-${item.id}`} type="number" min="0.01" step="0.01" value={offerAmounts[item.id]??""} onChange={event=>setOfferAmounts(current=>({...current,[item.id]:event.target.value}))} placeholder="Required when recording an offer"/></div><div className="space-y-1"><Label htmlFor={`reason-${item.id}`}>Cancellation reason</Label><Input id={`reason-${item.id}`} maxLength={1000} value={reasons[item.id]??""} onChange={event=>setReasons(current=>({...current,[item.id]:event.target.value}))} placeholder="Required only for cancellation"/></div></div><div className="flex flex-wrap gap-2">{(managerNext[item.status]??[]).map(status=><Button key={status} size="sm" variant={status==="CANCELLED"?"destructive":"outline"} disabled={busy} onClick={()=>void advance(item,status)}>{status==="OFFERED"?"Record offer":label(status)}</Button>)}</div>
-     <details onToggle={event=>{if(event.currentTarget.open&&!milestones[item.id])void loadMilestones(item.id)}} className="rounded-md bg-muted/40 p-3"><summary className="cursor-pointer font-medium">Due diligence, verified payment and handover evidence</summary><div className="mt-3 space-y-3"><Select value={milestoneType[item.id]??""} onValueChange={value=>setMilestoneType(current=>({...current,[item.id]:value as SaleMilestoneType}))}><SelectTrigger className="max-w-md"><SelectValue placeholder="Select milestone"/></SelectTrigger><SelectContent>{milestoneTypes.map(type=><SelectItem key={type} value={type}>{label(type)}</SelectItem>)}</SelectContent></Select>
-      {milestoneType[item.id]==="ESCROW_FUNDED"?(item.escrowInvoiceId?<div className="space-y-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm"><p><strong>Buyer escrow invoice #{item.escrowInvoiceId}</strong> · {item.currency} {item.escrowRequiredAmount?.toLocaleString()}</p><p className="text-muted-foreground">The buyer pays this invoice from Billing. SlickHood will record escrow only after the linked invoice is fully reconciled.</p><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" asChild><Link href="/dashboard/invoices">Open Billing</Link></Button><Button size="sm" disabled={busy} onClick={()=>void addMilestone(item)}>Verify paid invoice and record escrow</Button></div></div>:item.status==="RESERVED"||item.status==="DUE_DILIGENCE"||item.status==="AGREEMENT"||item.status==="COMPLETION"?<div className="space-y-3 rounded-md border p-3"><div className="max-w-md space-y-1"><Label htmlFor={`escrow-${item.id}`}>Contractual escrow amount</Label><Input id={`escrow-${item.id}`} type="number" min="0.01" max={item.offerAmount} step="0.01" placeholder={`Maximum ${item.currency} ${item.offerAmount?.toLocaleString()??""}`} value={milestoneAmount[item.id]??""} onChange={event=>setMilestoneAmount(current=>({...current,[item.id]:event.target.value}))}/></div><div className="max-w-md space-y-1"><Label>Settlement account</Label><Select value={escrowAccountId[item.id]??""} onValueChange={value=>setEscrowAccountId(current=>({...current,[item.id]:value}))}><SelectTrigger><SelectValue placeholder="Select verified Property Sales account"/></SelectTrigger><SelectContent>{paymentAccounts.map(account=><SelectItem key={account.id} value={String(account.id)}>{account.name} · {account.channelDisplayName??account.channel}</SelectItem>)}</SelectContent></Select>{paymentAccounts.length===0&&<p className="text-sm text-amber-700">No verified account is available. <Link className="font-medium underline" href="/dashboard/sales/accounts">Open Sales Payment Setup</Link>.</p>}</div><Button size="sm" disabled={busy||!item.offerAmount||!escrowAccountId[item.id]} onClick={()=>void createEscrowInvoice(item)}>Create buyer escrow invoice</Button></div>:<p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Accept the signed offer first. Escrow becomes available when the sale is reserved.</p>):milestoneType[item.id]?<div className="space-y-3">{milestoneType[item.id]==="AGREEMENT_SIGNED"?<p className="rounded-md border bg-blue-50 p-3 text-sm text-blue-900">SlickHood will use the fully signed Property Sale Agreement automatically.</p>:<div className="max-w-md space-y-1"><Label htmlFor={`evidence-${item.id}`}>Supporting evidence</Label><Input id={`evidence-${item.id}`} type="file" accept="application/pdf,image/jpeg,image/png" onChange={event=>setEvidenceFiles(current=>({...current,[item.id]:event.target.files?.[0]}))}/><p className="text-xs text-muted-foreground">Private PDF, JPG or PNG · maximum 10 MB.</p></div>}{milestoneType[item.id]!=="AGREEMENT_SIGNED"&&<><Label htmlFor={`evidence-ref-${item.id}`}>Supporting record reference</Label><Input id={`evidence-ref-${item.id}`} required maxLength={120} value={evidenceReferences[item.id]??""} onChange={event=>setEvidenceReferences(current=>({...current,[item.id]:event.target.value}))}/><Label htmlFor={`evidence-note-${item.id}`}>Verification notes</Label><Textarea id={`evidence-note-${item.id}`} required maxLength={1000} value={evidenceNotes[item.id]??""} onChange={event=>setEvidenceNotes(current=>({...current,[item.id]:event.target.value}))}/><p className="text-sm text-muted-foreground">Identify the external due-diligence, registry or handover record and the checks performed.</p></>}<Button size="sm" disabled={busy} onClick={()=>void addMilestone(item)}>Record completed milestone</Button></div>:null}
-      <div className="space-y-1">{(milestones[item.id]??[]).map(milestone=><div key={milestone.id} className="flex flex-wrap justify-between gap-2 rounded border bg-background px-3 py-2 text-sm"><span>{label(milestone.milestoneType)} · {label(milestone.status)}</span><span className="text-muted-foreground">{milestone.amount?`${milestone.currency} ${milestone.amount.toLocaleString()} · `:""}{milestone.externalReference??(milestone.evidenceDocumentId?"Signed agreement":"")}</span></div>)}{(saleEvidence[item.id]??[]).map(evidence=><a key={evidence.id} href={evidence.downloadUrl} target="_blank" rel="noopener noreferrer" className="block rounded border bg-background px-3 py-2 text-sm underline">{label(evidence.category)} · {evidence.displayName}</a>)}</div></div></details>
-    </div>}
-   </div>)}
-   {!loadError&&totalPages>1&&<div className="flex items-center justify-between border-t pt-4"><Button variant="outline" disabled={page===0||loading} onClick={()=>setPage(value=>value-1)}>Previous</Button><span className="text-sm text-muted-foreground">Page {page+1} of {totalPages}</span><Button variant="outline" disabled={page>=totalPages-1||loading} onClick={()=>setPage(value=>value+1)}>Next</Button></div>}
-  </CardContent></Card>
- </div>
- </RequireRole>
+  return (
+    <RequireRole
+      roles={["SalesAgent", "SalesCoordinator", "ListingAgent", "Buyer"]}
+      permissions={["view_sale_pipeline"]}
+    >
+      <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[.18em] text-[#EF4217]">
+            SlickHood Property Sales
+          </p>
+          <h1 className="mt-1 text-3xl font-bold">
+            {isBuyer ? "My Property Purchases" : "Property Sale Management"}
+          </h1>
+          <p className="text-muted-foreground">
+            {isBuyer
+              ? "Track each purchase, review and sign documents, pay verified invoices and follow transfer through handover."
+              : "Manage buyers from invitation and offer through due diligence, verified payment, transfer and handover."}
+          </p>
+        </div>
+        <Card className="border-slate-200 bg-slate-50/70">
+          <CardContent className="p-4">
+            <div
+              className="flex flex-wrap gap-2"
+              aria-label="Property sale tasks"
+            >
+              {canManage && (
+                <Button
+                  type="button"
+                  variant={activeTask === "invite" ? "default" : "outline"}
+                  className={activeTask === "invite" ? "bg-[#EF4217]" : ""}
+                  onClick={() => setActiveTask("invite")}
+                >
+                  Setup & invite buyer
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant={activeTask === "pipeline" ? "default" : "outline"}
+                className={activeTask === "pipeline" ? "bg-[#EF4217]" : ""}
+                onClick={() => setActiveTask("pipeline")}
+              >
+                {isBuyer ? "My purchase journey" : "Sales pipeline"}
+              </Button>
+              {canManage && (
+                <>
+                  <Button asChild variant="outline">
+                    <Link href="/dashboard/property/sale-units">
+                      Sale inventory
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/dashboard/sales/buyers">Buyers</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/dashboard/documents">Documents</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/dashboard/sales/accounts">Payments</Link>
+                  </Button>
+                </>
+              )}
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              {activeTask === "invite"
+                ? "Check the controlled offer and receiving account, then invite the buyer for a specific available unit."
+                : isBuyer
+                  ? "Follow each purchase from offer and payment through transfer and handover."
+                  : "Progress active buyers, offers, verified payments, due diligence, transfer and handover."}
+            </p>
+          </CardContent>
+        </Card>
+        <div className={activeTask === "invite" ? "space-y-6" : "hidden"}>
+          {canManage && (
+            <Card
+              className={
+                paymentAccounts.length > 0 &&
+                offerTemplateReady &&
+                (!isSalesBiller || lateFeeConfigured)
+                  ? "border-emerald-200"
+                  : "border-orange-200"
+              }
+            >
+              <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <ShieldCheck className="h-5 w-5 text-[#EF4217]" />
+                      Property Sales setup
+                    </CardTitle>
+                    <CardDescription>
+                      Complete these once. Every buyer then receives a secure,
+                      ready-to-sign Letter of Offer, payments use your receiving
+                      account, and any late-fee rule is disclosed.
+                    </CardDescription>
+                  </div>
+                  {!setupLoading && (
+                    <span className="text-sm font-semibold">
+                      {Number(offerTemplateReady) +
+                        Number(paymentAccounts.length > 0) +
+                        (isSalesBiller ? Number(lateFeeConfigured) : 0)}
+                      /{isSalesBiller ? 3 : 2} ready
+                    </span>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {setupLoading ? (
+                  <p role="status" className="text-sm text-muted-foreground">
+                    Checking offer and payment readiness…
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="flex gap-3 rounded-lg border p-4">
+                        {offerTemplateReady ? (
+                          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+                        ) : (
+                          <Circle className="h-5 w-5 shrink-0 text-slate-300" />
+                        )}
+                        <div>
+                          <p className="font-semibold">
+                            Letter of Offer standard
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {offerTemplateReady
+                              ? "Approved, integrity-checked standard is ready."
+                              : "An administrator must approve the controlled Letter of Offer standard."}
+                          </p>
+                          <Button asChild variant="link" className="h-auto p-0">
+                            <Link href="/dashboard/documents?view=templates&type=PROPERTY_SALE_LETTER_OF_OFFER">
+                              Open documents
+                            </Link>
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex gap-3 rounded-lg border p-4">
+                        {paymentAccounts.length > 0 ? (
+                          <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+                        ) : (
+                          <Circle className="h-5 w-5 shrink-0 text-slate-300" />
+                        )}
+                        <div>
+                          <p className="font-semibold">Receiving account</p>
+                          <p className="text-sm text-muted-foreground">
+                            {paymentAccounts.length > 0
+                              ? `${paymentAccounts.length} verified Property Sales account${paymentAccounts.length === 1 ? "" : "s"} ready.`
+                              : "Add and complete provider verification for a Property Sales account."}
+                          </p>
+                          <Button asChild variant="link" className="h-auto p-0">
+                            <Link href="/dashboard/sales/accounts">
+                              Configure receiving account
+                            </Link>
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    {isSalesBiller && (
+                      <LateFeePolicySetup
+                        billingType="SALE"
+                        onReadyChange={setLateFeeConfigured}
+                      />
+                    )}{" "}
+                    {setupError && (
+                      <div role="alert" className="text-sm text-red-700">
+                        {setupError}
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+          {isBuyer && (
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Active on this page</CardDescription>
+                  <CardTitle>
+                    {loading
+                      ? "Loading…"
+                      : items.filter(
+                          (item) =>
+                            !["COMPLETED", "CANCELLED"].includes(item.status),
+                        ).length}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>
+                    Awaiting signature on this page
+                  </CardDescription>
+                  <CardTitle>
+                    {loading
+                      ? "Loading…"
+                      : items.filter(
+                          (item) =>
+                            item.status === "OFFERED" ||
+                            item.status === "AGREEMENT",
+                        ).length}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Payment ready on this page</CardDescription>
+                  <CardTitle>
+                    {loading
+                      ? "Loading…"
+                      : items.filter(
+                          (item) =>
+                            Boolean(item.escrowInvoiceId) &&
+                            item.status !== "COMPLETED",
+                        ).length}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+            </div>
+          )}
+          {canManage && (
+            <Card id="invite-buyer" className="scroll-mt-24">
+              <CardHeader>
+                <CardTitle>Invite a buyer</CardTitle>
+                <CardDescription>
+                  {hasSelectedUnitLink
+                    ? "The selected unit and its stored sale terms are fixed. Enter the buyer email and the date by which the buyer must respond."
+                    : "Select a unit, enter the buyer email and response date, then send. Existing buyers sign in; new buyers register and complete KYC before opening the same secure offer."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  onSubmit={create}
+                  className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
+                >
+                  {!hasSelectedUnitLink && (
+                    <div className="space-y-2">
+                      <Label>Property filter (optional)</Label>
+                      <Input
+                        value={propertyOptions.search}
+                        onChange={(event) =>
+                          propertyOptions.setSearch(event.target.value)
+                        }
+                        placeholder="Search properties…"
+                      />
+                      <Select
+                        value={propertyId}
+                        onValueChange={chooseProperty}
+                        disabled={propertiesLoading && properties.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              propertiesLoading
+                                ? "Loading properties…"
+                                : "All properties"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">
+                            All sale inventory
+                          </SelectItem>
+                          {properties.map((property) => (
+                            <SelectItem
+                              key={property.id}
+                              value={String(property.id)}
+                            >
+                              {property.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {propertyOptions.hasMore && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={propertyOptions.loadMore}
+                          disabled={propertiesLoading}
+                        >
+                          Load more properties
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  {!hasSelectedUnitLink && (
+                    <div className="space-y-2">
+                      <Label>Sale unit</Label>
+                      <Input
+                        value={unitOptions.search}
+                        onChange={(event) =>
+                          unitOptions.setSearch(event.target.value)
+                        }
+                        placeholder="Search unit reference…"
+                      />
+                      <Select
+                        value={unitId}
+                        onValueChange={chooseUnit}
+                        disabled={unitsLoading && units.length === 0}
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={
+                              unitsLoading
+                                ? "Loading sale units…"
+                                : "Select available sale unit"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {units.map((unit) => (
+                            <SelectItem
+                              key={unit.unitId}
+                              value={String(unit.unitId)}
+                            >
+                              {properties.find(
+                                (property) => property.id === unit.propertyId,
+                              )?.name ?? `Property #${unit.propertyId}`}{" "}
+                              / {unit.ref} · {unit.currency}{" "}
+                              {unit.price?.toLocaleString()}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {unitOptions.hasMore && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={unitOptions.loadMore}
+                          disabled={unitsLoading}
+                        >
+                          Load more units
+                        </Button>
+                      )}
+                      {!unitsLoading && units.length === 0 && (
+                        <p className="text-sm text-amber-700">
+                          No available sale units match this filter. Set a
+                          unit&apos;s commercial use to Sale, then return here.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {inquiry && (
+                    <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm md:col-span-2 lg:col-span-3">
+                      <p className="font-semibold">
+                        Website enquiry from {inquiry.name}
+                      </p>
+                      <p className="mt-1">
+                        {inquiry.email}
+                        {inquiry.phone ? ` · ${inquiry.phone}` : ""}
+                      </p>
+                      <p className="mt-2 text-slate-600">{inquiry.message}</p>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="buyer-email">Buyer email</Label>
+                    <Input
+                      id="buyer-email"
+                      required
+                      type="email"
+                      autoComplete="email"
+                      maxLength={254}
+                      value={buyerEmail}
+                      onChange={(event) => setBuyerEmail(event.target.value)}
+                      placeholder="buyer@example.com"
+                    />
+                  </div>
+                  {selectedUnit && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 md:col-span-2 lg:col-span-3">
+                      <p className="font-semibold">Selected sale unit</p>
+                      <div className="mt-2 grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                        <p>
+                          <span className="text-muted-foreground">
+                            Property
+                          </span>
+                          <br />
+                          <strong>
+                            {selectedProperty?.name ??
+                              `Property #${selectedUnit.propertyId}`}
+                          </strong>
+                        </p>
+                        <p>
+                          <span className="text-muted-foreground">Unit</span>
+                          <br />
+                          <strong>{selectedUnit.ref}</strong>
+                        </p>
+                        <p>
+                          <span className="text-muted-foreground">
+                            Type and size
+                          </span>
+                          <br />
+                          <strong>
+                            {selectedUnit.unitType
+                              ? label(selectedUnit.unitType)
+                              : "Not recorded"}
+                            {selectedUnit.size
+                              ? ` · ${selectedUnit.size.toLocaleString()} ${selectedUnit.measurementUnits?.name ?? ""}`
+                              : ""}
+                          </strong>
+                        </p>
+                        <p>
+                          <span className="text-muted-foreground">
+                            Listing price
+                          </span>
+                          <br />
+                          <strong>
+                            {currency} {selectedUnit.price?.toLocaleString()}
+                          </strong>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {existingUnitSale && (
+                    <div
+                      role="alert"
+                      className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 md:col-span-2 lg:col-span-3"
+                    >
+                      <p className="font-semibold">
+                        This unit already has an active sale
+                      </p>
+                      <p className="mt-1">
+                        Continue sale #{existingUnitSale.id} for{" "}
+                        {existingUnitSale.buyerName ??
+                          existingUnitSale.buyerEmail ??
+                          existingUnitSale.invitedBuyerEmail ??
+                          "the existing buyer"}
+                        , currently at {label(existingUnitSale.status)}. Cancel
+                        that transaction first if you need to invite a different
+                        buyer.
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="mt-3"
+                        onClick={() =>
+                          document
+                            .getElementById(`sale-${existingUnitSale.id}`)
+                            ?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "center",
+                            })
+                        }
+                      >
+                        Open existing sale
+                      </Button>
+                    </div>
+                  )}
+                  {!hasSelectedUnitLink && (
+                    <div className="space-y-2">
+                      <Label htmlFor="asking-price">
+                        Asking price from unit
+                      </Label>
+                      <Input
+                        id="asking-price"
+                        required
+                        readOnly
+                        aria-readonly="true"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={askingPrice}
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Change the unit listing to change its asking price.
+                      </p>
+                    </div>
+                  )}
+                  {!hasSelectedUnitLink && (
+                    <div className="space-y-2">
+                      <Label htmlFor="offer-amount">Agreed offer amount</Label>
+                      <Input
+                        id="offer-amount"
+                        required
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={offerAmount}
+                        onChange={(event) => setOfferAmount(event.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        This amount is frozen into the buyer&apos;s Letter of
+                        Offer.
+                      </p>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="offer-response-due">
+                      Buyer response due
+                    </Label>
+                    <Input
+                      id="offer-response-due"
+                      required
+                      type="date"
+                      min={new Date(Date.now() + 86400000)
+                        .toISOString()
+                        .slice(0, 10)}
+                      value={responseDueDate}
+                      onChange={(event) =>
+                        setResponseDueDate(event.target.value)
+                      }
+                    />
+                  </div>
+                  {!hasSelectedUnitLink && (
+                    <div className="space-y-2">
+                      <Label htmlFor="currency">Currency from unit</Label>
+                      <Input
+                        id="currency"
+                        required
+                        readOnly
+                        aria-readonly="true"
+                        maxLength={12}
+                        value={currency}
+                        className="bg-muted"
+                      />
+                    </div>
+                  )}
+                  {!hasSelectedUnitLink && (
+                    <div className="space-y-2">
+                      <Label htmlFor="sale-notes">Internal notes</Label>
+                      <Textarea
+                        id="sale-notes"
+                        maxLength={1000}
+                        value={notes}
+                        onChange={(event) => setNotes(event.target.value)}
+                        placeholder="Optional context for the sales team"
+                      />
+                    </div>
+                  )}
+                  {hasSelectedUnitLink && !unitsLoading && !selectedUnit && (
+                    <div
+                      role="alert"
+                      className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 md:col-span-2 lg:col-span-3"
+                    >
+                      This sale unit could not be loaded. Return to the unit and
+                      open Property Sales again.
+                    </div>
+                  )}
+                  <div className="md:col-span-2 lg:col-span-3">
+                    <Button
+                      disabled={
+                        busy ||
+                        setupLoading ||
+                        paymentAccounts.length === 0 ||
+                        !offerTemplateReady ||
+                        !selectedUnit ||
+                        !offerAmount ||
+                        !responseDueDate ||
+                        Boolean(existingUnitSale)
+                      }
+                      className="bg-[#EF4217]"
+                    >
+                      {busy
+                        ? "Sending…"
+                        : existingUnitSale
+                          ? "Existing sale must be continued or cancelled"
+                          : "Send invitation and Letter of Offer"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+        <div className={activeTask === "pipeline" ? "space-y-6" : "hidden"}>
+          <Card id="buyers" className="scroll-mt-24">
+            <CardHeader>
+              <CardTitle>
+                {isBuyer ? "My purchases" : "Buyers & sale transactions"}
+              </CardTitle>
+              <CardDescription>
+                {totalElements} transaction{totalElements === 1 ? "" : "s"}.{" "}
+                {isBuyer
+                  ? "Each card shows your next action and current purchase status."
+                  : "Search by buyer, email, property or unit. Stage changes are locked, validated and notified."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form
+                className="flex max-w-2xl gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setPage(0);
+                  setSearch(searchInput.trim());
+                }}
+              >
+                <Input
+                  aria-label="Search buyers and sales"
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
+                  placeholder={
+                    isBuyer
+                      ? "Search my property or unit…"
+                      : "Search buyer, email, property or unit…"
+                  }
+                />
+                <Button type="submit" variant="outline">
+                  Search
+                </Button>
+                {search && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setSearchInput("");
+                      setPage(0);
+                      setSearch("");
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </form>
+              {loading && (
+                <p className="py-8 text-center text-muted-foreground">
+                  Loading sale transactions…
+                </p>
+              )}
+              {loadError && (
+                <div role="alert">
+                  {loadError}
+                  <Button variant="outline" onClick={() => void load()}>
+                    Retry sales
+                  </Button>
+                </div>
+              )}
+              {!loading && !loadError && items.length === 0 && (
+                <p className="py-8 text-center text-muted-foreground">
+                  {search
+                    ? "No purchases match your search."
+                    : isBuyer
+                      ? "You do not have a property purchase yet. Open the secure invitation sent by the seller to link it to this account."
+                      : "No buyer or property sale transactions in this workspace."}
+                </p>
+              )}
+              {!loading &&
+                !loadError &&
+                items.map((item) => (
+                  <div
+                    id={`sale-${item.id}`}
+                    key={item.id}
+                    className="scroll-mt-24 space-y-4 rounded-lg border p-4"
+                  >
+                    <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <strong>
+                            {isBuyer
+                              ? (item.propertyName ??
+                                `Property ${item.propertyId}`)
+                              : `Sale #${item.id}`}
+                          </strong>
+                          <Badge>{label(item.status)}</Badge>
+                          {!item.buyerUserId && (
+                            <Badge variant="outline">
+                              Buyer invite pending
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {item.propertyName ?? `Property ${item.propertyId}`} ·{" "}
+                          {item.unitRef ?? `Unit ${item.unitId}`}
+                          {!isBuyer &&
+                            ` · ${item.buyerName ?? item.buyerEmail ?? item.invitedBuyerEmail ?? `Buyer #${item.buyerUserId}`}`}{" "}
+                          · {item.currency} {item.askingPrice.toLocaleString()}
+                        </p>
+                        {item.offerAmount && (
+                          <p className="text-sm font-medium">
+                            Offer: {item.currency}{" "}
+                            {item.offerAmount.toLocaleString()}
+                          </p>
+                        )}
+                        {isBuyer && (
+                          <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                            <strong>Next:</strong> {buyerNextStep(item)}
+                          </p>
+                        )}
+                      </div>
+                      {item.status === "OFFERED" && item.offerAmount && (
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" asChild>
+                            <Link
+                              href={`/dashboard/documents?${canAccept ? "" : "view=templates&"}saleId=${item.id}&type=PROPERTY_SALE_LETTER_OF_OFFER&amount=${item.offerAmount}&currency=${item.currency}`}
+                            >
+                              {canAccept
+                                ? "Review and sign letter of offer"
+                                : "Prepare letter of offer"}
+                            </Link>
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" asChild>
+                        <Link
+                          href={`/dashboard/unit/details/${item.unitId}?p=${item.propertyId}&from=sale-units`}
+                        >
+                          View unit
+                        </Link>
+                      </Button>
+                      {(canManage ||
+                        canAccept ||
+                        permissions.includes("view_lease_document")) && (
+                        <Button size="sm" variant="outline" asChild>
+                          <Link href={`/dashboard/documents?saleId=${item.id}`}>
+                            View letters, agreements and signing status
+                          </Link>
+                        </Button>
+                      )}
+                      {canManage && permissions.includes("edit_unit") && (
+                        <Button size="sm" asChild>
+                          <Link
+                            href={`/dashboard/unit/details/${item.unitId}?p=${item.propertyId}&from=sale-units`}
+                          >
+                            Manage unit
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
+                    {canAccept && item.escrowInvoiceId && (
+                      <Button size="sm" asChild>
+                        <Link
+                          href={`/dashboard/invoices?invoiceId=${item.escrowInvoiceId}`}
+                        >
+                          Pay sale invoice #{item.escrowInvoiceId}
+                        </Link>
+                      </Button>
+                    )}
+                    {!item.buyerUserId && item.status === "OFFERED" && (
+                      <p className="text-sm text-amber-700">
+                        The buyer must complete the email invitation before a
+                        letter can be generated.
+                      </p>
+                    )}
+                    {item.status === "AGREEMENT" && (
+                      <Button size="sm" variant="outline" asChild>
+                        <Link
+                          href={`/dashboard/documents?${canManage ? "view=templates&" : ""}saleId=${item.id}&type=PROPERTY_SALE_AGREEMENT&amount=${item.offerAmount}&currency=${item.currency}`}
+                        >
+                          {canManage
+                            ? "Prepare sale agreement"
+                            : "Review sale agreement"}
+                        </Link>
+                      </Button>
+                    )}
+                    {canManage && (
+                      <div className="space-y-3 border-t pt-3">
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="space-y-1">
+                            <Label htmlFor={`offer-${item.id}`}>
+                              Offer amount
+                            </Label>
+                            <Input
+                              id={`offer-${item.id}`}
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={offerAmounts[item.id] ?? ""}
+                              onChange={(event) =>
+                                setOfferAmounts((current) => ({
+                                  ...current,
+                                  [item.id]: event.target.value,
+                                }))
+                              }
+                              placeholder="Required when recording an offer"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor={`reason-${item.id}`}>
+                              Cancellation reason
+                            </Label>
+                            <Input
+                              id={`reason-${item.id}`}
+                              maxLength={1000}
+                              value={reasons[item.id] ?? ""}
+                              onChange={(event) =>
+                                setReasons((current) => ({
+                                  ...current,
+                                  [item.id]: event.target.value,
+                                }))
+                              }
+                              placeholder="Required only for cancellation"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {(managerNext[item.status] ?? []).map((status) => (
+                            <Button
+                              key={status}
+                              size="sm"
+                              variant={
+                                status === "CANCELLED"
+                                  ? "destructive"
+                                  : "outline"
+                              }
+                              disabled={busy}
+                              onClick={() => void advance(item, status)}
+                            >
+                              {status === "OFFERED"
+                                ? "Record offer"
+                                : label(status)}
+                            </Button>
+                          ))}
+                        </div>
+                        <details
+                          onToggle={(event) => {
+                            if (
+                              event.currentTarget.open &&
+                              !milestones[item.id]
+                            )
+                              void loadMilestones(item.id);
+                          }}
+                          className="rounded-md bg-muted/40 p-3"
+                        >
+                          <summary className="cursor-pointer font-medium">
+                            Due diligence, verified payment and handover
+                            evidence
+                          </summary>
+                          <div className="mt-3 space-y-3">
+                            <Select
+                              value={milestoneType[item.id] ?? ""}
+                              onValueChange={(value) =>
+                                setMilestoneType((current) => ({
+                                  ...current,
+                                  [item.id]: value as SaleMilestoneType,
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="max-w-md">
+                                <SelectValue placeholder="Select milestone" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {milestoneTypes.map((type) => (
+                                  <SelectItem key={type} value={type}>
+                                    {label(type)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {milestoneType[item.id] === "ESCROW_FUNDED" ? (
+                              item.escrowInvoiceId ? (
+                                <div className="space-y-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                                  <p>
+                                    <strong>
+                                      Buyer escrow invoice #
+                                      {item.escrowInvoiceId}
+                                    </strong>{" "}
+                                    · {item.currency}{" "}
+                                    {item.escrowRequiredAmount?.toLocaleString()}
+                                  </p>
+                                  <p className="text-muted-foreground">
+                                    The buyer pays this invoice from Billing.
+                                    SlickHood will record escrow only after the
+                                    linked invoice is fully reconciled.
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button size="sm" variant="outline" asChild>
+                                      <Link href="/dashboard/invoices">
+                                        Open Billing
+                                      </Link>
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      disabled={busy}
+                                      onClick={() => void addMilestone(item)}
+                                    >
+                                      Verify paid invoice and record escrow
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : item.status === "RESERVED" ||
+                                item.status === "DUE_DILIGENCE" ||
+                                item.status === "AGREEMENT" ||
+                                item.status === "COMPLETION" ? (
+                                <div className="space-y-3 rounded-md border p-3">
+                                  <div className="max-w-md space-y-1">
+                                    <Label htmlFor={`escrow-${item.id}`}>
+                                      Contractual escrow amount
+                                    </Label>
+                                    <Input
+                                      id={`escrow-${item.id}`}
+                                      type="number"
+                                      min="0.01"
+                                      max={item.offerAmount}
+                                      step="0.01"
+                                      placeholder={`Maximum ${item.currency} ${item.offerAmount?.toLocaleString() ?? ""}`}
+                                      value={milestoneAmount[item.id] ?? ""}
+                                      onChange={(event) =>
+                                        setMilestoneAmount((current) => ({
+                                          ...current,
+                                          [item.id]: event.target.value,
+                                        }))
+                                      }
+                                    />
+                                  </div>
+                                  <div className="max-w-md space-y-1">
+                                    <Label>Settlement account</Label>
+                                    <Select
+                                      value={escrowAccountId[item.id] ?? ""}
+                                      onValueChange={(value) =>
+                                        setEscrowAccountId((current) => ({
+                                          ...current,
+                                          [item.id]: value,
+                                        }))
+                                      }
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select verified Property Sales account" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {paymentAccounts.map((account) => (
+                                          <SelectItem
+                                            key={account.id}
+                                            value={String(account.id)}
+                                          >
+                                            {account.name} ·{" "}
+                                            {account.channelDisplayName ??
+                                              account.channel}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    {paymentAccounts.length === 0 && (
+                                      <p className="text-sm text-amber-700">
+                                        No verified account is available.{" "}
+                                        <Link
+                                          className="font-medium underline"
+                                          href="/dashboard/sales/accounts"
+                                        >
+                                          Open Sales Payment Setup
+                                        </Link>
+                                        .
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    disabled={
+                                      busy ||
+                                      !item.offerAmount ||
+                                      !escrowAccountId[item.id]
+                                    }
+                                    onClick={() =>
+                                      void createEscrowInvoice(item)
+                                    }
+                                  >
+                                    Create buyer escrow invoice
+                                  </Button>
+                                </div>
+                              ) : (
+                                <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                                  Accept the signed offer first. Escrow becomes
+                                  available when the sale is reserved.
+                                </p>
+                              )
+                            ) : milestoneType[item.id] ? (
+                              <div className="space-y-3">
+                                {milestoneType[item.id] ===
+                                "AGREEMENT_SIGNED" ? (
+                                  <p className="rounded-md border bg-blue-50 p-3 text-sm text-blue-900">
+                                    SlickHood will use the fully signed Property
+                                    Sale Agreement automatically.
+                                  </p>
+                                ) : (
+                                  <div className="max-w-md space-y-1">
+                                    <Label htmlFor={`evidence-${item.id}`}>
+                                      Supporting evidence
+                                    </Label>
+                                    <Input
+                                      id={`evidence-${item.id}`}
+                                      type="file"
+                                      accept="application/pdf,image/jpeg,image/png"
+                                      onChange={(event) =>
+                                        setEvidenceFiles((current) => ({
+                                          ...current,
+                                          [item.id]: event.target.files?.[0],
+                                        }))
+                                      }
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                      Private PDF, JPG or PNG · maximum 10 MB.
+                                    </p>
+                                  </div>
+                                )}
+                                {milestoneType[item.id] !==
+                                  "AGREEMENT_SIGNED" && (
+                                  <>
+                                    <Label htmlFor={`evidence-ref-${item.id}`}>
+                                      Supporting record reference
+                                    </Label>
+                                    <Input
+                                      id={`evidence-ref-${item.id}`}
+                                      required
+                                      maxLength={120}
+                                      value={evidenceReferences[item.id] ?? ""}
+                                      onChange={(event) =>
+                                        setEvidenceReferences((current) => ({
+                                          ...current,
+                                          [item.id]: event.target.value,
+                                        }))
+                                      }
+                                    />
+                                    <Label htmlFor={`evidence-note-${item.id}`}>
+                                      Verification notes
+                                    </Label>
+                                    <Textarea
+                                      id={`evidence-note-${item.id}`}
+                                      required
+                                      maxLength={1000}
+                                      value={evidenceNotes[item.id] ?? ""}
+                                      onChange={(event) =>
+                                        setEvidenceNotes((current) => ({
+                                          ...current,
+                                          [item.id]: event.target.value,
+                                        }))
+                                      }
+                                    />
+                                    <p className="text-sm text-muted-foreground">
+                                      Identify the external due-diligence,
+                                      registry or handover record and the checks
+                                      performed.
+                                    </p>
+                                  </>
+                                )}
+                                <Button
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() => void addMilestone(item)}
+                                >
+                                  Record completed milestone
+                                </Button>
+                              </div>
+                            ) : null}
+                            <div className="space-y-1">
+                              {(milestones[item.id] ?? []).map((milestone) => (
+                                <div
+                                  key={milestone.id}
+                                  className="flex flex-wrap justify-between gap-2 rounded border bg-background px-3 py-2 text-sm"
+                                >
+                                  <span>
+                                    {label(milestone.milestoneType)} ·{" "}
+                                    {label(milestone.status)}
+                                  </span>
+                                  <span className="text-muted-foreground">
+                                    {milestone.amount
+                                      ? `${milestone.currency} ${milestone.amount.toLocaleString()} · `
+                                      : ""}
+                                    {milestone.externalReference ??
+                                      (milestone.evidenceDocumentId
+                                        ? "Signed agreement"
+                                        : "")}
+                                  </span>
+                                </div>
+                              ))}
+                              {(saleEvidence[item.id] ?? []).map((evidence) => (
+                                <a
+                                  key={evidence.id}
+                                  href={evidence.downloadUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block rounded border bg-background px-3 py-2 text-sm underline"
+                                >
+                                  {label(evidence.category)} ·{" "}
+                                  {evidence.displayName}
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              {!loadError && totalPages > 1 && (
+                <div className="flex items-center justify-between border-t pt-4">
+                  <Button
+                    variant="outline"
+                    disabled={page === 0 || loading}
+                    onClick={() => setPage((value) => value - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {page + 1} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    disabled={page >= totalPages - 1 || loading}
+                    onClick={() => setPage((value) => value + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </RequireRole>
+  );
 }
