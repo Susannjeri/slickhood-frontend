@@ -314,10 +314,15 @@ export default function PropertyAccountsSheet({
                           </p>
                           <AccountBadges account={account} />
                           {!account.verified && (
-                            <p className="flex items-center gap-1 text-[11px] text-amber-700 mt-1">
-                              <AlertTriangle className="w-3 h-3 shrink-0" />
-                              Complete its setup and mark it Ready for payments before attaching it.
-                            </p>
+                            <div className="mt-1 space-y-1">
+                              <p className="flex items-center gap-1 text-[11px] text-amber-700">
+                                <AlertTriangle className="w-3 h-3 shrink-0" />
+                                Complete its setup and mark it Ready for payments before attaching it.
+                              </p>
+                              <Link href={createAccountHref} className="inline-flex items-center gap-1 text-xs font-medium text-[#EF4217] hover:underline">
+                                Complete account setup <ExternalLink className="size-3" />
+                              </Link>
+                            </div>
                           )}
                         </div>
                         <Button
@@ -377,6 +382,9 @@ export default function PropertyAccountsSheet({
                     <Plus className="w-4 h-4 mr-2" />
                     Attach account
                   </Button>
+                  <Link href={createAccountHref} className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-[#EF4217] hover:underline">
+                    Create or complete a receiving account <ExternalLink className="size-3" />
+                  </Link>
                 </div>
               ) : (
                 <ul className="space-y-2">

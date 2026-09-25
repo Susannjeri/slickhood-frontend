@@ -140,6 +140,18 @@ test("property list renders the role-scoped API envelope", async ({ page }) => {
 
   await expect(page.getByText("Green Court", { exact: true })).toBeVisible();
   await expect(page.getByText(/Cannot read properties of undefined/i)).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Landlord workflow" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Receiving accounts" })).toHaveAttribute("href", "/dashboard/accounts");
+});
+
+test("missing receiving accounts provide a direct recovery action", async ({ page }) => {
+  await page.unroute("**/account/list**");
+  await page.route("**/account/list**", route => route.fulfill({ json: envelope([]) }));
+  await page.goto("/dashboard/property/create");
+  await page.getByRole("button", { name: /Rental property/i }).click();
+  await expect(page.getByText(/No compatible payment-ready account is available/i)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Create or complete an account first" })).toHaveAttribute("href", "/dashboard/accounts");
+  await expect(page.getByRole("button", { name: "Create property" })).toBeDisabled();
 });
 
 test("property list preserves the API failure and offers a working retry", async ({ page }) => {

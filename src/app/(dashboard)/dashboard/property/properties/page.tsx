@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useApi } from "@/hooks/useApi";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,10 @@ import {
   MapPin,
   Loader2,
   SlidersHorizontal,
+  ArrowRight,
+  Building2,
+  FileSignature,
+  Wallet,
 } from "lucide-react";
 import {
   Select,
@@ -187,6 +192,20 @@ export default function PropertiesPage() {
           </div>
         </div>
       </div>
+
+      <Can roles={["Landlord"]}><section aria-labelledby="landlord-workflow-title" className="rounded-xl border border-orange-200 bg-orange-50/50 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl">
+            <h2 id="landlord-workflow-title" className="font-semibold text-[#141130]">Landlord workflow</h2>
+            <p className="mt-1 text-sm text-slate-600">Follow the next relevant task. Missing setup items take you directly to the screen where you can resolve them.</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[620px]">
+            <Can permissions={["create_property"]}><Link href="/dashboard/property/create" className="group flex min-h-12 items-center gap-3 rounded-lg border bg-white px-3 py-2 text-sm font-medium text-[#141130] hover:border-[#EF4217]"><Building2 className="size-4 text-[#EF4217]" /> Add property <ArrowRight className="ml-auto size-4 transition-transform group-hover:translate-x-0.5" /></Link></Can>
+            <Can permissions={["view_account"]}><Link href="/dashboard/accounts" className="group flex min-h-12 items-center gap-3 rounded-lg border bg-white px-3 py-2 text-sm font-medium text-[#141130] hover:border-[#EF4217]"><Wallet className="size-4 text-[#EF4217]" /> Receiving accounts <ArrowRight className="ml-auto size-4 transition-transform group-hover:translate-x-0.5" /></Link></Can>
+            <Can permissions={["view_lease_document"]}><Link href="/dashboard/documents" className="group flex min-h-12 items-center gap-3 rounded-lg border bg-white px-3 py-2 text-sm font-medium text-[#141130] hover:border-[#EF4217]"><FileSignature className="size-4 text-[#EF4217]" /> Review documents <ArrowRight className="ml-auto size-4 transition-transform group-hover:translate-x-0.5" /></Link></Can>
+          </div>
+        </div>
+      </section></Can>
 
       {/* Filters Bar */}
       <div className="bg-white p-4 rounded-lg border shadow-sm space-y-4 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
