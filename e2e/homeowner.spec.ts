@@ -10,7 +10,7 @@ test.beforeEach(async ({ context, page }) => {
   await page.route("**/property/type**", route => route.fulfill({ json: envelope([{ id: "APARTMENT", name: "Apartment" }]) }));
   await page.route("**/property/unit/type**", route => route.fulfill({ json: envelope([{ id: 1, name: "Apartment" }]) }));
   await page.route("**/property/measurement/units**", route => route.fulfill({ json: envelope([{ id: 1, name: "sqm" }]) }));
-  await page.route("**/property/unit/list?propertyId=11&unitId=77", route => route.fulfill({
+  await page.route("**/property/unit/77", route => route.fulfill({
     json: envelope({
       propertyId: 11,
       ref: "A-101",
@@ -30,6 +30,7 @@ test.beforeEach(async ({ context, page }) => {
       templateId: null,
     }),
   }));
+  await page.route("**/property/unit/77/images", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/property/unit/charges?unitId=77", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/invite/list**", route => route.fulfill({ json: envelope([]) }));
   await page.route("**/maintenance/unit/77", route => route.fulfill({ json: envelope([]) }));

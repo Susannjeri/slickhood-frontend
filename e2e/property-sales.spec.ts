@@ -12,10 +12,9 @@ test("sale unit exposes its live status and opens the prefilled buyer invitation
  await page.route("**/maintenance/unit/77",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[]}}));
  await page.route("**/lease/documents**",route=>route.fulfill({json:pageEnvelope([])}));
  await page.route("**/property/list**",route=>route.fulfill({json:pageEnvelope([{id:11,name:"Acacia Court",managementMode:"SALE"}])}));
- await page.route("**/property/unit/list**",route=>{
-  const unit={unitId:77,propertyId:11,ref:"A-07",unitType:"TWO_BEDROOM",propertyType:"APARTMENT",size:88,measurementUnits:{id:1,name:"sqm"},utilities:[],currency:"KES",price:15000000,leaseMode:"SALE",occupied:false,advertise:false,thumbnail:"",images:[],templateId:null,lifecycle:{code:"AVAILABLE_SALE",label:"Available for sale",description:"No buyer journey is active.",invitationBlocked:false,activeInviteId:null,journeyId:null}};
-  return route.fulfill({json:page.url().includes("/unit/details/")?{success:true,code:"s00000",description:"Success",data:unit}:pageEnvelope([unit])});
- });
+ const unit={unitId:77,propertyId:11,ref:"A-07",unitType:"TWO_BEDROOM",propertyType:"APARTMENT",size:88,measurementUnits:{id:1,name:"sqm"},utilities:[],currency:"KES",price:15000000,leaseMode:"SALE",occupied:false,advertise:false,thumbnail:"",images:[],templateId:null,lifecycle:{code:"AVAILABLE_SALE",label:"Available for sale",description:"No buyer journey is active.",invitationBlocked:false,activeInviteId:null,journeyId:null}};
+ await page.route("**/property/unit/77",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:unit}}));
+ await page.route("**/property/unit/77/images",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[]}}));
  await page.route("**/account/list**",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:81,name:"Sales collections",channel:"MPESA",category:"PROPERTY_SALES",active:true,verified:true}]}}));
  await page.route("**/lease/documents/templates",route=>route.fulfill({json:{success:true,code:"s00000",description:"Success",data:[{id:9,documentType:"PROPERTY_SALE_LETTER_OF_OFFER",legalReviewRequired:false,legalReviewedAt:"2026-09-01T10:00:00"}]}}));
  await page.route("**/sales**",route=>new URL(route.request().url()).pathname==="/dashboard/sales"
