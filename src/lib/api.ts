@@ -91,6 +91,7 @@ export interface HelpDeskSupportSummary { waitingForSupport: number; unassigned:
 
 export interface HelpDeskArticle {
   id: number;
+  serialNumber?: number;
   slug: string;
   title: string;
   category: string;
@@ -121,7 +122,7 @@ export const addHelpInternalNote = (conversationId: number, message: string) =>
 export const claimHelpConversation = (conversationId: number) => API.post(`/helpdesk/admin/conversations/${conversationId}/claim`);
 export const resolveHelpConversation = (conversationId: number) =>
   API.post(`/helpdesk/admin/conversations/${conversationId}/resolve`);
-export const saveHelpArticle = (article: Omit<HelpDeskArticle, "id">, id?: number) =>
+export const saveHelpArticle = (article: Omit<HelpDeskArticle, "id" | "serialNumber">, id?: number) =>
   id ? API.put(`/helpdesk/admin/articles/${id}`, article) : API.post("/helpdesk/admin/articles", article);
 export const createGuestHelpConversation = (subject: string, category: string, pageContext?: string) =>
   API.post("/helpdesk/public/conversations", { subject, category, pageContext });

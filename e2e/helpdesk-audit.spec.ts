@@ -43,22 +43,23 @@ test("customer can reopen a resolved case", async ({ context, page }) => {
   await expect(page.getByRole("button", { name: "Support queue", exact: true })).toHaveCount(0);
 });
 
-test("superadmin imports manual drafts without silently publishing", async ({ context, page }) => {
+test("superadmin synchronises the governed manual without silently publishing", async ({ context, page }) => {
   await authenticated(context, page, { title: "Superadmin", permissions: ["manage_helpdesk_articles"] });
   await page.route("**/helpdesk/articles", r => r.fulfill({ json: envelope([]) }));
   await page.route("**/helpdesk/conversations?**", r => r.fulfill({ json: envelope([]) }));
   const articles: object[] = [];
   await page.route("**/helpdesk/admin/articles", r => r.fulfill({ json: envelope(articles) }));
   await page.route("**/helpdesk/admin/articles/manual-drafts", r => {
-    articles.push({ id: 1, slug: "manual-start", title: "Getting started manual", category: "Getting started", body: "Review the active workspace.", published: false });
-    return r.fulfill({ json: envelope({ created: 1, retained: 0 }) });
+    articles.push({ id: 91, serialNumber: 1, slug: "manual-start", title: "01 · Getting started manual", category: "Getting started", body: "Review the active workspace.", published: false });
+    return r.fulfill({ json: envelope({ created: 1, updated: 0 }) });
   });
   await page.goto("/dashboard/helpdesk");
   await page.getByRole("button", { name: "Knowledge", exact: true }).click();
-  await page.getByRole("button", { name: "Import user manual drafts" }).click();
-  await expect(page.getByText("Getting started manual", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Synchronise user manual" }).click();
+  await expect(page.getByText("01 · Getting started manual", { exact: true })).toBeVisible();
+  await expect(page.getByText("Article 01 · Reference 91", { exact: true })).toBeVisible();
   await expect(page.getByText("Draft", { exact: true })).toBeVisible();
-  await expect(page.getByText(/1 manual drafts added/)).toBeVisible();
+  await expect(page.getByText(/1 manual articles added/)).toBeVisible();
 });
 
 test("guest can request a human before asking the AI", async ({ page }) => {
