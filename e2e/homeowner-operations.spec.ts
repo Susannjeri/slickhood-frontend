@@ -3,173 +3,399 @@ import { authenticated, envelope } from "./support";
 
 function estateSetup(billingConfigured: boolean) {
   return {
-    propertyId: 11, propertyName: "Silverwood Estate", managementMode: "SERVICE_CHARGE",
-    activeUnits: 1, activeStaff: 0, operatingAccounts: billingConfigured ? 1 : 0,
-    activeHomeowners: 0, currentBudgets: 0, unitsConfigured: true, billingConfigured,
-    homeownerOperationsConfigured: false, readyForHomeownerOperations: false,
-    nextAction: billingConfigured ? "ASSIGN_HOMEOWNERS" : "LINK_OPERATING_ACCOUNT",
+    propertyId: 11,
+    propertyName: "Silverwood Estate",
+    managementMode: "SERVICE_CHARGE",
+    activeUnits: 1,
+    activeStaff: 0,
+    operatingAccounts: billingConfigured ? 1 : 0,
+    activeHomeowners: 0,
+    currentBudgets: 0,
+    unitsConfigured: true,
+    billingConfigured,
+    homeownerOperationsConfigured: false,
+    readyForHomeownerOperations: false,
+    nextAction: billingConfigured
+      ? "ASSIGN_HOMEOWNERS"
+      : "LINK_OPERATING_ACCOUNT",
   };
 }
 
-test("homeowner visitor registration offers ownership-scoped units", async ({ context, page }) => {
+test("homeowner visitor registration offers ownership-scoped units", async ({
+  context,
+  page,
+}) => {
   await authenticated(context, page, {
     title: "Homeowner",
     permissions: ["view_unit", "register_visitor", "view_visitor_list"],
   });
-  await page.route("**/visitor/list**", route => route.fulfill({ json: envelope([]) }));
-  await page.route("**/property/unit/list/by/resident", route => route.fulfill({ json: envelope([{
-    propertyName: "Silverwood Estate", propertyId: 11, unitId: 77, unitRef: "A-101",
-  }]) }));
+  await page.route("**/visitor/list**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
+  await page.route("**/property/unit/list/by/resident", (route) =>
+    route.fulfill({
+      json: envelope([
+        {
+          propertyName: "Silverwood Estate",
+          propertyId: 11,
+          unitId: 77,
+          unitRef: "A-101",
+        },
+      ]),
+    }),
+  );
 
   await page.goto("/dashboard/visitors");
   await page.getByRole("button", { name: "Register Visitor" }).click();
 
-  const unitSelect = page.locator("select").filter({ has: page.getByRole("option", { name: "A-101 — Silverwood Estate" }) });
-  await expect(page.getByRole("option", { name: "A-101 — Silverwood Estate" })).toHaveCount(1);
+  const unitSelect = page
+    .locator("select")
+    .filter({
+      has: page.getByRole("option", { name: "A-101 — Silverwood Estate" }),
+    });
+  await expect(
+    page.getByRole("option", { name: "A-101 — Silverwood Estate" }),
+  ).toHaveCount(1);
   await unitSelect.selectOption("77");
   await expect(unitSelect).toHaveValue("77");
 });
 
-test("manager termination requires a reason and sends the structured request", async ({ context, page }) => {
+test("manager termination requires a reason and sends the structured request", async ({
+  context,
+  page,
+}) => {
   await authenticated(context, page, {
     title: "EstateManager",
     permissions: ["view_estate", "manage_estate", "view_service_charge"],
     propertyIds: [11],
     propertyNames: ["Silverwood Estate"],
   });
-  await page.route("**/estate/ownership**", route => route.request().method() === "GET"
-    ? route.fulfill({ json: envelope([{ id: 9, propertyId: 11, propertyName: "Silverwood Estate", unitId: 77, unitRef: "A-101", homeownerUserId: 200, homeownerName: "Amina Owner", homeownerEmail: "amina@example.com", ownershipStart: "2026-01-01", active: true }]) })
-    : route.continue());
-  await page.route("**/property/list**", route => route.fulfill({ json: envelope([{ id: 11, name: "Silverwood Estate" }]) }));
-  await page.route("**/estate/service-charges**", route => route.fulfill({ json: envelope([]) }));
-  await page.route("**/estate/setup/properties/11", route => route.fulfill({ json: envelope(estateSetup(true)) }));
-  await page.route("**/estate/operations/properties/11/**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/estate/ownership**", (route) =>
+    route.request().method() === "GET"
+      ? route.fulfill({
+          json: envelope([
+            {
+              id: 9,
+              propertyId: 11,
+              propertyName: "Silverwood Estate",
+              unitId: 77,
+              unitRef: "A-101",
+              homeownerUserId: 200,
+              homeownerName: "Amina Owner",
+              homeownerEmail: "amina@example.com",
+              ownershipStart: "2026-01-01",
+              active: true,
+            },
+          ]),
+        })
+      : route.continue(),
+  );
+  await page.route("**/property/list**", (route) =>
+    route.fulfill({ json: envelope([{ id: 11, name: "Silverwood Estate" }]) }),
+  );
+  await page.route("**/estate/service-charges**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
+  await page.route("**/estate/setup/properties/11", (route) =>
+    route.fulfill({ json: envelope(estateSetup(true)) }),
+  );
+  await page.route("**/estate/operations/properties/11/**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
 
   await page.goto("/dashboard/estate");
-  const scopedChargeRequest = page.waitForRequest(request => request.url().includes("/estate/service-charges")
-    && new URL(request.url()).searchParams.get("propertyId") === "11");
+  const scopedChargeRequest = page.waitForRequest(
+    (request) =>
+      request.url().includes("/estate/service-charges") &&
+      new URL(request.url()).searchParams.get("propertyId") === "11",
+  );
   await page.getByLabel("Estate").click();
   await page.getByRole("option", { name: "Silverwood Estate" }).click();
-  expect(new URL((await scopedChargeRequest).url()).searchParams.get("propertyId")).toBe("11");
+  await page.getByRole("button", { name: "Charges & payments" }).click();
+  expect(
+    new URL((await scopedChargeRequest).url()).searchParams.get("propertyId"),
+  ).toBe("11");
+  await page.getByRole("button", { name: "Homeowners", exact: true }).click();
   await page.getByRole("button", { name: "End ownership" }).click();
   await page.getByLabel("Reason").fill("Property sale completed");
-  await page.route("**/estate/ownership/9/end", route => route.fulfill({ json: envelope({ id: 9, active: false }) }));
-  const requestPromise = page.waitForRequest(request => request.url().endsWith("/estate/ownership/9/end") && request.method() === "POST");
+  await page.route("**/estate/ownership/9/end", (route) =>
+    route.fulfill({ json: envelope({ id: 9, active: false }) }),
+  );
+  const requestPromise = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/estate/ownership/9/end") &&
+      request.method() === "POST",
+  );
   await page.getByRole("button", { name: "End ownership" }).last().click();
   const request = await requestPromise;
 
-  expect(request.postDataJSON()).toMatchObject({ reason: "Property sale completed" });
+  expect(request.postDataJSON()).toMatchObject({
+    reason: "Property sale completed",
+  });
   expect(request.postDataJSON().endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 });
 
-test("manager onboards a homeowner without duplicating the homeowner-unit list", async ({ context, page }) => {
+test("manager onboards a homeowner without duplicating the homeowner-unit list", async ({
+  context,
+  page,
+}) => {
   await authenticated(context, page, {
     title: "EstateOperationsManager",
     permissions: ["view_estate", "manage_estate", "view_service_charge"],
     propertyIds: [11],
     propertyNames: ["Silverwood Estate"],
   });
-  await page.route("**/estate/ownership**", route => route.fulfill({ json: envelope([]) }));
-  await page.route("**/estate/service-charges**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/estate/ownership**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
+  await page.route("**/estate/service-charges**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
   // A stale readiness response must never block the authoritative invitation endpoint.
-  await page.route("**/estate/setup/properties/11", route => route.fulfill({ json: envelope(estateSetup(false)) }));
+  await page.route("**/estate/setup/properties/11", (route) =>
+    route.fulfill({ json: envelope(estateSetup(false)) }),
+  );
   let homeownerEstateFilterRequested = false;
-  await page.route("**/property/list**", route => {
-    homeownerEstateFilterRequested = new URL(route.request().url()).searchParams.get("unitLeaseMode") === "SERVICE_CHARGE";
-    return route.fulfill({ json: envelope([{ id: 11, name: "Silverwood Estate" }]) });
+  await page.route("**/property/list**", (route) => {
+    homeownerEstateFilterRequested =
+      new URL(route.request().url()).searchParams.get("unitLeaseMode") ===
+      "SERVICE_CHARGE";
+    return route.fulfill({
+      json: envelope([{ id: 11, name: "Silverwood Estate" }]),
+    });
   });
-  await page.route("**/property/unit/list**", route => route.fulfill({ json: envelope([{
-    unitId: 77, propertyId: 11, ref: "A-101", unitType: "APARTMENT", size: 120,
-    measurementUnits: { id: 1, name: "sqm" }, currency: "KES", price: 7500, leaseMode: "SERVICE_CHARGE",
-  }]) }));
-  await page.route("**/estate/operations/properties/11/**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/property/unit/list**", (route) =>
+    route.fulfill({
+      json: envelope([
+        {
+          unitId: 77,
+          propertyId: 11,
+          ref: "A-101",
+          unitType: "APARTMENT",
+          size: 120,
+          measurementUnits: { id: 1, name: "sqm" },
+          currency: "KES",
+          price: 7500,
+          leaseMode: "SERVICE_CHARGE",
+        },
+      ]),
+    }),
+  );
+  await page.route("**/estate/operations/properties/11/**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
 
   await page.goto("/dashboard/homeowners?propertyId=11");
   await expect.poll(() => homeownerEstateFilterRequested).toBe(true);
   await page.getByRole("combobox").nth(1).click();
-  await page.getByRole("option", { name: /Silverwood Estate \/ A-101/ }).click();
+  await page
+    .getByRole("option", { name: /Silverwood Estate \/ A-101/ })
+    .click();
   await expect(page.getByText("Selected homeowner unit")).toBeVisible();
   await expect(page.getByText("120 sqm").first()).toBeVisible();
-  await page.getByLabel("Homeowner email", { exact: true }).fill("resident@example.test");
-  await page.route("**/invite/email", route => route.fulfill({ json: envelope([]) }));
-  const sent = page.waitForRequest(request => request.url().endsWith("/invite/email") && request.method() === "POST");
-  await page.getByRole("button", { name: "Send invitation & agreement", exact: true }).click();
-  expect((await sent).postDataJSON()).toMatchObject({ inviteType: "HOMEOWNER", entityId: 77, email: "resident@example.test", leaseStartDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) });
-  await expect(page.getByRole("heading", { name: "Homeowner units", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Open home & invite" })).toHaveCount(0);
+  await page
+    .getByLabel("Homeowner email", { exact: true })
+    .fill("resident@example.test");
+  await page.route("**/invite/email", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
+  const sent = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/invite/email") && request.method() === "POST",
+  );
+  await page
+    .getByRole("button", { name: "Send invitation & agreement", exact: true })
+    .click();
+  expect((await sent).postDataJSON()).toMatchObject({
+    inviteType: "HOMEOWNER",
+    entityId: 77,
+    email: "resident@example.test",
+    leaseStartDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+  });
+  await expect(
+    page.getByRole("heading", { name: "Homeowner units", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Open home & invite" }),
+  ).toHaveCount(0);
 });
 
-test("estate setup connects a ready receiving account to the selected estate", async ({ context, page }) => {
+test("estate setup connects a ready receiving account to the selected estate", async ({
+  context,
+  page,
+}) => {
   await authenticated(context, page, {
     title: "EstateManager",
-    permissions: ["view_estate", "manage_estate", "view_service_charge", "view_account", "edit_property_param"],
+    permissions: [
+      "view_estate",
+      "manage_estate",
+      "view_service_charge",
+      "view_account",
+      "edit_property_param",
+    ],
     propertyIds: [11],
     propertyNames: ["Silverwood Estate"],
   });
-  await page.route("**/property/list**", route => route.fulfill({ json: envelope([{ id: 11, name: "Silverwood Estate" }]) }));
-  await page.route("**/property/unit/list**", route => route.fulfill({ json: envelope([{
-    unitId: 77, propertyId: 11, ref: "A-101", unitType: "APARTMENT", size: 120,
-    measurementUnits: { id: 1, name: "sqm" }, currency: "KES", price: 7500, leaseMode: "SERVICE_CHARGE",
-  }]) }));
-  await page.route("**/estate/ownership**", route => route.fulfill({ json: envelope([]) }));
-  await page.route("**/estate/service-charges**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/property/list**", (route) =>
+    route.fulfill({ json: envelope([{ id: 11, name: "Silverwood Estate" }]) }),
+  );
+  await page.route("**/property/unit/list**", (route) =>
+    route.fulfill({
+      json: envelope([
+        {
+          unitId: 77,
+          propertyId: 11,
+          ref: "A-101",
+          unitType: "APARTMENT",
+          size: 120,
+          measurementUnits: { id: 1, name: "sqm" },
+          currency: "KES",
+          price: 7500,
+          leaseMode: "SERVICE_CHARGE",
+        },
+      ]),
+    }),
+  );
+  await page.route("**/estate/ownership**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
+  await page.route("**/estate/service-charges**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
   let accountConnected = false;
-  await page.route("**/estate/setup/properties/11", route => route.fulfill({ json: envelope(estateSetup(accountConnected)) }));
-  await page.route("**/estate/operations/properties/11/**", route => route.fulfill({ json: envelope([]) }));
-  await page.route("**/account/list**", route => {
-    const propertyId = new URL(route.request().url()).searchParams.get("propertyId");
-    return route.fulfill({ json: envelope(propertyId ? [] : [{
-      id: 501, name: "Estate collections", channel: "MPESA_BANK", channelDisplayName: "M-Pesa bank Paybill",
-      category: "ESTATE_MANAGEMENT", active: true, verified: true,
-    }]) });
+  await page.route("**/estate/setup/properties/11", (route) =>
+    route.fulfill({ json: envelope(estateSetup(accountConnected)) }),
+  );
+  await page.route("**/estate/operations/properties/11/**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
+  await page.route("**/account/list**", (route) => {
+    const propertyId = new URL(route.request().url()).searchParams.get(
+      "propertyId",
+    );
+    return route.fulfill({
+      json: envelope(
+        propertyId
+          ? []
+          : [
+              {
+                id: 501,
+                name: "Estate collections",
+                channel: "MPESA_BANK",
+                channelDisplayName: "M-Pesa bank Paybill",
+                category: "ESTATE_MANAGEMENT",
+                active: true,
+                verified: true,
+              },
+            ],
+      ),
+    });
   });
-  await page.route("**/property/account/add", route => {
+  await page.route("**/property/account/add", (route) => {
     accountConnected = true;
     return route.fulfill({ json: envelope(null) });
   });
 
   await page.goto("/dashboard/estate?propertyId=11");
-  await expect(page.getByText("Connection required", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Connect account to Silverwood Estate" }).click();
+  await expect(
+    page.getByText("Connection required", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Connect account to Silverwood Estate" })
+    .click();
   await page.getByRole("button", { name: "Attach account" }).first().click();
-  const requestPromise = page.waitForRequest(request => request.url().endsWith("/property/account/add")
-    && request.method() === "POST");
+  const requestPromise = page.waitForRequest(
+    (request) =>
+      request.url().endsWith("/property/account/add") &&
+      request.method() === "POST",
+  );
   await page.getByRole("button", { name: "Attach", exact: true }).click();
 
   const request = await requestPromise;
   expect(request.postDataJSON()).toEqual({ accountId: 501, propertyId: 11 });
-  await expect(page.getByText("Connected & ready", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Connected & ready", { exact: true }),
+  ).toBeVisible();
 });
 
-test("authoritative homeowner invitation rejection opens account connection", async ({ context, page }) => {
+test("authoritative homeowner invitation rejection opens account connection", async ({
+  context,
+  page,
+}) => {
   await authenticated(context, page, {
     title: "EstateManager",
-    permissions: ["view_estate", "manage_estate", "view_service_charge", "view_account", "edit_property_param"],
+    permissions: [
+      "view_estate",
+      "manage_estate",
+      "view_service_charge",
+      "view_account",
+      "edit_property_param",
+    ],
     propertyIds: [11],
     propertyNames: ["Silverwood Estate"],
   });
-  await page.route("**/property/list**", route => route.fulfill({ json: envelope([{ id: 11, name: "Silverwood Estate" }]) }));
-  await page.route("**/property/unit/list**", route => route.fulfill({ json: envelope([{
-    unitId: 77, propertyId: 11, ref: "A-101", unitType: "APARTMENT", size: 120,
-    measurementUnits: { id: 1, name: "sqm" }, currency: "KES", price: 7500, leaseMode: "SERVICE_CHARGE",
-  }]) }));
-  await page.route("**/estate/ownership**", route => route.fulfill({ json: envelope([]) }));
-  await page.route("**/estate/service-charges**", route => route.fulfill({ json: envelope([]) }));
-  await page.route("**/estate/setup/properties/11", route => route.fulfill({ json: envelope(estateSetup(false)) }));
-  await page.route("**/account/list**", route => route.fulfill({ json: envelope([]) }));
+  await page.route("**/property/list**", (route) =>
+    route.fulfill({ json: envelope([{ id: 11, name: "Silverwood Estate" }]) }),
+  );
+  await page.route("**/property/unit/list**", (route) =>
+    route.fulfill({
+      json: envelope([
+        {
+          unitId: 77,
+          propertyId: 11,
+          ref: "A-101",
+          unitType: "APARTMENT",
+          size: 120,
+          measurementUnits: { id: 1, name: "sqm" },
+          currency: "KES",
+          price: 7500,
+          leaseMode: "SERVICE_CHARGE",
+        },
+      ]),
+    }),
+  );
+  await page.route("**/estate/ownership**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
+  await page.route("**/estate/service-charges**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
+  await page.route("**/estate/setup/properties/11", (route) =>
+    route.fulfill({ json: envelope(estateSetup(false)) }),
+  );
+  await page.route("**/account/list**", (route) =>
+    route.fulfill({ json: envelope([]) }),
+  );
   let invitationAttempted = false;
-  await page.route("**/invite/email", route => {
+  await page.route("**/invite/email", (route) => {
     invitationAttempted = true;
-    return route.fulfill({ status: 400, json: { success: false, code: "S00361", description: "Receiving account required" } });
+    return route.fulfill({
+      status: 400,
+      json: {
+        success: false,
+        code: "S00361",
+        description: "Receiving account required",
+      },
+    });
   });
 
   await page.goto("/dashboard/estate?propertyId=11");
   await page.getByRole("combobox").nth(1).click();
-  await page.getByRole("option", { name: /Silverwood Estate \/ A-101/ }).click();
-  await page.getByLabel("Homeowner email", { exact: true }).fill("resident@example.test");
-  await page.getByRole("button", { name: "Send invitation & agreement", exact: true }).click();
+  await page
+    .getByRole("option", { name: /Silverwood Estate \/ A-101/ })
+    .click();
+  await page
+    .getByLabel("Homeowner email", { exact: true })
+    .fill("resident@example.test");
+  await page
+    .getByRole("button", { name: "Send invitation & agreement", exact: true })
+    .click();
 
-  await expect(page.getByRole("heading", { name: "Payment Accounts" })).toBeVisible();
-  await expect(page.getByText("No payment accounts attached to this property")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Payment Accounts" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No payment accounts attached to this property"),
+  ).toBeVisible();
   expect(invitationAttempted).toBe(true);
 });

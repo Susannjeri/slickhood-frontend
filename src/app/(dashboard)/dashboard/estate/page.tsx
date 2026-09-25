@@ -571,6 +571,13 @@ function EstateWorkspace() {
                     : outstandingLabel}
               </CardTitle>
             </CardHeader>
+            {billing.error && (
+              <CardContent className="pt-0">
+                <Button size="sm" variant="outline" onClick={billing.retry}>
+                  Retry service charges
+                </Button>
+              </CardContent>
+            )}
           </Card>
           <Card>
             <CardHeader className="pb-2">
@@ -585,6 +592,16 @@ function EstateWorkspace() {
                     : overdue.length}
               </CardTitle>
             </CardHeader>
+            {!billing.loading && !billing.error && overdue.length > 0 && (
+              <CardContent className="pt-0">
+                <Badge
+                  variant="outline"
+                  className="border-red-200 bg-red-50 text-red-700"
+                >
+                  OVERDUE
+                </Badge>
+              </CardContent>
+            )}
           </Card>
         </div>
       )}
