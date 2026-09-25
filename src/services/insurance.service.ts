@@ -20,7 +20,7 @@ export type InsuranceRenewalOffer={id:number;policyId:number;quoteNumber:string;
 export type InsuranceRenewalPayment={id:number;policyId:number;renewalOfferId:number;paymentConfigurationId:number;amount:number;currency:string;paymentReference:string;paidAt:string;status:string;rejectionReason?:string;remittanceReference?:string;remittedAt?:string;proofAvailable:boolean;proofContentType?:string};
 export type InsuranceRenewalJourney={policyId:number;companyCode:string;offer?:InsuranceRenewalOffer;payment?:InsuranceRenewalPayment};
 export type InsuranceClaim={id:number;policyId:number;policyNumber:string;reference:string;status:string;incidentAt:string;incidentLocation?:string;description:string;estimatedAmount?:number;insurerReference?:string;resolutionNotes?:string};
-export type InsuranceDocument={id:number;caseId?:number;policyId?:number;claimId?:number;category:string;displayName:string;contentType:string;fileSize:number;checksumSha256:string;downloadUrl:string;versionNumber:number};
+export type InsuranceDocument={id:number;caseId?:number;policyId?:number;claimId?:number;category:string;displayName:string;contentType:string;fileSize:number;checksumSha256:string;downloadUrl?:string|null;versionNumber:number};
 export type InsuranceOperationsSummary={openCases:number;unassignedCases:number;paymentsAwaitingVerification:number;openClaims:number;renewalsDue:number};
 export type InsuranceStaff={id:number;fullName:string;email:string;roleName:string};
 export type PageResult<T>={content:T[];totalElements:number;totalPages:number;number:number;size:number};
@@ -80,6 +80,7 @@ export const insuranceService={
  claims:async()=>envelopeList<InsuranceClaim>(await API.get("/insurance/claims")),
  createClaim:async(payload:Record<string,unknown>)=>envelopeItem<InsuranceClaim>(await API.post("/insurance/claims",payload),{} as InsuranceClaim),
  documents:async()=>envelopeList<InsuranceDocument>(await API.get("/insurance/documents")),
+ document:async(id:number)=>envelopeItem<InsuranceDocument>(await API.get(`/insurance/documents/${id}`),{} as InsuranceDocument),
  uploadDocument:async(payload:{caseId?:number;policyId?:number;claimId?:number;category:string;file:File})=>{const f=new FormData();if(payload.caseId)f.append("caseId",String(payload.caseId));if(payload.policyId)f.append("policyId",String(payload.policyId));if(payload.claimId)f.append("claimId",String(payload.claimId));f.append("category",payload.category);f.append("file",payload.file);return envelopeItem<InsuranceDocument>(await API.post("/insurance/documents",f),{} as InsuranceDocument)},
  operationsSummary:async()=>envelopeItem<InsuranceOperationsSummary>(await API.get("/insurance/admin/operations/summary"),{openCases:0,unassignedCases:0,paymentsAwaitingVerification:0,openClaims:0,renewalsDue:0}),
  operationsStaff:async()=>envelopeList<InsuranceStaff>(await API.get("/insurance/admin/staff")),

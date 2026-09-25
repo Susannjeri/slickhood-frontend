@@ -502,6 +502,18 @@ export default function InsuranceOperationsPage() {
       });
     }
   }
+  async function openDocument(id: number) {
+    const popup = window.open("about:blank", "_blank", "noopener,noreferrer");
+    try {
+      const document = await insuranceService.document(id);
+      if (!document.downloadUrl) throw new Error("Download link unavailable");
+      if (popup) popup.location.href = document.downloadUrl;
+      else window.location.assign(document.downloadUrl);
+    } catch (error: unknown) {
+      popup?.close();
+      toast.error(apiErrorMessage(error, "This attachment could not be opened securely."));
+    }
+  }
   function createQuoteFromResponse(message: InsuranceEmailExchange) {
     if (!correspondence) return;
     const company = companies.find((value) => value.code === message.companyCode);
@@ -745,11 +757,9 @@ export default function InsuranceOperationsPage() {
                     <strong>{title(document.category)}</strong>
                     <p className="text-sm text-muted-foreground">{document.displayName}</p>
                   </div>
-                  <Button asChild size="sm" variant="outline">
-                    <a href={document.downloadUrl} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="mr-2 size-4" />
-                      Open
-                    </a>
+                  <Button type="button" size="sm" variant="outline" onClick={() => void openDocument(document.id)}>
+                    <ExternalLink className="mr-2 size-4" />
+                    Open
                   </Button>
                 </div>
               ))
