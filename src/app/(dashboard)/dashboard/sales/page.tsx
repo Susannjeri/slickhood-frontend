@@ -175,6 +175,7 @@ function SalesWorkspace() {
   } | null>(null);
   const [activeTask, setActiveTask] = useState<SalesTask>(() =>
     isBuyer ||
+    !canManage ||
     (Number.isSafeInteger(requestedSaleId) && requestedSaleId > 0) ||
     (canManage && !permissions.includes("view_unit"))
       ? "pipeline"
