@@ -262,6 +262,8 @@ export default function ViewUnitPage() {
   const unitId = params?.id as string;
   const propertyId = searchParams?.get("p") as string;
   const origin = parseUnitOrigin(searchParams?.get("from"));
+  const requestedInquiryId = Number(searchParams?.get("inquiryId"));
+  const inviteFromEnquiry = searchParams?.get("invite") === "tenant";
   const backHref = unitListHref(origin, propertyId);
 
   const {
@@ -310,6 +312,7 @@ export default function ViewUnitPage() {
   const [createInviteOpen, setCreateInviteOpen] = useState(false);
   const [shareInviteOpen, setShareInviteOpen] = useState(false);
   const [occupantEmail, setOccupantEmail] = useState("");
+  const [listingInquiry, setListingInquiry] = useState<{id:number;propertyId:number;unitId:number;name:string;email:string;phone?:string;message:string}|null>(null);
   const [leaseStartDate, setLeaseStartDate] = useState("");
   const [leaseEndDate, setLeaseEndDate] = useState("");
   const [selectedInviteId, setSelectedInviteId] = useState<number | null>(null);
@@ -398,6 +401,20 @@ export default function ViewUnitPage() {
       loadUnitDetails();
     }
   }, [unitId, isLoadingTypes, activeRole]);
+
+  useEffect(() => {
+    if (!unit || !inviteFromEnquiry || !Number.isSafeInteger(requestedInquiryId) || requestedInquiryId <= 0) return;
+    try {
+      const value = JSON.parse(sessionStorage.getItem(`listing-inquiry:${requestedInquiryId}`) ?? "null");
+      if (value?.id === requestedInquiryId && value.propertyId === Number(propertyId) && value.unitId === Number(unitId)) {
+        setListingInquiry(value);
+        setOccupantEmail(value.email ?? "");
+        setCreateInviteOpen(true);
+      }
+    } catch {
+      // An invalid local handoff never bypasses the normal invitation form or its validation.
+    }
+  }, [unit, inviteFromEnquiry, requestedInquiryId, propertyId, unitId]);
 
   const loadUnitDetails = async () => {
     try {
@@ -907,6 +924,7 @@ export default function ViewUnitPage() {
             <DialogDescription>{occupantLabel === "Tenant" ? "Set the lease period and tenant email. SlickHood will freeze these terms and send a secure invitation." : "Enter the homeowner email and agreement effective date. SlickHood will freeze the approved agreement, send a secure invitation, and present it for signature after identity verification."}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
+              {listingInquiry && occupantLabel === "Tenant" && <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm"><p className="font-semibold">Website enquiry from {listingInquiry.name}</p><p className="mt-1">{listingInquiry.email}{listingInquiry.phone ? ` · ${listingInquiry.phone}` : ""}</p><p className="mt-2 text-slate-600">{listingInquiry.message}</p></div>}
               <div className="space-y-2">
                 <Label htmlFor="occupant-email">{occupantLabel} email</Label>
                 <Input id="occupant-email" type="email" autoComplete="email" placeholder="tenant@example.com" value={occupantEmail} onChange={(event) => setOccupantEmail(event.target.value)} required />

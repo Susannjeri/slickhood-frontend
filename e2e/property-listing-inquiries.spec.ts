@@ -12,6 +12,11 @@ test("listing owner sees requester email and phone with the exact listing", asyn
         content: [
           {
             id: 18,
+            listingId: 8,
+            propertyId: 11,
+            unitId: 77,
+            unitRef: "A-101",
+            listingType: "RENT",
             listingSlug: "atlas-court-two-bedroom-test",
             listingHeadline: "Two bedroom at Atlas Court",
             name: "Amina Wanjiku",
@@ -42,4 +47,6 @@ test("listing owner sees requester email and phone with the exact listing", asyn
     "href",
     "/property/atlas-court-two-bedroom-test",
   );
+  await expect(page.getByText("RENT · Unit A-101")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Invite this tenant" })).toBeVisible();
 });
