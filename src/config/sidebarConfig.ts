@@ -448,7 +448,7 @@ export const sidebarLinks: SidebarLink[] = [
     subLinks: [
       { label: "Lease operations", href: "/dashboard/lease/operations", permissions: ["view_active_lease"], protected: true },
       { label: "Tenants", href: "/dashboard/rental/tenants", permissions: ["view_active_lease"], excludedRoles: ["Tenant"], protected: true },
-      { label: "My agreement templates", href: "/dashboard/lease/templates", permissions: ["view_lease_template"], excludedRoles: ["Tenant"], protected: true },
+      { label: "Agreement templates", href: "/dashboard/lease/templates", permissions: ["view_lease_template"], excludedRoles: ["Tenant"], protected: true },
     ],
   },
   {

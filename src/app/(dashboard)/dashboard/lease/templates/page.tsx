@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Eye, FileText } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Edit, Trash2, Eye, FileText, ArrowRight, CircleCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +32,7 @@ const LeaseTemplatesPage = () => {
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalElements, setTotalElements] = useState<number>(0);
-  const [pageSize, setPageSize] = useState<number>(3); // 3 columns x 2 rows, pagination shows with 7+ templates
+  const [pageSize, setPageSize] = useState<number>(6);
 
   // Profile Gate State
   const [profileGate, setProfileGate] = useState<Record<string, boolean> | null>(null);
@@ -91,6 +92,12 @@ const LeaseTemplatesPage = () => {
 
   const isDefaultTemplate = (name: string): boolean => {
     return name === 'DEFAULT_SALE' || name === 'DEFAULT_RENT';
+  };
+
+  const templateName = (template: any): string => {
+    if (template.name === 'DEFAULT_RENT') return 'SlickHood rental agreement';
+    if (template.name === 'DEFAULT_SALE') return 'SlickHood sale agreement';
+    return template.name.replace(/_/g, ' ');
   };
 
   const handleOpenForm = (template: any = null) => {
@@ -228,11 +235,11 @@ const LeaseTemplatesPage = () => {
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-[#141130]">My agreement templates</h1>
-              <p className="text-gray-600 mt-1">Rental and sale templates created by your account, plus the approved SlickHood defaults.</p>
+              <h1 className="text-3xl font-bold text-[#141130]">Agreement templates</h1>
+              <p className="text-gray-600 mt-1">Reusable terms for rental and sale agreements. SlickHood defaults are ready to use; create a custom template only when your standard terms differ.</p>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
+              {totalElements > 6 && <div className="flex items-center gap-2">
                 <Label htmlFor="pageSize" className="text-sm text-gray-600 whitespace-nowrap">
                   Show:
                 </Label>
@@ -254,17 +261,34 @@ const LeaseTemplatesPage = () => {
                     <SelectItem value="24">24</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </div>}
               <Button 
                 onClick={() => handleOpenForm()}
                 className="bg-[#EF4217] hover:bg-[#d63a14] text-white"
               >
                 <Plus className="w-4 h-4 mr-2" />
-                Create Template
+                Create custom template
               </Button>
             </div>
           </div>
         </div>
+
+        <section aria-labelledby="template-help-title" className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 id="template-help-title" className="font-semibold text-[#141130]">How agreement templates work</h2>
+              <div className="mt-2 grid gap-2 text-sm text-slate-700 sm:grid-cols-3">
+                <p className="flex gap-2"><CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />Use a SlickHood default if its terms suit you.</p>
+                <p className="flex gap-2"><CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />Create a custom template for different recurring terms.</p>
+                <p className="flex gap-2"><CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />Choose the template when creating or editing a unit.</p>
+              </div>
+              <p className="mt-3 text-xs text-slate-600">Editing a template does not rewrite an agreement that has already been generated or signed.</p>
+            </div>
+            <Button asChild variant="outline" className="shrink-0 bg-white">
+              <Link href="/dashboard/property/properties">Manage properties and units <ArrowRight className="ml-2 size-4" /></Link>
+            </Button>
+          </div>
+        </section>
 
         {/* Templates Grid */}
         {loading ? (
@@ -278,14 +302,14 @@ const LeaseTemplatesPage = () => {
         ) : templates.length === 0 ? (
           <Card className="p-12 text-center border-2 border-dashed">
             <FileText className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No Lease Templates</h3>
-            <p className="text-gray-500 mb-6">Get started by creating your first lease template</p>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No agreement templates available</h3>
+            <p className="text-gray-500 mb-6">Create a reusable template for your standard rental or sale terms.</p>
             <Button 
               onClick={() => handleOpenForm()}
               className="bg-[#EF4217] hover:bg-[#d63a14] text-white"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Create Template
+              Create custom template
             </Button>
           </Card>
         ) : (
@@ -304,7 +328,7 @@ const LeaseTemplatesPage = () => {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <CardTitle className="text-lg font-semibold text-[#141130] mb-2">
-                          {template.name.replace(/_/g, ' ')}
+                          {templateName(template)}
                         </CardTitle>
                         <div className="flex gap-2 flex-wrap">
                           <Badge 
@@ -315,11 +339,11 @@ const LeaseTemplatesPage = () => {
                                 : 'bg-[#141130] hover:bg-[#141130]/90 text-white'
                             }
                           >
-                            {template.leaseMode}
+                            {template.leaseMode === 'RENT' ? 'Rental agreement' : 'Sale agreement'}
                           </Badge>
                           {isDefaultTemplate(template.name) && (
                             <Badge variant="outline" className="border-[#141130] text-[#141130]">
-                              Default
+                              SlickHood default
                             </Badge>
                           )}
                         </div>
@@ -371,7 +395,7 @@ const LeaseTemplatesPage = () => {
                       className="flex-1 border-[#141130] text-[#141130] hover:bg-[#141130] hover:text-white"
                     >
                       <Eye className="w-4 h-4 mr-1" />
-                      View
+                      Preview PDF
                     </Button>
                     {!isDefaultTemplate(template.name) && (
                       <>
@@ -488,12 +512,12 @@ const LeaseTemplatesPage = () => {
         <SheetContent className="w-full sm:max-w-xl overflow-y-auto p-6">
           <SheetHeader className="mb-6">
             <SheetTitle className="text-[#141130]">
-              {editingTemplate ? 'Edit Lease Template' : 'Create Lease Template'}
+              {editingTemplate ? 'Edit custom template' : 'Create custom template'}
             </SheetTitle>
             <SheetDescription>
               {formData.leaseMode === 'RENT' 
-                ? 'Configure rental lease agreement details' 
-                : 'Configure sale lease agreement details'}
+                ? 'Set the standard terms to reuse for rental agreements.'
+                : 'Set the standard terms to reuse for sale agreements.'}
             </SheetDescription>
           </SheetHeader>
 
@@ -653,7 +677,7 @@ const LeaseTemplatesPage = () => {
                 onClick={handleSubmit}
                 className="flex-1 bg-[#EF4217] hover:bg-[#d63a14] text-white"
               >
-                {editingTemplate ? 'Update Template' : 'Create Template'}
+                {editingTemplate ? 'Save changes' : 'Create custom template'}
               </Button>
             </div>
           </div>
