@@ -96,8 +96,10 @@ test("new service-charge property starts a guided estate setup journey", async (
   await expect(page.getByText("0%", { exact: true })).toBeVisible();
   await expect(page.getByText("Next: Add units")).toBeVisible();
   expect(setupStatusRequests).toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Add units" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/unit\/create\/41\?/);
+  await Promise.all([
+    page.waitForURL(/\/dashboard\/unit\/create\/41\?/, { timeout: 30_000 }),
+    page.getByRole("button", { name: "Add units" }).click(),
+  ]);
   await expect(page).toHaveURL(/currency=KES/);
   await expect(page).toHaveURL(/leaseMode=SERVICE_CHARGE/);
 });
